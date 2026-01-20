@@ -113,30 +113,30 @@
   const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   async function loadEvents() {
-    const { data, error } = await supabase
-      .from('events')
-      .select('id, title, description')
-      .eq('is_active', true);
-    }
-    if (error) {
-      console.error(error);
-      return;
-    }
+  const { data, error } = await supabase
+    .from('events')
+    .select('id, title, description')
+    .eq('is_active', true);
 
-    const container = document.getElementById('events');
-
-    data.forEach(event => {
-      const div = document.createElement('div');
-      div.className = 'event';
-
-      div.innerHTML = `
-        <strong>${event.title}</strong><br>
-        <small>${event.description || ''}</small>
-      `;
-
-      container.appendChild(div);
-    });
+  if (error) {
+    console.error(error);
+    return;
   }
+
+  const container = document.getElementById('events');
+
+  data.forEach(event => {
+    const div = document.createElement('div');
+    div.className = 'event';
+
+    div.innerHTML = `
+      <strong>${event.title}</strong><br>
+      <small>${event.description || ''}</small>
+    `;
+
+    container.appendChild(div);
+  });
+}
 
   loadEvents();
 </script>
