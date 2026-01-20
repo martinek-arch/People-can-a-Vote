@@ -56,24 +56,33 @@
   zoom: 2
 });
 
-map.on('load', () => {
+  map.on('load', () => {
   map.addSource('greenland', {
-    type: 'vector',
-    url: 'mapbox://mapbox.country-boundaries-v1'
+    type: 'geojson',
+    data: 'https://raw.githubusercontent.com/johan/world.geo.json/master/countries/GRL.geo.json'
   });
 
   map.addLayer({
-    id: 'greenland-highlight',
+    id: 'greenland-fill',
     type: 'fill',
     source: 'greenland',
-    'source-layer': 'country_boundaries',
-    filter: ['==', ['get', 'iso_3166_1_alpha_2'], 'GL'],
     paint: {
       'fill-color': '#4CAF50',
-      'fill-opacity': 0.5
+      'fill-opacity': 0.6
+    }
+  });
+
+  map.addLayer({
+    id: 'greenland-border',
+    type: 'line',
+    source: 'greenland',
+    paint: {
+      'line-color': '#2E7D32',
+      'line-width': 2
     }
   });
 });
+
 
 </script>
 
