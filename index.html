@@ -107,10 +107,10 @@
   /***********************
    * SUPABASE
    ***********************/
-  const SUPABASE_URL = 'https://jqoomnhpyuikbntnrukw.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h';
-
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const client = supabase.createClient( 
+   'https://jqoomnhpyuikbntnrukw.supabase.co';
+   'sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h';
+ );
 
   async function loadEvents() {
   const { data, error } = await supabase
