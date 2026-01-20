@@ -115,7 +115,7 @@
       .from('events')
       .select('id, title, description')
       .eq('is_active', true);
-
+    }
     if (error) {
       console.error(error);
       return;
