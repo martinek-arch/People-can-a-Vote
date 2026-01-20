@@ -52,6 +52,18 @@
   <p>Global view of opinions from around the world</p>
 </header>
 
+<section id="auth" style="padding:20px; background:#fff; border-radius:6px; margin:20px;">
+  <h2>Přihlášení / Registrace</h2>
+  <div id="auth-forms">
+    <input type="email" id="email" placeholder="Email" />
+    <input type="password" id="password" placeholder="Heslo" />
+    <button id="signup-btn">Registrovat</button>
+    <button id="login-btn">Přihlásit</button>
+    <button id="logout-btn" style="display:none;">Odhlásit</button>
+    <p id="auth-message"></p>
+  </div>
+</section>
+  
 <section id="events">
   <h2>Aktuální hlasovací události</h2>
 </section>
@@ -143,6 +155,73 @@
       }
     });
   });
+// -------------------------------
+// Supabase Auth
+// -------------------------------
+
+const emailInput = document.getElementById('email');
+const passwordInput = document.getElementById('password');
+const signupBtn = document.getElementById('signup-btn');
+const loginBtn = document.getElementById('login-btn');
+const logoutBtn = document.getElementById('logout-btn');
+const authMessage = document.getElementById('auth-message');
+
+// Registrace
+signupBtn.addEventListener('click', async () => {
+  const email = emailInput.value;
+  const password = passwordInput.value;
+
+  const { data, error } = await client.auth.signUp({
+    email,
+    password
+  });
+
+  if (error) {
+    authMessage.textContent = `Chyba: ${error.message}`;
+  } else {
+    authMessage.textContent = 'Registrace úspěšná! Zkontrolujte email pro potvrzení.';
+  }
+});
+
+// Přihlášení
+loginBtn.addEventListener('click', async () => {
+  const email = emailInput.value;
+  const password = passwordInput.value;
+
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    authMessage.textContent = `Chyba: ${error.message}`;
+  } else {
+    authMessage.textContent = `Přihlášen jako: ${email}`;
+    loginBtn.style.display = 'none';
+    signupBtn.style.display = 'none';
+    logoutBtn.style.display = 'inline-block';
+  }
+});
+
+// Odhlášení
+logoutBtn.addEventListener('click', async () => {
+  await client.auth.signOut();
+  authMessage.textContent = 'Odhlášen';
+  loginBtn.style.display = 'inline-block';
+  signupBtn.style.display = 'inline-block';
+  logoutBtn.style.display = 'none';
+});
+
+// Kontrola, zda je uživatel přihlášen při načtení
+client.auth.onAuthStateChange((event, session) => {
+  if (session && session.user) {
+    authMessage.textContent = `Přihlášen jako: ${session.user.email}`;
+    loginBtn.style.display = 'none';
+    signupBtn.style.display = 'none';
+    logoutBtn.style.display = 'inline-block';
+  }
+});
+
 </script>
 
 </body>
