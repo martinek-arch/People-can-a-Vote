@@ -14,7 +14,7 @@
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background: #f7f7f7;
+      background: #f4f6f8;
     }
 
     header {
@@ -24,7 +24,18 @@
     }
 
     h1 {
-      margin: 0;
+      margin: 0 0 5px 0;
+    }
+
+    #events {
+      padding: 20px;
+    }
+
+    .event {
+      background: white;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 10px;
     }
 
     #map {
@@ -36,69 +47,79 @@
 
 <body>
 
+<header>
+  <h1>Do you agree with US president statements about Greenland?</h1>
+  <p>Global view of opinions from around the world</p>
 </header>
 
-<section id="events" style="padding:20px;"></section>
+<section id="events">
+  <h2>Aktuální hlasovací události</h2>
+</section>
 
-  
 <div id="map"></div>
 
 <!-- Mapbox JS -->
 <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
 
+<!-- Supabase JS -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
 <script>
+  /***********************
+   * MAPBOX
+   ***********************/
   mapboxgl.accessToken = 'pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ';
 
   const map = new mapboxgl.Map({
-  container: 'map',
-  style: 'mapbox://styles/mapbox/light-v11',
-  center: [-42, 72], // Greenland
-  zoom: 2
-});
+    container: 'map',
+    style: 'mapbox://styles/mapbox/light-v11',
+    center: [-42, 72],
+    zoom: 2
+  });
 
   map.on('load', () => {
-  map.addSource('greenland', {
-    type: 'geojson',
-    data: 'https://raw.githubusercontent.com/johan/world.geo.json/master/countries/GRL.geo.json'
+    map.addSource('greenland', {
+      type: 'geojson',
+      data: 'https://raw.githubusercontent.com/johan/world.geo.json/master/countries/GRL.geo.json'
+    });
+
+    map.addLayer({
+      id: 'greenland-fill',
+      type: 'fill',
+      source: 'greenland',
+      paint: {
+        'fill-color': '#4CAF50',
+        'fill-opacity': 0.6
+      }
+    });
+
+    map.addLayer({
+      id: 'greenland-border',
+      type: 'line',
+      source: 'greenland',
+      paint: {
+        'line-color': '#2E7D32',
+        'line-width': 2
+      }
+    });
   });
 
-  map.addLayer({
-    id: 'greenland-fill',
-    type: 'fill',
-    source: 'greenland',
-    paint: {
-      'fill-color': '#4CAF50',
-      'fill-opacity': 0.6
-    }
-  });
-
-  map.addLayer({
-    id: 'greenland-border',
-    type: 'line',
-    source: 'greenland',
-    paint: {
-      'line-color': '#2E7D32',
-      'line-width': 2
-    }
-  });
-});
-
-
-</script>
-<script>
+  /***********************
+   * SUPABASE
+   ***********************/
   const SUPABASE_URL = 'https://jqoomnhpyuikbntnrukw.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h';
+  const SUPABASE_ANON_KEY = 'sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h';
 
   const supabase = supabaseJs.createClient(
     SUPABASE_URL,
-    SUPABASE_KEY
+    SUPABASE_ANON_KEY
   );
 
-<script>
   async function loadEvents() {
     const { data, error } = await supabase
       .from('events')
-      .select('id, title, description');
+      .select('id, title, description')
+      .eq('is_active', true);
 
     if (error) {
       console.error(error);
@@ -106,18 +127,14 @@
     }
 
     const container = document.getElementById('events');
-    container.innerHTML = '<h2>Aktuální hlasovací události</h2>';
 
     data.forEach(event => {
       const div = document.createElement('div');
-      div.style.padding = '10px';
-      div.style.marginBottom = '10px';
-      div.style.background = 'white';
-      div.style.borderRadius = '6px';
+      div.className = 'event';
 
       div.innerHTML = `
         <strong>${event.title}</strong><br>
-        <small>${event.description}</small>
+        <small>${event.description || ''}</small>
       `;
 
       container.appendChild(div);
