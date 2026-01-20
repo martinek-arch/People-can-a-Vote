@@ -68,6 +68,17 @@
   <h2>Aktuální hlasovací události</h2>
 </section>
 
+<div id="vote-buttons" style="padding:20px; background:#fff; border-radius:6px; margin:20px; display:none;">
+  <h3>Hlasujte:</h3>
+  <button id="vote-yes">Ano</button>
+  <button id="vote-no">Ne</button>
+  <button id="vote-neutral">Nemám názor</button>
+  <p id="vote-message"></p>
+</div>
+
+<div id="vote-stats" style="padding:20px;"></div>
+  
+  
 <div id="map"></div>
 
 <!-- Mapbox JS -->
@@ -221,6 +232,130 @@ client.auth.onAuthStateChange((event, session) => {
     logoutBtn.style.display = 'inline-block';
   }
 });
+
+// -------------------------------
+// Hlasování
+// -------------------------------
+  
+const voteButtons = document.getElementById('vote-buttons');
+const voteMessage = document.getElementById('vote-message');
+const voteStats = document.getElementById('vote-stats');
+
+// vybraná událost (zatím vezmeme první)
+let currentEventId = null;
+
+// kontrola přihlášeného uživatele pro zobrazení tlačítek
+client.auth.onAuthStateChange((event, session) => {
+  if (session && session.user) {
+    voteButtons.style.display = 'block';
+  } else {
+    voteButtons.style.display = 'none';
+  }
+});
+
+// Po načtení událostí nastav první jako currentEventId
+async function loadEvents() {
+  const { data, error } = await client
+    .from('events')
+    .select('id, title, description, country_id')
+    .eq('is_active', true);
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  const container = document.getElementById('events');
+  container.innerHTML = '<h2>Aktuální hlasovací události</h2>';
+
+  if (data.length > 0) currentEventId = data[0].id;
+
+  data.forEach(event => {
+    const div = document.createElement('div');
+    div.className = 'event';
+
+    div.innerHTML = `
+      <strong>${event.title}</strong><br>
+      <small>${event.description || ''}</small>
+    `;
+
+    container.appendChild(div);
+  });
+
+  if (currentEventId) await loadVoteStats(currentEventId);
+}
+
+// funkce pro hlasování
+async function submitVote(voteValue) {
+  const session = client.auth.getSession();
+  const user = (await session).data.session?.user;
+  if (!user) {
+    voteMessage.textContent = 'Musíte být přihlášeni.';
+    return;
+  }
+
+  // zkontroluj, jestli už hlasoval
+  const { data: existing } = await client
+    .from('votes')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('event_id', currentEventId)
+    .single();
+
+  if (existing) {
+    voteMessage.textContent = 'Už jste hlasovali pro tuto událost.';
+    return;
+  }
+
+  // vložení hlasu
+  const { error } = await client
+    .from('votes')
+    .insert([{
+      user_id: user.id,
+      event_id: currentEventId,
+      vote: voteValue,
+      country_code: 'GL' // zatím pevně Grónsko, později podle profilu
+    }]);
+
+  if (error) {
+    voteMessage.textContent = `Chyba: ${error.message}`;
+  } else {
+    voteMessage.textContent = 'Hlas uložen!';
+    await loadVoteStats(currentEventId);
+  }
+}
+
+// napojení tlačítek
+document.getElementById('vote-yes').addEventListener('click', () => submitVote('yes'));
+document.getElementById('vote-no').addEventListener('click', () => submitVote('no'));
+document.getElementById('vote-neutral').addEventListener('click', () => submitVote('neutral'));
+
+// načtení statistik
+async function loadVoteStats(eventId) {
+  const { data, error } = await client
+    .from('votes')
+    .select('vote, country_code');
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  const total = data.length;
+  const fromGL = data.filter(v => v.country_code === 'GL').length;
+  const others = total - fromGL;
+  const yes = data.filter(v => v.vote === 'yes').length;
+  const no = data.filter(v => v.vote === 'no').length;
+  const neutral = data.filter(v => v.vote === 'neutral').length;
+
+  voteStats.innerHTML = `
+    <h3>Statistiky hlasování</h3>
+    <p>Celkem hlasů: ${total}</p>
+    <p>Ano: ${yes} | Ne: ${no} | Nemám názor: ${neutral}</p>
+    <p>Hlasy občanů Grónska: ${fromGL} (${fromGL/total*100 || 0}%)</p>
+    <p>Ostatní státy: ${others} (${others/total*100 || 0}%)</p>
+  `;
+}
 
 </script>
 
