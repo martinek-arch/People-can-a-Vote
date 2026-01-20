@@ -65,9 +65,49 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-  /***********************
-   * MAPBOX
-   ***********************/
+  // -------------------------------
+  // Supabase connection
+  // -------------------------------
+  const SUPABASE_URL = 'https://jqoomnhpyuikbntnrukw.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h';
+
+  // Vlastní proměnná client, aby se nepřekrývalo supabase
+  const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // -------------------------------
+  // Load events from Supabase
+  // -------------------------------
+  async function loadEvents() {
+    const { data, error } = await client
+      .from('events')
+      .select('id, title, description')
+      .eq('is_active', true);
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    const container = document.getElementById('events');
+
+    data.forEach(event => {
+      const div = document.createElement('div');
+      div.className = 'event';
+
+      div.innerHTML = `
+        <strong>${event.title}</strong><br>
+        <small>${event.description || ''}</small>
+      `;
+
+      container.appendChild(div);
+    });
+  }
+
+  loadEvents();
+
+  // -------------------------------
+  // Mapbox map
+  // -------------------------------
   mapboxgl.accessToken = 'pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ';
 
   const map = new mapboxgl.Map({
@@ -103,42 +143,6 @@
       }
     });
   });
-
-  /***********************
-   * SUPABASE
-   ***********************/
-  const client = supabase.createClient( 
-   'https://jqoomnhpyuikbntnrukw.supabase.co';
-   'sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h';
- );
-
-  async function loadEvents() {
-  const { data, error } = await supabase
-    .from('events')
-    .select('id, title, description')
-    .eq('is_active', true);
-
-  if (error) {
-    console.error(error);
-    return;
-  }
-
-  const container = document.getElementById('events');
-
-  data.forEach(event => {
-    const div = document.createElement('div');
-    div.className = 'event';
-
-    div.innerHTML = `
-      <strong>${event.title}</strong><br>
-      <small>${event.description || ''}</small>
-    `;
-
-    container.appendChild(div);
-  });
-}
-
-  loadEvents();
 </script>
 
 </body>
