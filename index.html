@@ -36,11 +36,11 @@
 
 <body>
 
-<header>
-  <h1>Do you agree with statements about Greenland?</h1>
-  <p>Global view of opinions from around the world</p>
 </header>
 
+<section id="events" style="padding:20px;"></section>
+
+  
 <div id="map"></div>
 
 <!-- Mapbox JS -->
@@ -84,6 +84,47 @@
 });
 
 
+</script>
+<script>
+  const SUPABASE_URL = 'https://jqoomnhpyuikbntnrukw.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h';
+
+  const supabase = supabaseJs.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+
+<script>
+  async function loadEvents() {
+    const { data, error } = await supabase
+      .from('events')
+      .select('id, title, description');
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    const container = document.getElementById('events');
+    container.innerHTML = '<h2>Aktuální hlasovací události</h2>';
+
+    data.forEach(event => {
+      const div = document.createElement('div');
+      div.style.padding = '10px';
+      div.style.marginBottom = '10px';
+      div.style.background = 'white';
+      div.style.borderRadius = '6px';
+
+      div.innerHTML = `
+        <strong>${event.title}</strong><br>
+        <small>${event.description}</small>
+      `;
+
+      container.appendChild(div);
+    });
+  }
+
+  loadEvents();
 </script>
 
 </body>
