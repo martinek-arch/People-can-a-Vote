@@ -12,7 +12,7 @@
   header { padding:20px; background:#fff; box-shadow:0 2px 4px rgba(0,0,0,0.1); }
   h1 { margin:0 0 5px 0; }
   section { padding:20px; }
-  .event { background:#fff; padding:15px; border-radius:6px; margin-bottom:10px; }
+  .event { background:#fff; padding:15px; border-radius:6px; margin-bottom:10px; cursor:pointer; }
   #map { width:100%; height:500px; }
   button { margin-right:5px; padding:5px 10px; cursor:pointer; }
 </style>
@@ -121,7 +121,7 @@ function updateAuthUI() {
       document.getElementById('auth-forms').style.display = 'none';
       document.getElementById('auth-logged').style.display = 'block';
       document.getElementById('auth-message').textContent = `Přihlášen jako: ${user.email}`;
-      voteButtons.style.display = 'block';
+      if(currentEventId) checkUserVote(currentEventId);
     } else {
       document.getElementById('auth-forms').style.display = 'block';
       document.getElementById('auth-logged').style.display = 'none';
@@ -129,6 +129,13 @@ function updateAuthUI() {
     }
   });
 }
+
+/* -------------------------------
+   Listener změny stavu přihlášení
+------------------------------- */
+client.auth.onAuthStateChange(() => {
+  if(currentEventId) checkUserVote(currentEventId);
+});
 
 /* -------------------------------
    Načtení událostí
@@ -150,6 +157,11 @@ async function loadEvents() {
     const div = document.createElement('div');
     div.className = 'event';
     div.innerHTML = `<strong>${event.title}</strong><br><small>${event.description || ''}</small>`;
+    div.addEventListener('click', () => {
+      currentEventId = event.id;
+      loadVoteStats(currentEventId);
+      checkUserVote(currentEventId);
+    });
     container.appendChild(div);
   });
 
@@ -163,16 +175,18 @@ async function loadEvents() {
    Kontrola, jestli už hlasoval
 ------------------------------- */
 async function checkUserVote(eventId) {
-  const session = await client.auth.getSession();
-  const user = session.data.session?.user;
-  if (!user) { voteButtons.style.display = 'none'; return false; }
+  const { data: { session } } = await client.auth.getSession();
+  const user = session?.user;
+  if (!user) { voteButtons.style.display = 'none'; voteMessage.textContent = 'Pro hlasování se přihlaste.'; return false; }
 
-  const { data: existing } = await client
+  const { data: existing, error } = await client
     .from('votes')
     .select('id')
     .eq('user_id', user.id)
     .eq('event_id', eventId)
     .single();
+
+  if (error && error.code !== 'PGRST116') console.error(error);
 
   if (existing) {
     voteButtons.style.display = 'none';
@@ -189,8 +203,8 @@ async function checkUserVote(eventId) {
    Hlasování
 ------------------------------- */
 async function submitVote(voteValue) {
-  const session = await client.auth.getSession();
-  const user = session.data.session?.user;
+  const { data: { session } } = await client.auth.getSession();
+  const user = session?.user;
   if (!user) { voteMessage.textContent = 'Musíte být přihlášeni.'; return; }
 
   const { data: existing } = await client
