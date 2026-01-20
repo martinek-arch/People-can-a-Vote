@@ -1,50 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Global Opinion</title>
+<meta charset="UTF-8" />
+<title>People can a Vote</title>
 
-  <!-- Mapbox CSS -->
-  <link
-    href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"
-    rel="stylesheet"
-  />
+<!-- Mapbox CSS -->
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet"/>
 
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f4f6f8;
-    }
-
-    header {
-      padding: 20px;
-      background: white;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    h1 {
-      margin: 0 0 5px 0;
-    }
-
-    #events {
-      padding: 20px;
-    }
-
-    .event {
-      background: white;
-      padding: 15px;
-      border-radius: 6px;
-      margin-bottom: 10px;
-    }
-
-    #map {
-      width: 100%;
-      height: 500px;
-    }
-  </style>
+<style>
+  body { margin:0; font-family: Arial,sans-serif; background:#f4f6f8; }
+  header { padding:20px; background:#fff; box-shadow:0 2px 4px rgba(0,0,0,0.1); }
+  h1 { margin:0 0 5px 0; }
+  section { padding:20px; }
+  .event { background:#fff; padding:15px; border-radius:6px; margin-bottom:10px; }
+  #map { width:100%; height:500px; }
+  button { margin-right:5px; padding:5px 10px; cursor:pointer; }
+</style>
 </head>
-
 <body>
 
 <header>
@@ -52,22 +24,26 @@
   <p>Global view of opinions from around the world</p>
 </header>
 
-<section id="auth" style="padding:20px; background:#fff; border-radius:6px; margin:20px;">
-  <h2>Přihlášení / Registrace</h2>
+<!-- Přihlášení / Registrace -->
+<section id="auth" style="background:#fff; border-radius:6px; margin:20px; padding:20px;">
   <div id="auth-forms">
     <input type="email" id="email" placeholder="Email" />
     <input type="password" id="password" placeholder="Heslo" />
     <button id="signup-btn">Registrovat</button>
     <button id="login-btn">Přihlásit</button>
-    <button id="logout-btn" style="display:none;">Odhlásit</button>
-    <p id="auth-message"></p>
+  </div>
+  <div id="auth-logged" style="display:none;">
+    <span id="auth-message"></span>
+    <button id="logout-btn">Odhlásit</button>
   </div>
 </section>
-  
+
+<!-- Události -->
 <section id="events">
   <h2>Aktuální hlasovací události</h2>
 </section>
 
+<!-- Hlasování -->
 <div id="vote-buttons" style="padding:20px; background:#fff; border-radius:6px; margin:20px; display:none;">
   <h3>Hlasujte:</h3>
   <button id="vote-yes">Ano</button>
@@ -77,8 +53,8 @@
 </div>
 
 <div id="vote-stats" style="padding:20px;"></div>
-  
-  
+
+<!-- Mapa -->
 <div id="map"></div>
 
 <!-- Mapbox JS -->
@@ -88,88 +64,24 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-  // -------------------------------
-  // Supabase connection
-  // -------------------------------
-  const SUPABASE_URL = 'https://jqoomnhpyuikbntnrukw.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h';
+/* -------------------------------
+   Supabase klient
+------------------------------- */
+const SUPABASE_URL = 'https://jqoomnhpyuikbntnrukw.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h';
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // Vlastní proměnná client, aby se nepřekrývalo supabase
-  const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/* -------------------------------
+   Proměnné pro hlasování
+------------------------------- */
+const voteButtons = document.getElementById('vote-buttons');
+const voteMessage = document.getElementById('vote-message');
+const voteStats = document.getElementById('vote-stats');
+let currentEventId = null;
 
-  // -------------------------------
-  // Load events from Supabase
-  // -------------------------------
-  async function loadEvents() {
-    const { data, error } = await client
-      .from('events')
-      .select('id, title, description')
-      .eq('is_active', true);
-
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    const container = document.getElementById('events');
-
-    data.forEach(event => {
-      const div = document.createElement('div');
-      div.className = 'event';
-
-      div.innerHTML = `
-        <strong>${event.title}</strong><br>
-        <small>${event.description || ''}</small>
-      `;
-
-      container.appendChild(div);
-    });
-  }
-
-  loadEvents();
-
-  // -------------------------------
-  // Mapbox map
-  // -------------------------------
-  mapboxgl.accessToken = 'pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ';
-
-  const map = new mapboxgl.Map({
-    container: 'map',
-    style: 'mapbox://styles/mapbox/light-v11',
-    center: [-42, 72],
-    zoom: 2
-  });
-
-  map.on('load', () => {
-    map.addSource('greenland', {
-      type: 'geojson',
-      data: 'https://raw.githubusercontent.com/johan/world.geo.json/master/countries/GRL.geo.json'
-    });
-
-    map.addLayer({
-      id: 'greenland-fill',
-      type: 'fill',
-      source: 'greenland',
-      paint: {
-        'fill-color': '#4CAF50',
-        'fill-opacity': 0.6
-      }
-    });
-
-    map.addLayer({
-      id: 'greenland-border',
-      type: 'line',
-      source: 'greenland',
-      paint: {
-        'line-color': '#2E7D32',
-        'line-width': 2
-      }
-    });
-  });
-// -------------------------------
-// Supabase Auth
-// -------------------------------
-
+/* -------------------------------
+   Přihlášení / Registrace
+------------------------------- */
 const emailInput = document.getElementById('email');
 const passwordInput = document.getElementById('password');
 const signupBtn = document.getElementById('signup-btn');
@@ -177,93 +89,57 @@ const loginBtn = document.getElementById('login-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const authMessage = document.getElementById('auth-message');
 
-// Registrace
 signupBtn.addEventListener('click', async () => {
-  const email = emailInput.value;
-  const password = passwordInput.value;
-
   const { data, error } = await client.auth.signUp({
-    email,
-    password
+    email: emailInput.value,
+    password: passwordInput.value
   });
-
-  if (error) {
-    authMessage.textContent = `Chyba: ${error.message}`;
-  } else {
-    authMessage.textContent = 'Registrace úspěšná! Zkontrolujte email pro potvrzení.';
-  }
+  if (error) authMessage.textContent = `Chyba: ${error.message}`;
+  else authMessage.textContent = 'Registrace úspěšná! Zkontrolujte email.';
+  updateAuthUI();
 });
 
-// Přihlášení
 loginBtn.addEventListener('click', async () => {
-  const email = emailInput.value;
-  const password = passwordInput.value;
-
   const { data, error } = await client.auth.signInWithPassword({
-    email,
-    password
+    email: emailInput.value,
+    password: passwordInput.value
   });
-
-  if (error) {
-    authMessage.textContent = `Chyba: ${error.message}`;
-  } else {
-    authMessage.textContent = `Přihlášen jako: ${email}`;
-    loginBtn.style.display = 'none';
-    signupBtn.style.display = 'none';
-    logoutBtn.style.display = 'inline-block';
-  }
+  if (error) authMessage.textContent = `Chyba: ${error.message}`;
+  updateAuthUI();
 });
 
-// Odhlášení
 logoutBtn.addEventListener('click', async () => {
   await client.auth.signOut();
   authMessage.textContent = 'Odhlášen';
-  loginBtn.style.display = 'inline-block';
-  signupBtn.style.display = 'inline-block';
-  logoutBtn.style.display = 'none';
+  updateAuthUI();
 });
 
-// Kontrola, zda je uživatel přihlášen při načtení
-client.auth.onAuthStateChange((event, session) => {
-  if (session && session.user) {
-    authMessage.textContent = `Přihlášen jako: ${session.user.email}`;
-    loginBtn.style.display = 'none';
-    signupBtn.style.display = 'none';
-    logoutBtn.style.display = 'inline-block';
-  }
-});
+function updateAuthUI() {
+  client.auth.getSession().then(res => {
+    const user = res.data.session?.user;
+    if (user) {
+      document.getElementById('auth-forms').style.display = 'none';
+      document.getElementById('auth-logged').style.display = 'block';
+      document.getElementById('auth-message').textContent = `Přihlášen jako: ${user.email}`;
+      voteButtons.style.display = 'block';
+    } else {
+      document.getElementById('auth-forms').style.display = 'block';
+      document.getElementById('auth-logged').style.display = 'none';
+      voteButtons.style.display = 'none';
+    }
+  });
+}
 
-// -------------------------------
-// Hlasování
-// -------------------------------
-  
-const voteButtons = document.getElementById('vote-buttons');
-const voteMessage = document.getElementById('vote-message');
-const voteStats = document.getElementById('vote-stats');
-
-// vybraná událost (zatím vezmeme první)
-let currentEventId = null;
-
-// kontrola přihlášeného uživatele pro zobrazení tlačítek
-client.auth.onAuthStateChange((event, session) => {
-  if (session && session.user) {
-    voteButtons.style.display = 'block';
-  } else {
-    voteButtons.style.display = 'none';
-  }
-});
-
-// Po načtení událostí nastav první jako currentEventId
+/* -------------------------------
+   Načtení událostí
+------------------------------- */
 async function loadEvents() {
   const { data, error } = await client
     .from('events')
     .select('id, title, description, country_id')
     .eq('is_active', true);
 
-  if (error) {
-    console.error(error);
-    return;
-  }
+  if (error) { console.error(error); return; }
 
   const container = document.getElementById('events');
   container.innerHTML = '<h2>Aktuální hlasovací události</h2>';
@@ -273,28 +149,50 @@ async function loadEvents() {
   data.forEach(event => {
     const div = document.createElement('div');
     div.className = 'event';
-
-    div.innerHTML = `
-      <strong>${event.title}</strong><br>
-      <small>${event.description || ''}</small>
-    `;
-
+    div.innerHTML = `<strong>${event.title}</strong><br><small>${event.description || ''}</small>`;
     container.appendChild(div);
   });
 
-  if (currentEventId) await loadVoteStats(currentEventId);
+  if (currentEventId) {
+    await loadVoteStats(currentEventId);
+    await checkUserVote(currentEventId);
+  }
 }
 
-// funkce pro hlasování
-async function submitVote(voteValue) {
-  const session = client.auth.getSession();
-  const user = (await session).data.session?.user;
-  if (!user) {
-    voteMessage.textContent = 'Musíte být přihlášeni.';
-    return;
-  }
+/* -------------------------------
+   Kontrola, jestli už hlasoval
+------------------------------- */
+async function checkUserVote(eventId) {
+  const session = await client.auth.getSession();
+  const user = session.data.session?.user;
+  if (!user) { voteButtons.style.display = 'none'; return false; }
 
-  // zkontroluj, jestli už hlasoval
+  const { data: existing } = await client
+    .from('votes')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('event_id', eventId)
+    .single();
+
+  if (existing) {
+    voteButtons.style.display = 'none';
+    voteMessage.textContent = 'Už jste hlasoval pro tuto událost.';
+    return true;
+  } else {
+    voteButtons.style.display = 'block';
+    voteMessage.textContent = '';
+    return false;
+  }
+}
+
+/* -------------------------------
+   Hlasování
+------------------------------- */
+async function submitVote(voteValue) {
+  const session = await client.auth.getSession();
+  const user = session.data.session?.user;
+  if (!user) { voteMessage.textContent = 'Musíte být přihlášeni.'; return; }
+
   const { data: existing } = await client
     .from('votes')
     .select('id')
@@ -303,43 +201,42 @@ async function submitVote(voteValue) {
     .single();
 
   if (existing) {
-    voteMessage.textContent = 'Už jste hlasovali pro tuto událost.';
+    voteMessage.textContent = 'Už jste hlasoval pro tuto událost.';
+    voteButtons.style.display = 'none';
     return;
   }
 
-  // vložení hlasu
   const { error } = await client
     .from('votes')
     .insert([{
       user_id: user.id,
       event_id: currentEventId,
       vote: voteValue,
-      country_code: 'GL' // zatím pevně Grónsko, později podle profilu
+      country_code: 'GL'
     }]);
 
-  if (error) {
-    voteMessage.textContent = `Chyba: ${error.message}`;
-  } else {
+  if (error) voteMessage.textContent = `Chyba: ${error.message}`;
+  else {
     voteMessage.textContent = 'Hlas uložen!';
+    voteButtons.style.display = 'none';
     await loadVoteStats(currentEventId);
   }
 }
 
-// napojení tlačítek
 document.getElementById('vote-yes').addEventListener('click', () => submitVote('yes'));
 document.getElementById('vote-no').addEventListener('click', () => submitVote('no'));
 document.getElementById('vote-neutral').addEventListener('click', () => submitVote('neutral'));
 
-// načtení statistik
+/* -------------------------------
+   Statistiky hlasování
+------------------------------- */
 async function loadVoteStats(eventId) {
   const { data, error } = await client
     .from('votes')
-    .select('vote, country_code');
+    .select('vote, country_code')
+    .eq('event_id', eventId);
 
-  if (error) {
-    console.error(error);
-    return;
-  }
+  if (error) { console.error(error); return; }
 
   const total = data.length;
   const fromGL = data.filter(v => v.country_code === 'GL').length;
@@ -357,6 +254,49 @@ async function loadVoteStats(eventId) {
   `;
 }
 
+/* -------------------------------
+   Inicializace
+------------------------------- */
+loadEvents();
+updateAuthUI();
+
+/* -------------------------------
+   Mapbox mapa
+------------------------------- */
+mapboxgl.accessToken = 'pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ';
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [-42, 72],
+  zoom: 2
+});
+
+map.on('load', () => {
+  map.addSource('greenland', {
+    type: 'geojson',
+    data: 'https://raw.githubusercontent.com/johan/world.geo.json/master/countries/GRL.geo.json'
+  });
+
+  map.addLayer({
+    id: 'greenland-fill',
+    type: 'fill',
+    source: 'greenland',
+    paint: {
+      'fill-color': '#4CAF50',
+      'fill-opacity': 0.6
+    }
+  });
+
+  map.addLayer({
+    id: 'greenland-border',
+    type: 'line',
+    source: 'greenland',
+    paint: {
+      'line-color': '#2E7D32',
+      'line-width': 2
+    }
+  });
+});
 </script>
 
 </body>
