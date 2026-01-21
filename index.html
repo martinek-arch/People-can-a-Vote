@@ -12,7 +12,7 @@
   header h1 { margin:0 0 6px 0; }
   header .muted { color:#666; margin:0; }
   .wrap { max-width:1100px; margin:0 auto; }
-  .card { background:#fff; padding:16px; border-radius:10px; margin:16px; }
+  .card { background:#fff; padding:16px; border-radius:10px; margin:16px; position:relative; }
   .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
   input, select { padding:10px; min-width:240px; }
   button { padding:10px 14px; cursor:pointer; border:0; border-radius:8px; }
@@ -37,6 +37,40 @@
   .topCard { border:1px solid #eee; border-radius:12px; padding:14px; cursor:pointer; }
   .topCard:hover { border-color:#ddd; }
   .topCount { font-size:12px; color:#666; margin-top:8px; }
+
+  /* mini map */
+  #mini-map-wrap{
+    position:absolute;
+    right:12px;
+    bottom:12px;
+    width:220px;
+    height:160px;
+    border-radius:12px;
+    overflow:hidden;
+    border:1px solid #eee;
+    box-shadow:0 6px 14px rgba(0,0,0,.08);
+    background:#fafafa;
+  }
+  #mini-map{
+    width:100%;
+    height:100%;
+  }
+  #mini-badge{
+    position:absolute;
+    left:10px;
+    top:10px;
+    background:rgba(255,255,255,.92);
+    border:1px solid #eee;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:12px;
+    color:#333;
+  }
+
+  /* space for mini map on small screens */
+  @media (max-width: 700px){
+    #mini-map-wrap{ position:relative; right:auto; bottom:auto; width:100%; height:200px; margin-top:12px; }
+  }
 </style>
 </head>
 
@@ -136,6 +170,12 @@
     </div>
 
     <p id="vote-message" style="margin:12px 0 0;"></p>
+
+    <!-- MINI MAP -->
+    <div id="mini-map-wrap">
+      <div id="mini-map"></div>
+      <div id="mini-badge">Země události: —</div>
+    </div>
   </section>
 
   <!-- STATS -->
@@ -163,7 +203,7 @@ mapboxgl.accessToken =
 let currentEventId = null;
 let currentEventCountryCode = null;
 let currentUserCountryCode = null;
-let selectedCountryCode = ""; // filtr pro události ("" = vše)
+let selectedCountryCode = "";
 
 /* ================== ELEMENTY ================== */
 const voteButtons = document.getElementById('vote-buttons');
@@ -188,6 +228,8 @@ const selectedCountryPill = document.getElementById('selected-country-pill');
 const clearCountryBtn = document.getElementById('clear-country');
 
 const top3Div = document.getElementById('top3');
+
+const miniBadge = document.getElementById('mini-badge');
 
 voteButtons.style.display = 'none';
 
@@ -318,8 +360,6 @@ async function updateAuthUI() {
 }
 
 /* ================== TOP 3 (GLOBÁLNĚ) ================== */
-/* Pozn.: pro MVP načteme všechny votes (stačí při menším objemu).
-   Později to přesuneme do DB view / RPC pro výkon. */
 async function loadTop3Global() {
   top3Div.innerHTML = '<div class="muted">Načítám…</div>';
 
@@ -327,47 +367,29 @@ async function loadTop3Global() {
     .from('votes')
     .select('event_id');
 
-  if (vErr) {
-    top3Div.innerHTML = '<div class="muted">Nelze načíst TOP události.</div>';
-    return;
-  }
+  if (vErr) { top3Div.innerHTML = '<div class="muted">Nelze načíst TOP události.</div>'; return; }
 
-  // spočti počty hlasů na event_id
   const counts = new Map();
-  for (const v of (votes || [])) {
-    counts.set(v.event_id, (counts.get(v.event_id) || 0) + 1);
-  }
+  for (const v of (votes || [])) counts.set(v.event_id, (counts.get(v.event_id) || 0) + 1);
 
-  // pokud ještě nejsou hlasy
-  if (counts.size === 0) {
-    top3Div.innerHTML = '<div class="muted">Zatím žádné hlasy.</div>';
-    return;
-  }
+  if (counts.size === 0) { top3Div.innerHTML = '<div class="muted">Zatím žádné hlasy.</div>'; return; }
 
-  const top = [...counts.entries()]
-    .sort((a,b) => b[1] - a[1])
-    .slice(0, 3);
-
+  const top = [...counts.entries()].sort((a,b) => b[1] - a[1]).slice(0, 3);
   const ids = top.map(t => t[0]);
 
   const { data: evs, error: eErr } = await supabaseClient
     .from('events')
-    .select('id, title, description, country_code, is_active')
+    .select('id, title, description, country_code')
     .in('id', ids);
 
-  if (eErr) {
-    top3Div.innerHTML = '<div class="muted">Nelze načíst detail TOP událostí.</div>';
-    return;
-  }
+  if (eErr) { top3Div.innerHTML = '<div class="muted">Nelze načíst detail TOP událostí.</div>'; return; }
 
-  // zachovej pořadí top (podle count)
   const byId = new Map((evs || []).map(e => [e.id, e]));
   const cards = [];
 
   for (const [id, cnt] of top) {
     const e = byId.get(id);
     if (!e) continue;
-
     cards.push(`
       <div class="topCard" data-event-id="${e.id}">
         <strong>${e.title}</strong>
@@ -378,8 +400,6 @@ async function loadTop3Global() {
   }
 
   top3Div.innerHTML = cards.join('');
-
-  // klik na TOP kartu
   for (const el of top3Div.querySelectorAll('.topCard')) {
     el.addEventListener('click', async () => {
       const eventId = Number(el.getAttribute('data-event-id'));
@@ -387,11 +407,9 @@ async function loadTop3Global() {
     });
   }
 }
-
 document.getElementById('refresh-top').onclick = loadTop3Global;
 
 async function openEventFromTop(eventId) {
-  // načti událost kvůli country_code
   const { data: evt, error } = await supabaseClient
     .from('events')
     .select('id, country_code')
@@ -400,7 +418,6 @@ async function openEventFromTop(eventId) {
 
   if (error || !evt) return;
 
-  // nastav filtr země podle události, a načti list událostí
   selectedCountryCode = evt.country_code || "";
   countryFilter.value = selectedCountryCode;
 
@@ -409,13 +426,10 @@ async function openEventFromTop(eventId) {
 
   await loadEventsList();
 
-  // nastav aktuální událost
   currentEventId = eventId;
   currentEventCountryCode = evt.country_code;
 
-  // posuň na hlasování (lepší UX)
   document.getElementById('vote-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-
   await refreshVoteAndStats();
 }
 
@@ -426,7 +440,7 @@ async function loadEventsList() {
 
   let q = supabaseClient
     .from('events')
-    .select('id, title, description, country_code, created_at, is_active')
+    .select('id, title, description, country_code, created_at')
     .eq('is_active', true);
 
   if (selectedCountryCode) q = q.eq('country_code', selectedCountryCode);
@@ -445,6 +459,8 @@ async function loadEventsList() {
     voteSubtitle.textContent = "";
     voteButtons.style.display = "none";
     voteStats.textContent = "Vyber událost.";
+    miniBadge.textContent = "Země události: —";
+    updateMiniMapSelected("");
     return;
   }
 
@@ -485,6 +501,11 @@ async function refreshVoteAndStats() {
   currentEventCountryCode = evt.country_code;
   voteTitle.textContent = evt.title || "Hlasování";
   voteSubtitle.textContent = evt.description || "";
+
+  // update mini map
+  const cc = currentEventCountryCode || "";
+  miniBadge.textContent = cc ? `Země události: ${cc}` : "Země události: —";
+  updateMiniMapSelected(cc);
 
   await loadVoteStats(currentEventId, currentEventCountryCode);
 
@@ -543,7 +564,7 @@ async function submitVote(value) {
 
   voteButtons.style.display = "none";
   setVoteMessage("Hlas uložen.");
-  await loadTop3Global(); // top se může změnit
+  await loadTop3Global();
   await refreshVoteAndStats();
 }
 
@@ -629,7 +650,7 @@ clearCountryBtn.onclick = async () => {
   await loadEventsList();
 };
 
-/* ================== MAPBOX CLICKABLE COUNTRIES ================== */
+/* ================== MAPBOX (BIG MAP) ================== */
 const map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/light-v11',
@@ -638,10 +659,7 @@ const map = new mapboxgl.Map({
 });
 
 map.on('load', () => {
-  map.addSource('countryBoundaries', {
-    type: 'vector',
-    url: 'mapbox://mapbox.country-boundaries-v1'
-  });
+  map.addSource('countryBoundaries', { type: 'vector', url: 'mapbox://mapbox.country-boundaries-v1' });
 
   map.addLayer({
     id: 'country-fill',
@@ -709,6 +727,76 @@ map.on('load', () => {
     await loadEventsList();
   });
 });
+
+/* ================== MINI MAP ================== */
+const miniMap = new mapboxgl.Map({
+  container: 'mini-map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [10, 20],
+  zoom: 0.6,
+  interactive: false
+});
+
+miniMap.on('load', () => {
+  miniMap.addSource('miniCountryBoundaries', { type: 'vector', url: 'mapbox://mapbox.country-boundaries-v1' });
+
+  miniMap.addLayer({
+    id: 'mini-country-fill',
+    type: 'fill',
+    source: 'miniCountryBoundaries',
+    'source-layer': 'country_boundaries',
+    paint: { 'fill-color': '#000', 'fill-opacity': 0.05 }
+  });
+
+  miniMap.addLayer({
+    id: 'mini-country-selected',
+    type: 'fill',
+    source: 'miniCountryBoundaries',
+    'source-layer': 'country_boundaries',
+    paint: { 'fill-color': '#000', 'fill-opacity': 0.25 },
+    filter: ['==', ['get', 'iso_3166_1'], '']
+  });
+
+  miniMap.addLayer({
+    id: 'mini-country-line',
+    type: 'line',
+    source: 'miniCountryBoundaries',
+    'source-layer': 'country_boundaries',
+    paint: { 'line-color': '#000', 'line-width': 1, 'line-opacity': 0.2 }
+  });
+});
+
+function updateMiniMapSelected(countryCode){
+  if (!miniMap || !miniMap.getLayer('mini-country-selected')) return;
+  miniMap.setFilter('mini-country-selected', ['==', ['get', 'iso_3166_1'], countryCode || '']);
+
+  // Jemné přiblížení/centrování: použijeme query na feature a fitBounds
+  if (!countryCode) return;
+
+  const features = miniMap.querySourceFeatures('miniCountryBoundaries', {
+    sourceLayer: 'country_boundaries',
+    filter: ['==', ['get', 'iso_3166_1'], countryCode]
+  });
+
+  if (!features || !features.length) return;
+
+  // vypočítat bbox
+  let minX = 180, minY = 90, maxX = -180, maxY = -90;
+  const geom = features[0].geometry;
+
+  function scanCoords(coords){
+    if (typeof coords[0] === 'number') {
+      const x = coords[0], y = coords[1];
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+      return;
+    }
+    for (const c of coords) scanCoords(c);
+  }
+  scanCoords(geom.coordinates);
+
+  miniMap.fitBounds([[minX, minY],[maxX, maxY]], { padding: 18, duration: 300 });
+}
 
 /* ================== INIT ================== */
 (async function init(){
