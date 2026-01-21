@@ -75,17 +75,31 @@ const email = document.getElementById('email');
 const password = document.getElementById('password');
 
 document.getElementById('signup-btn').onclick = async () => {
-  await client.auth.signUp({ email: email.value, password: password.value });
+  const { error } = await client.auth.signUp({
+    email: email.value,
+    password: password.value
+  });
+
+  if (error) {
+    alert(error.message);
+  }
 };
 
+
 document.getElementById('login-btn').onclick = async () => {
-  await client.auth.signInWithPassword({ email: email.value, password: password.value });
-  updateAuthUI();
+  const { error } = await client.auth.signInWithPassword({
+    email: email.value,
+    password: password.value
+  });
+
+  if (error) {
+    alert(error.message);
+  }
 };
+
 
 document.getElementById('logout-btn').onclick = async () => {
   await client.auth.signOut();
-  updateAuthUI();
 };
 
 async function updateAuthUI() {
@@ -201,6 +215,12 @@ new mapboxgl.Map({
 /* INIT */
 updateAuthUI();
 loadEvents();
+
+client.auth.onAuthStateChange((event, session) => {
+  updateAuthUI();
+});
+
+
 </script>
 
 </body>
