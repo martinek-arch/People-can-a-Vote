@@ -63,12 +63,13 @@ const client = supabase.createClient(
 
 let currentEventId = null;
 
-voteButtons.style.display = 'none';
-  
-  
 const voteButtons = document.getElementById('vote-buttons');
 const voteMessage = document.getElementById('vote-message');
 const voteStats = document.getElementById('vote-stats');
+
+/* výchozí stav */
+voteButtons.style.display = 'none';
+
 
 /* AUTH */
 const email = document.getElementById('email');
