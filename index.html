@@ -4,17 +4,15 @@
 <meta charset="UTF-8" />
 <title>People can a Vote</title>
 
-<!-- Mapbox CSS -->
 <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet"/>
 
 <style>
-  body { margin:0; font-family: Arial,sans-serif; background:#f4f6f8; }
-  header { padding:20px; background:#fff; box-shadow:0 2px 4px rgba(0,0,0,0.1); }
-  h1 { margin:0 0 5px 0; }
-  section { padding:20px; }
-  .event { background:#fff; padding:15px; border-radius:6px; margin-bottom:10px; cursor:pointer; }
-  #map { width:100%; height:500px; }
-  button { margin-right:5px; padding:5px 10px; cursor:pointer; }
+body { margin:0; font-family:Arial,sans-serif; background:#f4f6f8; }
+header { background:#fff; padding:20px; box-shadow:0 2px 4px rgba(0,0,0,.1); }
+section { padding:20px; }
+.event { background:#fff; padding:15px; border-radius:6px; margin-bottom:10px; cursor:pointer; }
+#map { height:500px; }
+button { padding:6px 12px; margin-right:6px; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -24,11 +22,10 @@
   <p>Global view of opinions from around the world</p>
 </header>
 
-<!-- Přihlášení / Registrace -->
-<section id="auth" style="background:#fff; border-radius:6px; margin:20px; padding:20px;">
+<section id="auth">
   <div id="auth-forms">
-    <input type="email" id="email" placeholder="Email" />
-    <input type="password" id="password" placeholder="Heslo" />
+    <input id="email" type="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Heslo">
     <button id="signup-btn">Registrovat</button>
     <button id="login-btn">Přihlásit</button>
   </div>
@@ -38,283 +35,167 @@
   </div>
 </section>
 
-<!-- Události -->
 <section id="events">
   <h2>Aktuální hlasovací události</h2>
 </section>
 
-<!-- Hlasování -->
-<div id="vote-buttons" style="padding:20px; background:#fff; border-radius:6px; margin:20px; display:none;">
-  <h3>Hlasujte:</h3>
+<section id="vote-buttons" style="display:none; background:#fff; border-radius:6px; margin:20px;">
+  <h3>Hlasujte</h3>
   <button id="vote-yes">Ano</button>
   <button id="vote-no">Ne</button>
   <button id="vote-neutral">Nemám názor</button>
   <p id="vote-message"></p>
-</div>
+</section>
 
-<div id="vote-stats" style="padding:20px;"></div>
+<section id="vote-stats"></section>
 
-<!-- Mapa -->
 <div id="map"></div>
 
-<!-- Mapbox JS -->
 <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-
-<!-- Supabase JS -->
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-/* -------------------------------
-   Supabase klient
-------------------------------- */
-const SUPABASE_URL = 'https://jqoomnhpyuikbntnrukw.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h';
-const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/* SUPABASE */
+const client = supabase.createClient(
+  'https://jqoomnhpyuikbntnrukw.supabase.co',
+  'sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h'
+);
 
-/* -------------------------------
-   Proměnné pro hlasování
-------------------------------- */
+let currentEventId = null;
+
 const voteButtons = document.getElementById('vote-buttons');
 const voteMessage = document.getElementById('vote-message');
 const voteStats = document.getElementById('vote-stats');
-let currentEventId = null;
 
-/* -------------------------------
-   Přihlášení / Registrace
-------------------------------- */
-const emailInput = document.getElementById('email');
-const passwordInput = document.getElementById('password');
-const signupBtn = document.getElementById('signup-btn');
-const loginBtn = document.getElementById('login-btn');
-const logoutBtn = document.getElementById('logout-btn');
-const authMessage = document.getElementById('auth-message');
+/* AUTH */
+const email = document.getElementById('email');
+const password = document.getElementById('password');
 
-signupBtn.addEventListener('click', async () => {
-  const { data, error } = await client.auth.signUp({
-    email: emailInput.value,
-    password: passwordInput.value
-  });
-  if (error) authMessage.textContent = `Chyba: ${error.message}`;
-  else authMessage.textContent = 'Registrace úspěšná! Zkontrolujte email.';
+document.getElementById('signup-btn').onclick = async () => {
+  await client.auth.signUp({ email: email.value, password: password.value });
+};
+
+document.getElementById('login-btn').onclick = async () => {
+  await client.auth.signInWithPassword({ email: email.value, password: password.value });
   updateAuthUI();
-});
+};
 
-loginBtn.addEventListener('click', async () => {
-  const { data, error } = await client.auth.signInWithPassword({
-    email: emailInput.value,
-    password: passwordInput.value
-  });
-  if (error) authMessage.textContent = `Chyba: ${error.message}`;
-  updateAuthUI();
-});
-
-logoutBtn.addEventListener('click', async () => {
+document.getElementById('logout-btn').onclick = async () => {
   await client.auth.signOut();
-  authMessage.textContent = 'Odhlášen';
   updateAuthUI();
-});
+};
 
-function updateAuthUI() {
-  client.auth.getSession().then(res => {
-    const user = res.data.session?.user;
-    if (user) {
-      document.getElementById('auth-forms').style.display = 'none';
-      document.getElementById('auth-logged').style.display = 'block';
-      document.getElementById('auth-message').textContent = `Přihlášen jako: ${user.email}`;
-      if(currentEventId) checkUserVote(currentEventId);
-    } else {
-      document.getElementById('auth-forms').style.display = 'block';
-      document.getElementById('auth-logged').style.display = 'none';
-      voteButtons.style.display = 'none';
-    }
-  });
+async function updateAuthUI() {
+  const { data } = await client.auth.getSession();
+  const user = data.session?.user;
+
+  if (user) {
+    document.getElementById('auth-forms').style.display = 'none';
+    document.getElementById('auth-logged').style.display = 'block';
+    document.getElementById('auth-message').textContent = `Přihlášen jako: ${user.email}`;
+    if (currentEventId) checkUserVote(currentEventId);
+  } else {
+    document.getElementById('auth-forms').style.display = 'block';
+    document.getElementById('auth-logged').style.display = 'none';
+    voteButtons.style.display = 'none';
+  }
 }
 
-/* -------------------------------
-   Listener změny stavu přihlášení
-------------------------------- */
-client.auth.onAuthStateChange(() => {
-  if(currentEventId) checkUserVote(currentEventId);
-});
-
-/* -------------------------------
-   Načtení událostí
-------------------------------- */
+/* EVENTS */
 async function loadEvents() {
-  const { data, error } = await client
-    .from('events')
-    .select('id, title, description, country_id')
-    .eq('is_active', true);
-
-  if (error) { console.error(error); return; }
-
+  const { data } = await client.from('events').select('*').eq('is_active', true);
   const container = document.getElementById('events');
-  container.innerHTML = '<h2>Aktuální hlasovací události</h2>';
 
-  if (data.length > 0) currentEventId = data[0].id;
-
-  data.forEach(event => {
+  data.forEach(e => {
     const div = document.createElement('div');
     div.className = 'event';
-    div.innerHTML = `<strong>${event.title}</strong><br><small>${event.description || ''}</small>`;
-    div.addEventListener('click', () => {
-      currentEventId = event.id;
-      loadVoteStats(currentEventId);
-      checkUserVote(currentEventId);
-    });
+    div.textContent = e.title;
+    div.onclick = () => {
+      currentEventId = e.id;
+      loadVoteStats(e.id);
+      checkUserVote(e.id);
+    };
     container.appendChild(div);
   });
 
-  if (currentEventId) {
-    await loadVoteStats(currentEventId);
-    await checkUserVote(currentEventId);
+  if (data.length) {
+    currentEventId = data[0].id;
+    loadVoteStats(currentEventId);
+    checkUserVote(currentEventId);
   }
 }
 
-/* -------------------------------
-   Kontrola, jestli už hlasoval
-------------------------------- */
+/* CHECK VOTE */
 async function checkUserVote(eventId) {
-  const { data: { session } } = await client.auth.getSession();
-  const user = session?.user;
-  if (!user) { voteButtons.style.display = 'none'; voteMessage.textContent = 'Pro hlasování se přihlaste.'; return false; }
-
-  const { data: existing, error } = await client
-    .from('votes')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('event_id', eventId)
-    .single();
-
-  if (error && error.code !== 'PGRST116') console.error(error);
-
-  if (existing) {
-    voteButtons.style.display = 'none';
-    voteMessage.textContent = 'Už jste hlasoval pro tuto událost.';
-    return true;
-  } else {
-    voteButtons.style.display = 'block';
-    voteMessage.textContent = '';
-    return false;
-  }
-}
-
-/* -------------------------------
-   Hlasování
-------------------------------- */
-async function submitVote(voteValue) {
-  const { data: { session } } = await client.auth.getSession();
-  const user = session?.user;
-  if (!user) { voteMessage.textContent = 'Musíte být přihlášeni.'; return; }
+  const { data } = await client.auth.getSession();
+  const user = data.session?.user;
+  if (!user) return;
 
   const { data: existing } = await client
     .from('votes')
     .select('id')
     .eq('user_id', user.id)
-    .eq('event_id', currentEventId)
-    .single();
+    .eq('event_id', eventId)
+    .maybeSingle();
 
- if (error) {
-  if (error.code === '23505') {
+  if (existing) {
+    voteButtons.style.display = 'none';
     voteMessage.textContent = 'Už jste hlasoval pro tuto událost.';
-    voteButtons.style.display = 'none';
   } else {
-    voteMessage.textContent = `Chyba: ${error.message}`;
+    voteButtons.style.display = 'block';
+    voteMessage.textContent = '';
   }
 }
 
+/* SUBMIT VOTE – KLÍČOVÁ ČÁST */
+async function submitVote(value) {
+  const { data } = await client.auth.getSession();
+  const user = data.session?.user;
 
-  const { error } = await client
-    .from('votes')
-    .insert([{
-      user_id: user.id,
-      event_id: currentEventId,
-      vote: voteValue,
-      country_code: 'GL'
-    }]);
+  const { error } = await client.from('votes').insert({
+    user_id: user.id,
+    event_id: currentEventId,
+    vote: value,
+    country_code: 'GL'
+  });
 
-  if (error) voteMessage.textContent = `Chyba: ${error.message}`;
-  else {
-    voteMessage.textContent = 'Hlas uložen!';
-    voteButtons.style.display = 'none';
-    await loadVoteStats(currentEventId);
+  if (error) {
+    if (error.code === '23505') {
+      voteMessage.textContent = 'Už jste hlasoval pro tuto událost.';
+      voteButtons.style.display = 'none';
+    } else {
+      voteMessage.textContent = error.message;
+    }
+    return;
   }
+
+  voteButtons.style.display = 'none';
+  voteMessage.textContent = 'Hlas uložen.';
+  loadVoteStats(currentEventId);
 }
 
-document.getElementById('vote-yes').addEventListener('click', () => submitVote('yes'));
-document.getElementById('vote-no').addEventListener('click', () => submitVote('no'));
-document.getElementById('vote-neutral').addEventListener('click', () => submitVote('neutral'));
+document.getElementById('vote-yes').onclick = () => submitVote('yes');
+document.getElementById('vote-no').onclick = () => submitVote('no');
+document.getElementById('vote-neutral').onclick = () => submitVote('neutral');
 
-/* -------------------------------
-   Statistiky hlasování
-------------------------------- */
+/* STATS */
 async function loadVoteStats(eventId) {
-  const { data, error } = await client
-    .from('votes')
-    .select('vote, country_code')
-    .eq('event_id', eventId);
-
-  if (error) { console.error(error); return; }
-
-  const total = data.length;
-  const fromGL = data.filter(v => v.country_code === 'GL').length;
-  const others = total - fromGL;
-  const yes = data.filter(v => v.vote === 'yes').length;
-  const no = data.filter(v => v.vote === 'no').length;
-  const neutral = data.filter(v => v.vote === 'neutral').length;
-
-  voteStats.innerHTML = `
-    <h3>Statistiky hlasování</h3>
-    <p>Celkem hlasů: ${total}</p>
-    <p>Ano: ${yes} | Ne: ${no} | Nemám názor: ${neutral}</p>
-    <p>Hlasy občanů Grónska: ${fromGL} (${fromGL/total*100 || 0}%)</p>
-    <p>Ostatní státy: ${others} (${others/total*100 || 0}%)</p>
-  `;
+  const { data } = await client.from('votes').select('vote').eq('event_id', eventId);
+  voteStats.innerHTML = `<p>Celkem hlasů: ${data.length}</p>`;
 }
 
-/* -------------------------------
-   Inicializace
-------------------------------- */
-loadEvents();
-updateAuthUI();
-
-/* -------------------------------
-   Mapbox mapa
-------------------------------- */
+/* MAP */
 mapboxgl.accessToken = 'pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ';
-const map = new mapboxgl.Map({
-  container: 'map',
-  style: 'mapbox://styles/mapbox/light-v11',
-  center: [-42, 72],
-  zoom: 2
+new mapboxgl.Map({
+  container:'map',
+  style:'mapbox://styles/mapbox/light-v11',
+  center:[-42,72],
+  zoom:2
 });
 
-map.on('load', () => {
-  map.addSource('greenland', {
-    type: 'geojson',
-    data: 'https://raw.githubusercontent.com/johan/world.geo.json/master/countries/GRL.geo.json'
-  });
-
-  map.addLayer({
-    id: 'greenland-fill',
-    type: 'fill',
-    source: 'greenland',
-    paint: {
-      'fill-color': '#4CAF50',
-      'fill-opacity': 0.6
-    }
-  });
-
-  map.addLayer({
-    id: 'greenland-border',
-    type: 'line',
-    source: 'greenland',
-    paint: {
-      'line-color': '#2E7D32',
-      'line-width': 2
-    }
-  });
-});
+/* INIT */
+updateAuthUI();
+loadEvents();
 </script>
 
 </body>
