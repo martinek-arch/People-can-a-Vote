@@ -10,7 +10,6 @@
   body { margin:0; font-family:Arial, sans-serif; background:#f4f6f8; }
   .wrap { max-width:1100px; margin:0 auto; }
 
-  /* Top nav (sticky) */
   header { background:#fff; box-shadow:0 2px 4px rgba(0,0,0,.1); position:sticky; top:0; z-index:20; }
   .nav { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; }
   .brand { display:flex; flex-direction:column; }
@@ -30,20 +29,18 @@
   .muted { color:#666; }
   .pill { background:#f1f1f1; padding:6px 10px; border-radius:999px; font-size:12px; }
 
-  /* Home */
   #map { height:480px; margin:16px; border-radius:12px; overflow:hidden; }
+
   .topGrid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:12px; }
   @media (max-width: 900px) { .topGrid { grid-template-columns: 1fr; } }
   .topCard { border:1px solid #eee; border-radius:12px; padding:14px; cursor:pointer; }
   .topCard:hover { border-color:#ddd; }
   .topCount { font-size:12px; color:#666; margin-top:8px; }
 
-  /* Country list */
   .event { background:#fff; padding:14px; border-radius:12px; margin:10px 16px; cursor:pointer; border:1px solid #eee; }
   .event:hover { border-color:#ddd; }
   .event small { color:#666; display:block; margin-top:6px; }
 
-  /* Event detail */
   .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
   .barWrap { margin:10px 0 14px; }
   .barRow { display:flex; align-items:center; gap:10px; margin:8px 0; }
@@ -52,7 +49,6 @@
   .barInner { height:100%; width:0%; background:#111; }
   .barValue { width:150px; text-align:right; font-size:13px; color:#333; }
 
-  /* mini map */
   #mini-map-wrap{
     position:absolute;
     right:12px;
@@ -84,9 +80,44 @@
     #mini-map-wrap{ position:relative; right:auto; bottom:auto; width:100%; height:220px; margin-top:12px; }
   }
 
-  /* Screens */
   .screen { display:none; }
   .screen.active { display:block; }
+
+  /* back buttons near titles */
+  .titleRow { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .backInline { padding:8px 12px; border-radius:10px; background:#eee; }
+
+  /* Search suggest dropdown */
+  .searchWrap { position:relative; }
+  #suggest {
+    position:absolute;
+    top:44px;
+    left:0;
+    right:0;
+    background:#fff;
+    border:1px solid #ddd;
+    border-radius:12px;
+    overflow:hidden;
+    box-shadow:0 10px 24px rgba(0,0,0,.10);
+    display:none;
+    max-height:320px;
+    overflow-y:auto;
+    z-index:30;
+  }
+  .suggestItem{
+    padding:10px 12px;
+    cursor:pointer;
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    border-top:1px solid #f2f2f2;
+  }
+  .suggestItem:first-child{ border-top:none; }
+  .suggestItem:hover{ background:#f6f6f6; }
+  .suggestLeft{ display:flex; flex-direction:column; }
+  .tag{ font-size:11px; color:#666; background:#f1f1f1; padding:4px 8px; border-radius:999px; white-space:nowrap; align-self:flex-start; }
+  .suggestTitle{ font-weight:600; }
+  .suggestSub{ color:#666; font-size:12px; margin-top:2px; }
 </style>
 </head>
 
@@ -99,18 +130,18 @@
         <h1>People can a Vote</h1>
         <div class="muted">Global view of opinions from around the world</div>
       </div>
-
       <button class="ghost" id="homeBtn">Home</button>
-      <button class="ghost" id="backBtn" disabled>← Zpět</button>
-
       <span class="pill" id="crumb">Home</span>
     </div>
 
     <div class="nav-right">
-      <input id="search" type="text" placeholder="Hledej událost…">
+      <div class="searchWrap">
+        <input id="search" type="text" placeholder="Hledej zemi nebo událost…">
+        <div id="suggest"></div>
+      </div>
+
       <span class="pill" id="selectedCountryPill">Země: (vše)</span>
 
-      <!-- Auth compact -->
       <span class="pill" id="authPill">Nepřihlášen</span>
       <button class="ghost" id="openAuthBtn">Přihlásit</button>
       <button class="ghost" id="logoutBtn" style="display:none;">Odhlásit</button>
@@ -120,7 +151,7 @@
 
 <div class="wrap">
 
-  <!-- AUTH MODAL-ish card -->
+  <!-- AUTH -->
   <section class="card" id="authCard" style="display:none;">
     <h3 style="margin:0 0 10px 0;">Přihlášení / Registrace</h3>
     <div class="row">
@@ -141,7 +172,7 @@
     </div>
   </section>
 
-  <!-- SCREEN: HOME -->
+  <!-- HOME -->
   <section id="screenHome" class="screen active">
     <section class="card">
       <div class="row" style="justify-content:space-between;">
@@ -168,20 +199,29 @@
     </section>
   </section>
 
-  <!-- SCREEN: COUNTRY (list of events only) -->
+  <!-- COUNTRY -->
   <section id="screenCountry" class="screen">
     <section class="card">
-      <h2 style="margin:0 0 6px 0;">Události</h2>
-      <div class="muted" id="countrySubtitle">Vyber z mapy zemi, nebo použij vyhledávání.</div>
+      <div class="titleRow">
+        <button class="backInline" id="backFromCountry">← Zpět</button>
+        <h2 style="margin:0;">Události</h2>
+      </div>
+      <div class="muted" id="countrySubtitle" style="margin-top:8px;">
+        Vyber z mapy zemi, nebo použij vyhledávání.
+      </div>
     </section>
     <div id="events"></div>
   </section>
 
-  <!-- SCREEN: EVENT (question + minimap + stats) -->
+  <!-- EVENT -->
   <section id="screenEvent" class="screen">
     <section class="card relative" id="eventCard">
-      <h2 id="eventTitle" style="margin:0 0 6px 0;">—</h2>
-      <div class="muted" id="eventDesc"></div>
+      <div class="titleRow">
+        <button class="backInline" id="backFromEvent">← Zpět</button>
+        <h2 id="eventTitle" style="margin:0;">—</h2>
+      </div>
+
+      <div class="muted" id="eventDesc" style="margin-top:8px;"></div>
 
       <div id="voteButtons" style="display:none; margin-top:12px;">
         <div class="row">
@@ -193,7 +233,6 @@
 
       <p id="voteMsg" style="margin:12px 0 0;"></p>
 
-      <!-- MINI MAP -->
       <div id="mini-map-wrap">
         <div id="mini-map"></div>
         <div id="mini-badge">Země události: —</div>
@@ -222,18 +261,18 @@ mapboxgl.accessToken =
   'pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ';
 
 /* ================== STATE ================== */
-let screen = "HOME"; // HOME | COUNTRY | EVENT
-let selectedCountryCode = ""; // ISO-2
+let screen = "HOME";
+let selectedCountryCode = "";
 let selectedCountryName = "";
 let currentEventId = null;
 let currentEventCountryCode = null;
 let userCountryCode = null;
 let countries = [];
+let eventsCache = []; // active events cache for search suggestions
 
-/* ================== UI refs ================== */
+/* ================== UI ================== */
 const crumb = document.getElementById('crumb');
 const homeBtn = document.getElementById('homeBtn');
-const backBtn = document.getElementById('backBtn');
 const selectedCountryPill = document.getElementById('selectedCountryPill');
 
 const screenHome = document.getElementById('screenHome');
@@ -255,6 +294,10 @@ const stats = document.getElementById('stats');
 const miniBadge = document.getElementById('mini-badge');
 
 const search = document.getElementById('search');
+const suggest = document.getElementById('suggest');
+
+document.getElementById('backFromCountry').onclick = () => goBackFromCountry();
+document.getElementById('backFromEvent').onclick = () => goBackFromEvent();
 
 const authCard = document.getElementById('authCard');
 const openAuthBtn = document.getElementById('openAuthBtn');
@@ -266,9 +309,10 @@ const email = document.getElementById('email');
 const password = document.getElementById('password');
 const countrySelect = document.getElementById('countrySelect');
 const authError = document.getElementById('authError');
-
 const loginBtn = document.getElementById('loginBtn');
 const signupBtn = document.getElementById('signupBtn');
+
+homeBtn.onclick = () => goHome();
 
 /* ================== Helpers ================== */
 function showScreen(next){
@@ -277,11 +321,25 @@ function showScreen(next){
   screenCountry.classList.toggle('active', next === "COUNTRY");
   screenEvent.classList.toggle('active', next === "EVENT");
 
-  // Back button logic
-  backBtn.disabled = (next === "HOME");
   if (next === "HOME") crumb.textContent = "Home";
   if (next === "COUNTRY") crumb.textContent = selectedCountryCode ? `Země: ${selectedCountryName} (${selectedCountryCode})` : "Události";
   if (next === "EVENT") crumb.textContent = "Událost";
+}
+
+function goHome(){
+  currentEventId = null;
+  hideSuggest();
+  showScreen("HOME");
+}
+
+function goBackFromCountry(){
+  hideSuggest();
+  showScreen("HOME");
+}
+
+function goBackFromEvent(){
+  hideSuggest();
+  showScreen("COUNTRY");
 }
 
 function setCountryPill(){
@@ -306,24 +364,91 @@ function barHTML(label, count, total) {
   `;
 }
 
-/* ================== Navigation buttons ================== */
-homeBtn.onclick = () => goHome();
-backBtn.onclick = () => goBack();
-
-function goHome(){
-  currentEventId = null;
-  showScreen("HOME");
+/* ================== Search suggest ================== */
+function hideSuggest(){
+  suggest.style.display = "none";
+  suggest.innerHTML = "";
 }
 
-function goBack(){
-  if (screen === "EVENT") {
-    showScreen("COUNTRY");
-  } else if (screen === "COUNTRY") {
-    showScreen("HOME");
+function showSuggest(items){
+  if (!items.length){ hideSuggest(); return; }
+  suggest.innerHTML = items.join("");
+  suggest.style.display = "block";
+}
+
+function escapeHtml(s){
+  return (s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+}
+
+function buildSuggest(term){
+  term = (term||"").trim().toLowerCase();
+  if (term.length < 2) { hideSuggest(); return; }
+
+  const maxItems = 10;
+
+  // countries matches
+  const cMatches = countries
+    .filter(c => c.name.toLowerCase().includes(term) || c.code.toLowerCase().startsWith(term))
+    .slice(0, 5)
+    .map(c => ({
+      type: "country",
+      key: c.code,
+      title: `${c.name} (${c.code})`,
+      sub: "Země"
+    }));
+
+  // events matches (from cache)
+  const eMatches = eventsCache
+    .filter(e =>
+      (e.title||"").toLowerCase().includes(term) ||
+      (e.description||"").toLowerCase().includes(term)
+    )
+    .slice(0, 5)
+    .map(e => ({
+      type: "event",
+      key: String(e.id),
+      title: e.title || "(bez názvu)",
+      sub: `${e.country_code || "?"} • Událost`
+    }));
+
+  const merged = [...cMatches, ...eMatches].slice(0, maxItems);
+
+  const html = merged.map(item => `
+    <div class="suggestItem" data-type="${item.type}" data-key="${escapeHtml(item.key)}">
+      <div class="suggestLeft">
+        <div class="suggestTitle">${escapeHtml(item.title)}</div>
+        <div class="suggestSub">${escapeHtml(item.sub)}</div>
+      </div>
+      <div class="tag">${item.type === "country" ? "Země" : "Událost"}</div>
+    </div>
+  `);
+
+  showSuggest(html);
+
+  // click handlers
+  for (const el of suggest.querySelectorAll('.suggestItem')){
+    el.addEventListener('click', async () => {
+      const type = el.getAttribute('data-type');
+      const key = el.getAttribute('data-key');
+      hideSuggest();
+      search.blur();
+
+      if (type === "country"){
+        await selectCountry(key);
+      } else {
+        await openEvent(Number(key));
+      }
+    });
   }
 }
 
-/* ================== Auth UI ================== */
+search.addEventListener('input', () => buildSuggest(search.value));
+search.addEventListener('focus', () => buildSuggest(search.value));
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.searchWrap')) hideSuggest();
+});
+
+/* ================== Auth ================== */
 openAuthBtn.onclick = () => { authCard.style.display = "block"; };
 closeAuthBtn.onclick = () => { authCard.style.display = "none"; };
 logoutBtn.onclick = async () => { await supabaseClient.auth.signOut(); };
@@ -383,15 +508,25 @@ async function refreshAuthPill(){
   authPill.textContent = userCountryCode ? `Přihlášen • ${userCountryCode}` : `Přihlášen`;
 }
 
-/* ================== Countries ================== */
+/* ================== Data loading ================== */
 async function loadCountries(){
-  const { data, error } = await supabaseClient.from('countries').select('code,name').order('name', { ascending: true });
+  const { data, error } = await supabaseClient.from('countries').select('code,name').order('name', { ascending:true });
   if (error) return;
   countries = data || [];
-
-  // for registration select
   countrySelect.innerHTML = ['<option value="">Vyber zemi (pro registraci)</option>']
     .concat(countries.map(c => `<option value="${c.code}">${c.name} (${c.code})</option>`)).join('');
+}
+
+async function loadEventsCache(){
+  // cache only active events (for search suggestions)
+  const { data, error } = await supabaseClient
+    .from('events')
+    .select('id,title,description,country_code,is_active,created_at')
+    .eq('is_active', true)
+    .order('created_at', { ascending:false })
+    .limit(500);
+
+  if (!error) eventsCache = data || [];
 }
 
 /* ================== HOME: Top 3 ================== */
@@ -406,31 +541,27 @@ async function loadTop3(){
 
   if (counts.size === 0) { top3Div.innerHTML = '<div class="muted">Zatím žádné hlasy.</div>'; return; }
 
-  const top = [...counts.entries()].sort((a,b) => b[1] - a[1]).slice(0, 3);
-  const ids = top.map(t => t[0]);
+  const top = [...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const ids = top.map(t=>t[0]);
 
   const { data: evs, error: eErr } = await supabaseClient.from('events')
-    .select('id,title,description,country_code,is_active')
+    .select('id,title,description,country_code')
     .in('id', ids);
 
   if (eErr) { top3Div.innerHTML = '<div class="muted">Nelze načíst TOP detail.</div>'; return; }
 
-  const byId = new Map((evs||[]).map(e => [e.id, e]));
-  const cards = [];
-
-  for (const [id, cnt] of top){
+  const byId = new Map((evs||[]).map(e=>[e.id,e]));
+  top3Div.innerHTML = top.map(([id,cnt])=>{
     const e = byId.get(id);
-    if (!e) continue;
-    cards.push(`
+    if (!e) return '';
+    return `
       <div class="topCard" data-id="${e.id}">
-        <strong>${e.title}</strong>
-        <div class="muted" style="margin-top:6px;">${e.description || ""}</div>
-        <div class="topCount">Hlasů: <strong>${cnt}</strong> • Země: ${e.country_code || "?"}</div>
+        <strong>${escapeHtml(e.title||'')}</strong>
+        <div class="muted" style="margin-top:6px;">${escapeHtml(e.description||'')}</div>
+        <div class="topCount">Hlasů: <strong>${cnt}</strong> • Země: ${escapeHtml(e.country_code||'?')}</div>
       </div>
-    `);
-  }
-
-  top3Div.innerHTML = cards.join('');
+    `;
+  }).join("");
 
   for (const el of top3Div.querySelectorAll('.topCard')){
     el.addEventListener('click', async () => {
@@ -441,7 +572,7 @@ async function loadTop3(){
 }
 refreshTop.onclick = loadTop3;
 
-/* ================== COUNTRY: Events list ================== */
+/* ================== COUNTRY: events list ================== */
 async function loadEvents(){
   eventsDiv.innerHTML = "";
 
@@ -452,43 +583,42 @@ async function loadEvents(){
 
   if (selectedCountryCode) q = q.eq('country_code', selectedCountryCode);
 
-  // search: filter by title/description (client-side for MVP)
-  const { data, error } = await q.order('created_at', { ascending: false });
+  const { data, error } = await q.order('created_at', { ascending:false });
   if (error) { eventsDiv.innerHTML = '<div class="muted" style="margin:0 16px;">Nelze načíst události.</div>'; return; }
 
-  let list = data || [];
-  const term = (search.value || "").trim().toLowerCase();
-  if (term) {
-    list = list.filter(e =>
-      (e.title || "").toLowerCase().includes(term) ||
-      (e.description || "").toLowerCase().includes(term)
-    );
-  }
-
+  const list = data || [];
   if (!list.length){
-    eventsDiv.innerHTML = '<div class="muted" style="margin:0 16px;">Žádné události pro tento výběr / hledání.</div>';
+    eventsDiv.innerHTML = '<div class="muted" style="margin:0 16px;">Žádné události pro tento výběr.</div>';
     return;
   }
 
   for (const e of list){
     const div = document.createElement('div');
     div.className = 'event';
-    div.innerHTML = `<strong>${e.title}</strong><small>${e.description || ""}</small>`;
+    div.innerHTML = `<strong>${escapeHtml(e.title||'')}</strong><small>${escapeHtml(e.description||'')}</small>`;
     div.onclick = async () => { await openEvent(e.id); };
     eventsDiv.appendChild(div);
   }
 }
 
-search.addEventListener('input', async () => {
-  if (screen === "COUNTRY") await loadEvents();
-});
+async function selectCountry(code){
+  selectedCountryCode = code || "";
+  selectedCountryName = selectedCountryCode ? getCountryNameByCode(selectedCountryCode) : "";
+  setCountryPill();
+  countrySubtitle.textContent = selectedCountryCode
+    ? `Vybraná země: ${selectedCountryName} (${selectedCountryCode})`
+    : "Vyber z mapy zemi, nebo použij vyhledávání.";
 
-/* ================== EVENT: Detail ================== */
+  showScreen("COUNTRY");
+  setBigMapSelected(selectedCountryCode);
+  await loadEvents();
+}
+
+/* ================== EVENT detail ================== */
 async function openEvent(eventId){
-  // načti event
   const { data: evt, error } = await supabaseClient
     .from('events')
-    .select('id,title,description,country_code,is_active')
+    .select('id,title,description,country_code')
     .eq('id', eventId)
     .maybeSingle();
 
@@ -497,19 +627,18 @@ async function openEvent(eventId){
   currentEventId = evt.id;
   currentEventCountryCode = evt.country_code || "";
 
-  // nastav country kontext (aby dávalo smysl, odkud se na událost přišlo)
-  selectedCountryCode = currentEventCountryCode || selectedCountryCode;
-  selectedCountryName = selectedCountryCode ? getCountryNameByCode(selectedCountryCode) : "";
-  setCountryPill();
+  // ensure country context
+  if (currentEventCountryCode){
+    selectedCountryCode = currentEventCountryCode;
+    selectedCountryName = getCountryNameByCode(selectedCountryCode);
+    setCountryPill();
+    setBigMapSelected(selectedCountryCode);
+  }
 
-  // přepni screen
   showScreen("EVENT");
-
-  // vykresli detail
-  await refreshEventDetail(eventId);
-
-  // zjemnění: zavřít auth card, pokud je otevřená
   authCard.style.display = "none";
+
+  await refreshEventDetail(eventId);
 }
 
 async function refreshEventDetail(eventId){
@@ -529,17 +658,13 @@ async function refreshEventDetail(eventId){
   eventTitle.textContent = evt.title || "—";
   eventDesc.textContent = evt.description || "";
 
-  // mini map update
   miniBadge.textContent = currentEventCountryCode ? `Země události: ${currentEventCountryCode}` : "Země události: —";
   updateMiniMapSelected(currentEventCountryCode || "");
 
-  // stats
   await loadStats(eventId, currentEventCountryCode);
 
-  // vote availability
   const { data: sess } = await supabaseClient.auth.getSession();
   const user = sess.session?.user;
-
   if (!user){
     voteMsg.textContent = "Pro hlasování se přihlas.";
     return;
@@ -595,7 +720,7 @@ async function submitVote(value){
 
   voteButtons.style.display = "none";
   voteMsg.textContent = "Hlas uložen.";
-  await loadTop3(); // může změnit pořadí
+  await loadTop3();
   await refreshEventDetail(currentEventId);
 }
 
@@ -651,28 +776,15 @@ async function loadStats(eventId, eventCountryCode){
   `;
 }
 
-/* ================== HOME: Map (select country) ================== */
+/* ================== MAPS ================== */
+let map, miniMap;
+
 clearCountry.onclick = () => {
   selectedCountryCode = "";
   selectedCountryName = "";
   setCountryPill();
-  // zůstáváme na home, jen zrušíme highlight
   setBigMapSelected("");
 };
-
-let map, miniMap;
-
-function selectCountry(code){
-  selectedCountryCode = code || "";
-  selectedCountryName = selectedCountryCode ? getCountryNameByCode(selectedCountryCode) : "";
-  setCountryPill();
-  countrySubtitle.textContent = selectedCountryCode
-    ? `Vybraná země: ${selectedCountryName} (${selectedCountryCode})`
-    : "Vyber z mapy zemi, nebo použij vyhledávání.";
-
-  showScreen("COUNTRY");
-  loadEvents();
-}
 
 function setBigMapSelected(code){
   if (!map || !map.getLayer('country-selected')) return;
@@ -690,7 +802,6 @@ function updateMiniMapSelected(countryCode){
   });
   if (!feats || !feats.length) return;
 
-  // bbox
   let minX=180, minY=90, maxX=-180, maxY=-90;
   const geom = feats[0].geometry;
   function scan(coords){
@@ -706,7 +817,6 @@ function updateMiniMapSelected(countryCode){
   miniMap.fitBounds([[minX,minY],[maxX,maxY]], { padding:18, duration:300 });
 }
 
-/* Big map init */
 function initMaps(){
   map = new mapboxgl.Map({
     container: 'map',
@@ -760,15 +870,14 @@ function initMaps(){
       map.getCanvas().style.cursor='';
     });
 
-    map.on('click','country-fill',(e)=>{
+    map.on('click','country-fill', async (e)=>{
       const iso = e.features?.[0]?.properties?.iso_3166_1 || "";
       if (!iso) return;
       setBigMapSelected(iso);
-      selectCountry(iso);
+      await selectCountry(iso);
     });
   });
 
-  // mini map
   miniMap = new mapboxgl.Map({
     container: 'mini-map',
     style: 'mapbox://styles/mapbox/light-v11',
@@ -810,6 +919,7 @@ function initMaps(){
 /* ================== INIT ================== */
 (async function init(){
   await loadCountries();
+  await loadEventsCache();     // 🔥 pro Google-like search
   await refreshAuthPill();
   setCountryPill();
   initMaps();
