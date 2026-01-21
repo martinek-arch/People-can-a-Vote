@@ -7,12 +7,16 @@
 <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet"/>
 
 <style>
-body { margin:0; font-family:Arial, sans-serif; background:#f4f6f8; }
-header { background:#fff; padding:20px; box-shadow:0 2px 4px rgba(0,0,0,.1); }
-section { padding:20px; }
-.event { background:#fff; padding:12px; border-radius:6px; margin-bottom:10px; cursor:pointer; }
-button { padding:6px 12px; margin-right:6px; cursor:pointer; }
-#map { height:450px; }
+  body { margin:0; font-family:Arial, sans-serif; background:#f4f6f8; }
+  header { background:#fff; padding:20px; box-shadow:0 2px 4px rgba(0,0,0,.1); }
+  section { padding:20px; }
+  .card { background:#fff; padding:15px; border-radius:8px; margin:20px; }
+  .event { background:#fff; padding:12px; border-radius:8px; margin:10px 20px; cursor:pointer; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  input, select { padding:8px; min-width:240px; }
+  button { padding:8px 14px; cursor:pointer; }
+  #map { height:450px; margin-top:10px; }
+  .muted { color:#666; }
 </style>
 </head>
 
@@ -20,40 +24,63 @@ button { padding:6px 12px; margin-right:6px; cursor:pointer; }
 
 <header>
   <h1>People can a Vote</h1>
-  <p>Global view of opinions from around the world</p>
+  <p class="muted">Global view of opinions from around the world</p>
 </header>
 
-<section id="auth">
+<!-- AUTH -->
+<section class="card" id="auth">
   <div id="auth-forms">
-    <input id="email" type="email" placeholder="Email">
-    <input id="password" type="password" placeholder="Heslo">
-    <button id="signup-btn">Registrovat</button>
-    <button id="login-btn">Přihlásit</button>
+    <h3>Přihlášení / Registrace</h3>
+    <div class="row">
+      <input id="email" type="email" placeholder="Email">
+      <input id="password" type="password" placeholder="Heslo">
+      <select id="country-select">
+        <option value="">Načítám země…</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <button id="signup-btn">Registrovat</button>
+      <button id="login-btn">Přihlásit</button>
+    </div>
+    <p id="auth-error" style="color:#b00020; margin-top:10px;"></p>
   </div>
 
   <div id="auth-logged" style="display:none;">
-    <span id="auth-message"></span>
-    <button id="logout-btn">Odhlásit</button>
+    <div class="row" style="align-items:center;">
+      <span id="auth-message"></span>
+      <span id="auth-country" class="muted"></span>
+      <button id="logout-btn">Odhlásit</button>
+    </div>
+    <p id="auth-hint" class="muted" style="margin-top:10px;"></p>
   </div>
 </section>
 
-<section id="events">
-  <h2>Hlasovací události</h2>
+<!-- EVENTS -->
+<section>
+  <h2 style="margin:0 20px;">Hlasovací události</h2>
+  <div id="events"></div>
 </section>
 
-<section id="vote-section" style="background:#fff; border-radius:6px; margin:20px; padding:15px;">
-  <h3>Hlasování</h3>
+<!-- VOTE -->
+<section class="card" id="vote-section">
+  <h3 id="vote-title" style="margin-top:0;">Vyber událost</h3>
 
   <div id="vote-buttons" style="display:none;">
-    <button id="vote-yes">Ano</button>
-    <button id="vote-no">Ne</button>
-    <button id="vote-neutral">Nemám názor</button>
+    <div class="row">
+      <button id="vote-yes">Ano</button>
+      <button id="vote-no">Ne</button>
+      <button id="vote-neutral">Nemám názor</button>
+    </div>
   </div>
 
-  <p id="vote-message"></p>
+  <p id="vote-message" style="margin-top:10px;"></p>
 </section>
 
-<section id="vote-stats"></section>
+<!-- STATS -->
+<section class="card">
+  <h3 style="margin-top:0;">Statistiky</h3>
+  <div id="vote-stats" class="muted">Zatím nejsou data.</div>
+</section>
 
 <div id="map"></div>
 
@@ -61,191 +88,357 @@ button { padding:6px 12px; margin-right:6px; cursor:pointer; }
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-/* ================= SUPABASE ================= */
+/* ================== KONFIG ================== */
 const supabaseClient = supabase.createClient(
   'https://jqoomnhpyuikbntnrukw.supabase.co',
   'sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h'
 );
 
-let currentEventId = null;
+mapboxgl.accessToken =
+  'pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ';
 
-/* ================= ELEMENTY ================= */
+/* ================== STAV ================== */
+let currentEventId = null;
+let currentEventCountryCode = null;   // země události (např. GL)
+let currentUserCountryCode = null;    // země uživatele z profiles
+
+/* ================== ELEMENTY ================== */
 const voteButtons = document.getElementById('vote-buttons');
 const voteMessage = document.getElementById('vote-message');
 const voteStats = document.getElementById('vote-stats');
+const voteTitle = document.getElementById('vote-title');
+
+const authForms = document.getElementById('auth-forms');
+const authLogged = document.getElementById('auth-logged');
+const authMessage = document.getElementById('auth-message');
+const authCountry = document.getElementById('auth-country');
+const authHint = document.getElementById('auth-hint');
+const authError = document.getElementById('auth-error');
+
+const email = document.getElementById('email');
+const password = document.getElementById('password');
+const countrySelect = document.getElementById('country-select');
 
 voteButtons.style.display = 'none';
 
-/* ================= AUTH ================= */
-const email = document.getElementById('email');
-const password = document.getElementById('password');
+/* ================== POMOCNÉ ================== */
+function setAuthError(msg) { authError.textContent = msg || ''; }
+function setVoteMessage(msg) { voteMessage.textContent = msg || ''; }
 
+/* ================== NAČTI ZEMĚ DO SELECTU ================== */
+async function loadCountriesForSelect() {
+  // Aby tohle fungovalo, musí být na `countries` povolený SELECT pro anon/authenticated.
+  const { data, error } = await supabaseClient
+    .from('countries')
+    .select('code, name')
+    .order('name', { ascending: true });
+
+  if (error) {
+    countrySelect.innerHTML = '<option value="">Země nelze načíst</option>';
+    return;
+  }
+
+  const opts = ['<option value="">Vyber zemi (pro registraci)</option>'];
+  for (const c of data) {
+    opts.push(`<option value="${c.code}">${c.name} (${c.code})</option>`);
+  }
+  countrySelect.innerHTML = opts.join('');
+}
+
+/* ================== AUTH ================== */
 document.getElementById('login-btn').onclick = async () => {
+  setAuthError('');
   const { error } = await supabaseClient.auth.signInWithPassword({
     email: email.value,
     password: password.value
   });
-  if (error) alert(error.message);
+  if (error) setAuthError(error.message);
 };
 
 document.getElementById('signup-btn').onclick = async () => {
-  const { error } = await supabaseClient.auth.signUp({
+  setAuthError('');
+
+  const selected = countrySelect.value;
+  if (!selected) {
+    setAuthError('Při registraci vyber svoji zemi.');
+    return;
+  }
+
+  const { error: signUpErr } = await supabaseClient.auth.signUp({
     email: email.value,
     password: password.value
   });
-  if (error) alert(error.message);
+
+  if (signUpErr) {
+    setAuthError(signUpErr.message);
+    return;
+  }
+
+  // Po registraci se rovnou přihlásíme (pokud máš vypnuté email potvrzení).
+  const { error: signInErr } = await supabaseClient.auth.signInWithPassword({
+    email: email.value,
+    password: password.value
+  });
+
+  if (signInErr) {
+    // Pokud bys měl zapnuté potvrzení emailu, tady se to může zastavit.
+    setAuthError(signInErr.message);
+    authHint.textContent = 'Pokud máš zapnuté potvrzení emailu, musíš nejdřív potvrdit registraci.';
+    return;
+  }
+
+  // Vytvoříme profil s vybranou zemí
+  const { data: sess } = await supabaseClient.auth.getSession();
+  const user = sess.session?.user;
+  if (!user) return;
+
+  const { error: profErr } = await supabaseClient
+    .from('profiles')
+    .insert([{ id: user.id, country_code: selected }]);
+
+  // Když už profil existuje, insert může selhat – to nevadí.
+  if (profErr && profErr.code !== '23505') {
+    setAuthError(profErr.message);
+  }
 };
 
 document.getElementById('logout-btn').onclick = async () => {
   await supabaseClient.auth.signOut();
 };
 
-/* ================= AUTH STATE ================= */
-supabaseClient.auth.onAuthStateChange((event, session) => {
-  updateAuthUI();
-
-  if (session && currentEventId) {
-    checkUserVote(currentEventId);
-  }
+/* Když se změní auth stav, vždy srovnáme UI a zkontrolujeme hlas */
+supabaseClient.auth.onAuthStateChange(async () => {
+  await updateAuthUI();
+  if (currentEventId) await refreshVoteUI();
 });
 
-/* ================= UI ================= */
+/* ================== UI / PROFIL ================== */
+async function loadMyProfile() {
+  currentUserCountryCode = null;
+
+  const { data: sess } = await supabaseClient.auth.getSession();
+  const user = sess.session?.user;
+  if (!user) return;
+
+  const { data, error } = await supabaseClient
+    .from('profiles')
+    .select('country_code')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (!error && data?.country_code) currentUserCountryCode = data.country_code;
+}
+
 async function updateAuthUI() {
   const { data } = await supabaseClient.auth.getSession();
   const user = data.session?.user;
 
   if (user) {
-    document.getElementById('auth-forms').style.display = 'none';
-    document.getElementById('auth-logged').style.display = 'block';
-    document.getElementById('auth-message').textContent =
-      `Přihlášen jako: ${user.email}`;
+    authForms.style.display = 'none';
+    authLogged.style.display = 'block';
+    authMessage.textContent = `Přihlášen jako: ${user.email}`;
+    authHint.textContent = '';
+
+    await loadMyProfile();
+    authCountry.textContent = currentUserCountryCode ? `Země: ${currentUserCountryCode}` : 'Země: (nenastavena)';
   } else {
-    document.getElementById('auth-forms').style.display = 'block';
-    document.getElementById('auth-logged').style.display = 'none';
+    authForms.style.display = 'block';
+    authLogged.style.display = 'none';
+    authMessage.textContent = '';
+    authCountry.textContent = '';
+    authHint.textContent = '';
+    currentUserCountryCode = null;
+
     voteButtons.style.display = 'none';
-    voteMessage.textContent = '';
+    setVoteMessage('');
   }
 }
 
-/* ================= EVENTS ================= */
+/* ================== UDÁLOSTI ================== */
 async function loadEvents() {
-  const { data } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from('events')
-    .select('*')
+    .select('id, title, description, country_id')
     .eq('is_active', true);
 
-  const container = document.getElementById('events');
+  if (error) return;
 
-  data.forEach(event => {
+  const eventsDiv = document.getElementById('events');
+  eventsDiv.innerHTML = '';
+
+  if (!data.length) {
+    eventsDiv.innerHTML = '<p class="muted" style="margin:0 20px;">Žádné aktivní události.</p>';
+    return;
+  }
+
+  // nastavíme defaultní událost
+  currentEventId = data[0].id;
+
+  for (const e of data) {
     const div = document.createElement('div');
     div.className = 'event';
-    div.textContent = event.title;
-
-    div.onclick = () => {
-      currentEventId = event.id;
-      loadVoteStats(event.id);
-
-      const { data } = supabaseClient.auth.getSession();
-      if (data?.session) checkUserVote(event.id);
+    div.innerHTML = `<strong>${e.title}</strong><div class="muted" style="margin-top:4px;">${e.description || ''}</div>`;
+    div.onclick = async () => {
+      currentEventId = e.id;
+      await refreshVoteUI();
     };
-
-    container.appendChild(div);
-  });
-
-  if (data.length) {
-    currentEventId = data[0].id;
-    loadVoteStats(currentEventId);
+    eventsDiv.appendChild(div);
   }
+
+  await refreshVoteUI();
 }
 
-/* ================= CHECK VOTE ================= */
+/* ================== REFRESH VOTE UI (KLÍČOVÉ) ================== */
+async function refreshVoteUI() {
+  voteButtons.style.display = 'none';
+  setVoteMessage('');
+  voteTitle.textContent = 'Hlasování';
+
+  if (!currentEventId) return;
+
+  // 1) zjistíme zemi události (country_code)
+  const { data: evt, error: evtErr } = await supabaseClient
+    .from('events')
+    .select('id, title, country_id, countries(code, name)')
+    .eq('id', currentEventId)
+    .maybeSingle();
+
+  if (evtErr || !evt) return;
+
+  currentEventCountryCode = evt.countries?.code || null;
+  voteTitle.textContent = evt.title || 'Hlasování';
+
+  // 2) načteme statistiky (funguje i pro nepřihlášené)
+  await loadVoteStats(currentEventId, currentEventCountryCode);
+
+  // 3) pokud není přihlášený uživatel, konec
+  const { data: sess } = await supabaseClient.auth.getSession();
+  const user = sess.session?.user;
+  if (!user) {
+    setVoteMessage('Pro hlasování se přihlas.');
+    return;
+  }
+
+  // 4) načteme profil (země uživatele) pokud ještě není
+  if (!currentUserCountryCode) await loadMyProfile();
+
+  // 5) zkontrolujeme, jestli už hlasoval
+  await checkUserVote(currentEventId);
+}
+
+/* ================== CHECK VOTE ================== */
 async function checkUserVote(eventId) {
   voteButtons.style.display = 'none';
-  voteMessage.textContent = '';
+  setVoteMessage('');
 
   const { data } = await supabaseClient.auth.getSession();
   const user = data.session?.user;
   if (!user) return;
 
-  const { data: existing } = await supabaseClient
+  const { data: existing, error } = await supabaseClient
     .from('votes')
     .select('vote')
     .eq('user_id', user.id)
     .eq('event_id', eventId)
     .maybeSingle();
 
-  if (existing) {
-    voteMessage.textContent = `Už jste hlasoval (${existing.vote}).`;
+  if (!error && existing) {
+    setVoteMessage(`Už jste hlasoval (${existing.vote}).`);
+    voteButtons.style.display = 'none';
   } else {
     voteButtons.style.display = 'block';
   }
 }
 
-/* ================= SUBMIT VOTE ================= */
+/* ================== SUBMIT VOTE ================== */
 async function submitVote(value) {
+  setVoteMessage('');
+
   const { data } = await supabaseClient.auth.getSession();
   const user = data.session?.user;
-  if (!user) return;
+  if (!user) {
+    setVoteMessage('Musíš být přihlášen.');
+    return;
+  }
+
+  if (!currentUserCountryCode) await loadMyProfile();
+  if (!currentUserCountryCode) {
+    setVoteMessage('Nemáš nastavenou zemi v profilu.');
+    return;
+  }
 
   const { error } = await supabaseClient.from('votes').insert({
     user_id: user.id,
     event_id: currentEventId,
     vote: value,
-    country_code: 'GL'
+    country_code: currentUserCountryCode
   });
 
   if (error) {
     if (error.code === '23505') {
-      voteMessage.textContent = 'Už jste hlasoval.';
+      setVoteMessage('Už jste hlasoval pro tuto událost.');
       voteButtons.style.display = 'none';
     } else {
-      voteMessage.textContent = error.message;
+      setVoteMessage(error.message);
     }
     return;
   }
 
   voteButtons.style.display = 'none';
-  voteMessage.textContent = 'Hlas uložen.';
-  loadVoteStats(currentEventId);
+  setVoteMessage('Hlas uložen.');
+  await refreshVoteUI();
 }
 
-/* ================= BUTTONS ================= */
+/* BUTTONS */
 document.getElementById('vote-yes').onclick = () => submitVote('Ano');
 document.getElementById('vote-no').onclick = () => submitVote('Ne');
 document.getElementById('vote-neutral').onclick = () => submitVote('Nemám názor');
 
-/* ================= STATS ================= */
-async function loadVoteStats(eventId) {
-  const { data } = await supabaseClient
+/* ================== STATS ================== */
+async function loadVoteStats(eventId, eventCountryCode) {
+  const { data, error } = await supabaseClient
     .from('votes')
-    .select('vote')
+    .select('vote, country_code')
     .eq('event_id', eventId);
 
-  voteStats.innerHTML = `<p>Celkem hlasů: ${data.length}</p>`;
+  if (error) return;
+
+  const total = data.length;
+  const yes = data.filter(v => v.vote === 'Ano').length;
+  const no = data.filter(v => v.vote === 'Ne').length;
+  const neutral = data.filter(v => v.vote === 'Nemám názor').length;
+
+  const citizens = eventCountryCode
+    ? data.filter(v => v.country_code === eventCountryCode).length
+    : 0;
+
+  const others = total - citizens;
+
+  const pct = (n) => total ? Math.round((n / total) * 100) : 0;
+
+  voteStats.innerHTML = `
+    <div><strong>Celkem:</strong> ${total} hlasů</div>
+    <div>✅ Ano: ${yes} (${pct(yes)}%) | ❌ Ne: ${no} (${pct(no)}%) | 🤷 Nemám názor: ${neutral} (${pct(neutral)}%)</div>
+    <div style="margin-top:8px;"><strong>Rozdělení podle země události</strong> ${eventCountryCode ? '('+eventCountryCode+')' : ''}</div>
+    <div>🏠 Občané země: ${citizens} (${pct(citizens)}%)</div>
+    <div>🌍 Ostatní státy: ${others} (${pct(others)}%)</div>
+  `;
 }
 
-/* ================= MAP ================= */
-mapboxgl.accessToken =
-  'pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ';
-
-new mapboxgl.Map({
+/* ================== MAP ================== */
+const map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/light-v11',
   center: [-42, 72],
   zoom: 2
 });
 
-/* ================= INIT ================= */
-updateAuthUI();
-loadEvents();
-
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && currentEventId) {
-    checkUserVote(currentEventId);
-  }
-});
-
-
+/* ================== INIT ================== */
+(async function init() {
+  await loadCountriesForSelect();
+  await updateAuthUI();
+  await loadEvents();
+})();
 </script>
 
 </body>
