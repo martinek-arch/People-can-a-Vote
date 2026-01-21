@@ -63,6 +63,9 @@ const client = supabase.createClient(
 
 let currentEventId = null;
 
+voteButtons.style.display = 'none';
+  
+  
 const voteButtons = document.getElementById('vote-buttons');
 const voteMessage = document.getElementById('vote-message');
 const voteStats = document.getElementById('vote-stats');
@@ -127,25 +130,27 @@ async function loadEvents() {
 
 /* CHECK VOTE */
 async function checkUserVote(eventId) {
+  voteButtons.style.display = 'none';
+  voteMessage.textContent = '';
+
   const { data } = await client.auth.getSession();
   const user = data.session?.user;
-  if (!user) return;
+  if (!user || !eventId) return;
 
-  const { data: existing } = await client
+  const { data: existing, error } = await client
     .from('votes')
-    .select('id')
+    .select('vote')
     .eq('user_id', user.id)
     .eq('event_id', eventId)
     .maybeSingle();
 
   if (existing) {
-    voteButtons.style.display = 'none';
-    voteMessage.textContent = 'Už jste hlasoval pro tuto událost.';
+    voteMessage.textContent = `Už jste hlasoval (${existing.vote}).`;
   } else {
     voteButtons.style.display = 'block';
-    voteMessage.textContent = '';
   }
 }
+
 
 /* SUBMIT VOTE – KLÍČOVÁ ČÁST */
 async function submitVote(value) {
