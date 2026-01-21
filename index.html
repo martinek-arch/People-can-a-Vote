@@ -8,53 +8,64 @@
 
 <style>
   body { margin:0; font-family:Arial, sans-serif; background:#f4f6f8; }
-  header { background:#fff; padding:20px; box-shadow:0 2px 4px rgba(0,0,0,.1); position:sticky; top:0; z-index:10; }
-  header h1 { margin:0 0 6px 0; }
-  header .muted { color:#666; margin:0; }
   .wrap { max-width:1100px; margin:0 auto; }
-  .card { background:#fff; padding:16px; border-radius:10px; margin:16px; position:relative; }
-  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  input, select { padding:10px; min-width:240px; }
-  button { padding:10px 14px; cursor:pointer; border:0; border-radius:8px; }
+
+  /* Top nav (sticky) */
+  header { background:#fff; box-shadow:0 2px 4px rgba(0,0,0,.1); position:sticky; top:0; z-index:20; }
+  .nav { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; }
+  .brand { display:flex; flex-direction:column; }
+  .brand h1 { margin:0; font-size:18px; }
+  .brand .muted { margin:2px 0 0; color:#666; font-size:12px; }
+
+  .nav-left, .nav-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  button { padding:10px 14px; cursor:pointer; border:0; border-radius:10px; }
   button.primary { background:#111; color:#fff; }
   button.ghost { background:#eee; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+
+  input, select { padding:10px; border-radius:10px; border:1px solid #ddd; background:#fff; }
+  input { min-width:260px; }
+
+  .card { background:#fff; padding:16px; border-radius:12px; margin:16px; }
   .muted { color:#666; }
-  .event { background:#fff; padding:14px; border-radius:10px; margin:10px 16px; cursor:pointer; border:1px solid #eee; }
-  .event:hover { border-color:#ddd; }
-  .event small { color:#666; display:block; margin-top:6px; }
-  #map { height:460px; margin:16px; border-radius:12px; overflow:hidden; }
   .pill { background:#f1f1f1; padding:6px 10px; border-radius:999px; font-size:12px; }
-  .barWrap { margin:10px 0 14px; }
-  .barRow { display:flex; align-items:center; gap:10px; margin:8px 0; }
-  .barLabel { width:140px; font-size:14px; }
-  .barOuter { flex:1; background:#eee; border-radius:999px; overflow:hidden; height:14px; }
-  .barInner { height:100%; width:0%; }
-  .barValue { width:150px; text-align:right; font-size:13px; color:#333; }
-  .sectionTitle { margin:0 0 10px 0; }
-  .hint { font-size:13px; color:#666; margin-top:10px; }
+
+  /* Home */
+  #map { height:480px; margin:16px; border-radius:12px; overflow:hidden; }
   .topGrid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:12px; }
   @media (max-width: 900px) { .topGrid { grid-template-columns: 1fr; } }
   .topCard { border:1px solid #eee; border-radius:12px; padding:14px; cursor:pointer; }
   .topCard:hover { border-color:#ddd; }
   .topCount { font-size:12px; color:#666; margin-top:8px; }
 
+  /* Country list */
+  .event { background:#fff; padding:14px; border-radius:12px; margin:10px 16px; cursor:pointer; border:1px solid #eee; }
+  .event:hover { border-color:#ddd; }
+  .event small { color:#666; display:block; margin-top:6px; }
+
+  /* Event detail */
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .barWrap { margin:10px 0 14px; }
+  .barRow { display:flex; align-items:center; gap:10px; margin:8px 0; }
+  .barLabel { width:140px; font-size:14px; }
+  .barOuter { flex:1; background:#eee; border-radius:999px; overflow:hidden; height:14px; }
+  .barInner { height:100%; width:0%; background:#111; }
+  .barValue { width:150px; text-align:right; font-size:13px; color:#333; }
+
   /* mini map */
   #mini-map-wrap{
     position:absolute;
     right:12px;
     bottom:12px;
-    width:220px;
-    height:160px;
+    width:240px;
+    height:170px;
     border-radius:12px;
     overflow:hidden;
     border:1px solid #eee;
     box-shadow:0 6px 14px rgba(0,0,0,.08);
     background:#fafafa;
   }
-  #mini-map{
-    width:100%;
-    height:100%;
-  }
+  #mini-map{ width:100%; height:100%; }
   #mini-badge{
     position:absolute;
     left:10px;
@@ -66,122 +77,133 @@
     font-size:12px;
     color:#333;
   }
+  .relative { position:relative; }
 
-  /* space for mini map on small screens */
   @media (max-width: 700px){
-    #mini-map-wrap{ position:relative; right:auto; bottom:auto; width:100%; height:200px; margin-top:12px; }
+    input{ min-width:180px; }
+    #mini-map-wrap{ position:relative; right:auto; bottom:auto; width:100%; height:220px; margin-top:12px; }
   }
+
+  /* Screens */
+  .screen { display:none; }
+  .screen.active { display:block; }
 </style>
 </head>
 
 <body>
 
 <header>
-  <div class="wrap">
-    <h1>People can a Vote</h1>
-    <p class="muted">Global view of opinions from around the world</p>
+  <div class="wrap nav">
+    <div class="nav-left">
+      <div class="brand">
+        <h1>People can a Vote</h1>
+        <div class="muted">Global view of opinions from around the world</div>
+      </div>
+
+      <button class="ghost" id="homeBtn">Home</button>
+      <button class="ghost" id="backBtn" disabled>← Zpět</button>
+
+      <span class="pill" id="crumb">Home</span>
+    </div>
+
+    <div class="nav-right">
+      <input id="search" type="text" placeholder="Hledej událost…">
+      <span class="pill" id="selectedCountryPill">Země: (vše)</span>
+
+      <!-- Auth compact -->
+      <span class="pill" id="authPill">Nepřihlášen</span>
+      <button class="ghost" id="openAuthBtn">Přihlásit</button>
+      <button class="ghost" id="logoutBtn" style="display:none;">Odhlásit</button>
+    </div>
   </div>
 </header>
 
 <div class="wrap">
 
-  <!-- AUTH -->
-  <section class="card" id="auth">
-    <div id="auth-forms">
-      <h3 class="sectionTitle">Přihlášení / Registrace</h3>
-      <div class="row">
-        <input id="email" type="email" placeholder="Email">
-        <input id="password" type="password" placeholder="Heslo">
-        <select id="country-select">
-          <option value="">Načítám země…</option>
-        </select>
-      </div>
-      <div class="row" style="margin-top:10px;">
-        <button class="primary" id="signup-btn">Registrovat</button>
-        <button class="ghost" id="login-btn">Přihlásit</button>
-      </div>
-      <p id="auth-error" style="color:#b00020; margin:10px 0 0;"></p>
-      <p class="hint">Pozn.: země je povinná jen při registraci. Při přihlášení se ignoruje.</p>
-    </div>
-
-    <div id="auth-logged" style="display:none;">
-      <div class="row">
-        <strong id="auth-message"></strong>
-        <span class="pill" id="auth-country"></span>
-        <button class="ghost" id="logout-btn">Odhlásit</button>
-      </div>
-      <p id="auth-hint" class="hint"></p>
-    </div>
-  </section>
-
-  <!-- TOP 3 -->
-  <section class="card">
-    <div class="row" style="justify-content:space-between;">
-      <div>
-        <h3 class="sectionTitle">TOP 3 události (globálně)</h3>
-        <div class="muted">Události s největším počtem hlasů.</div>
-      </div>
-      <button class="ghost" id="refresh-top">Obnovit</button>
-    </div>
-    <div id="top3" class="topGrid">
-      <div class="muted">Načítám…</div>
-    </div>
-  </section>
-
-  <!-- MAP + FILTER -->
-  <section class="card">
-    <div class="row" style="justify-content:space-between;">
-      <div>
-        <h3 class="sectionTitle">Mapa</h3>
-        <div class="muted">Klikni na zemi na mapě, nebo vyber zemi v seznamu.</div>
-      </div>
-      <div class="row">
-        <span class="pill" id="selected-country-pill">Země: (vše)</span>
-        <button class="ghost" id="clear-country">Zrušit filtr</button>
-      </div>
-    </div>
-    <div id="map"></div>
-
-    <div class="row" style="margin-top:10px;">
-      <select id="country-filter">
-        <option value="">Všechny země</option>
+  <!-- AUTH MODAL-ish card -->
+  <section class="card" id="authCard" style="display:none;">
+    <h3 style="margin:0 0 10px 0;">Přihlášení / Registrace</h3>
+    <div class="row">
+      <input id="email" type="email" placeholder="Email">
+      <input id="password" type="password" placeholder="Heslo">
+      <select id="countrySelect">
+        <option value="">Načítám země…</option>
       </select>
-      <span class="muted">Filtrovat události podle země</span>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <button class="primary" id="signupBtn">Registrovat</button>
+      <button class="ghost" id="loginBtn">Přihlásit</button>
+      <button class="ghost" id="closeAuthBtn">Zavřít</button>
+    </div>
+    <p id="authError" style="color:#b00020; margin:10px 0 0;"></p>
+    <div class="muted" style="margin-top:10px; font-size:13px;">
+      Země je povinná jen při registraci. Při přihlášení se ignoruje.
     </div>
   </section>
 
-  <!-- EVENTS -->
-  <section>
-    <h2 style="margin:0 16px;">Události</h2>
+  <!-- SCREEN: HOME -->
+  <section id="screenHome" class="screen active">
+    <section class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <h3 style="margin:0 0 6px 0;">TOP 3 události (globálně)</h3>
+          <div class="muted">Události s největším počtem hlasů.</div>
+        </div>
+        <button class="ghost" id="refreshTop">Obnovit</button>
+      </div>
+      <div id="top3" class="topGrid" style="margin-top:12px;">
+        <div class="muted">Načítám…</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <h3 style="margin:0 0 6px 0;">Mapa</h3>
+          <div class="muted">Klikni na zemi → uvidíš události pro danou zemi.</div>
+        </div>
+        <button class="ghost" id="clearCountry">Zrušit výběr</button>
+      </div>
+      <div id="map"></div>
+    </section>
+  </section>
+
+  <!-- SCREEN: COUNTRY (list of events only) -->
+  <section id="screenCountry" class="screen">
+    <section class="card">
+      <h2 style="margin:0 0 6px 0;">Události</h2>
+      <div class="muted" id="countrySubtitle">Vyber z mapy zemi, nebo použij vyhledávání.</div>
+    </section>
     <div id="events"></div>
   </section>
 
-  <!-- VOTE -->
-  <section class="card" id="vote-card">
-    <h3 class="sectionTitle" id="vote-title">Vyber událost</h3>
-    <div class="muted" id="vote-subtitle"></div>
+  <!-- SCREEN: EVENT (question + minimap + stats) -->
+  <section id="screenEvent" class="screen">
+    <section class="card relative" id="eventCard">
+      <h2 id="eventTitle" style="margin:0 0 6px 0;">—</h2>
+      <div class="muted" id="eventDesc"></div>
 
-    <div id="vote-buttons" style="display:none; margin-top:12px;">
-      <div class="row">
-        <button class="primary" id="vote-yes">Ano</button>
-        <button class="primary" id="vote-no">Ne</button>
-        <button class="primary" id="vote-neutral">Nemám názor</button>
+      <div id="voteButtons" style="display:none; margin-top:12px;">
+        <div class="row">
+          <button class="primary" id="voteYes">Ano</button>
+          <button class="primary" id="voteNo">Ne</button>
+          <button class="primary" id="voteNeutral">Nemám názor</button>
+        </div>
       </div>
-    </div>
 
-    <p id="vote-message" style="margin:12px 0 0;"></p>
+      <p id="voteMsg" style="margin:12px 0 0;"></p>
 
-    <!-- MINI MAP -->
-    <div id="mini-map-wrap">
-      <div id="mini-map"></div>
-      <div id="mini-badge">Země události: —</div>
-    </div>
-  </section>
+      <!-- MINI MAP -->
+      <div id="mini-map-wrap">
+        <div id="mini-map"></div>
+        <div id="mini-badge">Země události: —</div>
+      </div>
+    </section>
 
-  <!-- STATS -->
-  <section class="card">
-    <h3 class="sectionTitle">Statistiky</h3>
-    <div id="vote-stats" class="muted">Vyber událost.</div>
+    <section class="card">
+      <h3 style="margin:0 0 10px 0;">Statistiky</h3>
+      <div id="stats" class="muted">Načítám…</div>
+    </section>
   </section>
 
 </div>
@@ -199,175 +221,185 @@ const supabaseClient = supabase.createClient(
 mapboxgl.accessToken =
   'pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ';
 
-/* ================== STAV ================== */
+/* ================== STATE ================== */
+let screen = "HOME"; // HOME | COUNTRY | EVENT
+let selectedCountryCode = ""; // ISO-2
+let selectedCountryName = "";
 let currentEventId = null;
 let currentEventCountryCode = null;
-let currentUserCountryCode = null;
-let selectedCountryCode = "";
+let userCountryCode = null;
+let countries = [];
 
-/* ================== ELEMENTY ================== */
-const voteButtons = document.getElementById('vote-buttons');
-const voteMessage = document.getElementById('vote-message');
-const voteStats = document.getElementById('vote-stats');
-const voteTitle = document.getElementById('vote-title');
-const voteSubtitle = document.getElementById('vote-subtitle');
+/* ================== UI refs ================== */
+const crumb = document.getElementById('crumb');
+const homeBtn = document.getElementById('homeBtn');
+const backBtn = document.getElementById('backBtn');
+const selectedCountryPill = document.getElementById('selectedCountryPill');
 
-const authForms = document.getElementById('auth-forms');
-const authLogged = document.getElementById('auth-logged');
-const authMessage = document.getElementById('auth-message');
-const authCountry = document.getElementById('auth-country');
-const authHint = document.getElementById('auth-hint');
-const authError = document.getElementById('auth-error');
+const screenHome = document.getElementById('screenHome');
+const screenCountry = document.getElementById('screenCountry');
+const screenEvent = document.getElementById('screenEvent');
+
+const top3Div = document.getElementById('top3');
+const refreshTop = document.getElementById('refreshTop');
+const clearCountry = document.getElementById('clearCountry');
+
+const eventsDiv = document.getElementById('events');
+const countrySubtitle = document.getElementById('countrySubtitle');
+
+const eventTitle = document.getElementById('eventTitle');
+const eventDesc = document.getElementById('eventDesc');
+const voteButtons = document.getElementById('voteButtons');
+const voteMsg = document.getElementById('voteMsg');
+const stats = document.getElementById('stats');
+const miniBadge = document.getElementById('mini-badge');
+
+const search = document.getElementById('search');
+
+const authCard = document.getElementById('authCard');
+const openAuthBtn = document.getElementById('openAuthBtn');
+const closeAuthBtn = document.getElementById('closeAuthBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const authPill = document.getElementById('authPill');
 
 const email = document.getElementById('email');
 const password = document.getElementById('password');
-const countrySelect = document.getElementById('country-select');
+const countrySelect = document.getElementById('countrySelect');
+const authError = document.getElementById('authError');
 
-const countryFilter = document.getElementById('country-filter');
-const selectedCountryPill = document.getElementById('selected-country-pill');
-const clearCountryBtn = document.getElementById('clear-country');
+const loginBtn = document.getElementById('loginBtn');
+const signupBtn = document.getElementById('signupBtn');
 
-const top3Div = document.getElementById('top3');
+/* ================== Helpers ================== */
+function showScreen(next){
+  screen = next;
+  screenHome.classList.toggle('active', next === "HOME");
+  screenCountry.classList.toggle('active', next === "COUNTRY");
+  screenEvent.classList.toggle('active', next === "EVENT");
 
-const miniBadge = document.getElementById('mini-badge');
+  // Back button logic
+  backBtn.disabled = (next === "HOME");
+  if (next === "HOME") crumb.textContent = "Home";
+  if (next === "COUNTRY") crumb.textContent = selectedCountryCode ? `Země: ${selectedCountryName} (${selectedCountryCode})` : "Události";
+  if (next === "EVENT") crumb.textContent = "Událost";
+}
 
-voteButtons.style.display = 'none';
+function setCountryPill(){
+  selectedCountryPill.textContent = selectedCountryCode ? `Země: ${selectedCountryName} (${selectedCountryCode})` : "Země: (vše)";
+}
 
-/* ================== POMOCNÉ ================== */
-function setAuthError(msg){ authError.textContent = msg || ""; }
-function setVoteMessage(msg){ voteMessage.textContent = msg || ""; }
+function getCountryNameByCode(code){
+  const c = countries.find(x => x.code === code);
+  return c ? c.name : code;
+}
+
 function safePct(part, total){ return total ? Math.round((part/total)*100) : 0; }
-function setSelectedCountryUI(code, nameMaybe){
-  const label = code ? `Země: ${nameMaybe ? nameMaybe + ' ' : ''}(${code})` : "Země: (vše)";
-  selectedCountryPill.textContent = label;
-}
-function cleanCountryLabel(optionText){
-  return (optionText || "").replace(/\s*\(.+\)\s*$/, '').trim();
+
+function barHTML(label, count, total) {
+  const pct = safePct(count, total);
+  return `
+    <div class="barRow">
+      <div class="barLabel">${label}</div>
+      <div class="barOuter"><div class="barInner" style="width:${pct}%;"></div></div>
+      <div class="barValue">${count} (${pct}%)</div>
+    </div>
+  `;
 }
 
-/* ================== NAČTI ZEMĚ ================== */
-async function loadCountries() {
-  const { data, error } = await supabaseClient
-    .from('countries')
-    .select('code, name')
-    .order('name', { ascending: true });
+/* ================== Navigation buttons ================== */
+homeBtn.onclick = () => goHome();
+backBtn.onclick = () => goBack();
 
-  if (error) {
-    countrySelect.innerHTML = '<option value="">Země nelze načíst</option>';
-    return [];
+function goHome(){
+  currentEventId = null;
+  showScreen("HOME");
+}
+
+function goBack(){
+  if (screen === "EVENT") {
+    showScreen("COUNTRY");
+  } else if (screen === "COUNTRY") {
+    showScreen("HOME");
   }
-
-  countrySelect.innerHTML = ['<option value="">Vyber zemi (pro registraci)</option>']
-    .concat(data.map(c => `<option value="${c.code}">${c.name} (${c.code})</option>`))
-    .join('');
-
-  countryFilter.innerHTML = ['<option value="">Všechny země</option>']
-    .concat(data.map(c => `<option value="${c.code}">${c.name} (${c.code})</option>`))
-    .join('');
-
-  return data;
 }
 
-/* ================== PROFILES ================== */
-async function loadMyProfile() {
-  currentUserCountryCode = null;
+/* ================== Auth UI ================== */
+openAuthBtn.onclick = () => { authCard.style.display = "block"; };
+closeAuthBtn.onclick = () => { authCard.style.display = "none"; };
+logoutBtn.onclick = async () => { await supabaseClient.auth.signOut(); };
+
+loginBtn.onclick = async () => {
+  authError.textContent = "";
+  const { error } = await supabaseClient.auth.signInWithPassword({ email: email.value, password: password.value });
+  if (error) authError.textContent = error.message;
+};
+
+signupBtn.onclick = async () => {
+  authError.textContent = "";
+  const cc = countrySelect.value;
+  if (!cc) { authError.textContent = "Vyber zemi při registraci."; return; }
+
+  const { error: e1 } = await supabaseClient.auth.signUp({ email: email.value, password: password.value });
+  if (e1) { authError.textContent = e1.message; return; }
+
+  const { error: e2 } = await supabaseClient.auth.signInWithPassword({ email: email.value, password: password.value });
+  if (e2) { authError.textContent = e2.message; return; }
+
   const { data: sess } = await supabaseClient.auth.getSession();
   const user = sess.session?.user;
   if (!user) return;
 
-  const { data, error } = await supabaseClient
+  const { error: e3 } = await supabaseClient.from('profiles').insert([{ id: user.id, country_code: cc }]);
+  if (e3 && e3.code !== '23505') authError.textContent = e3.message;
+};
+
+supabaseClient.auth.onAuthStateChange(async () => {
+  await refreshAuthPill();
+  if (screen === "EVENT" && currentEventId) await refreshEventDetail(currentEventId);
+});
+
+async function refreshAuthPill(){
+  const { data } = await supabaseClient.auth.getSession();
+  const user = data.session?.user;
+
+  if (!user){
+    authPill.textContent = "Nepřihlášen";
+    openAuthBtn.style.display = "inline-block";
+    logoutBtn.style.display = "none";
+    userCountryCode = null;
+    return;
+  }
+
+  openAuthBtn.style.display = "none";
+  logoutBtn.style.display = "inline-block";
+
+  const { data: prof } = await supabaseClient
     .from('profiles')
     .select('country_code')
     .eq('id', user.id)
     .maybeSingle();
 
-  if (!error && data?.country_code) currentUserCountryCode = data.country_code;
+  userCountryCode = prof?.country_code || null;
+  authPill.textContent = userCountryCode ? `Přihlášen • ${userCountryCode}` : `Přihlášen`;
 }
 
-/* ================== AUTH ================== */
-document.getElementById('login-btn').onclick = async () => {
-  setAuthError("");
-  const { error } = await supabaseClient.auth.signInWithPassword({
-    email: email.value,
-    password: password.value
-  });
-  if (error) setAuthError(error.message);
-};
+/* ================== Countries ================== */
+async function loadCountries(){
+  const { data, error } = await supabaseClient.from('countries').select('code,name').order('name', { ascending: true });
+  if (error) return;
+  countries = data || [];
 
-document.getElementById('signup-btn').onclick = async () => {
-  setAuthError("");
-  const selected = countrySelect.value;
-  if (!selected) { setAuthError("Při registraci vyber svoji zemi."); return; }
-
-  const { error: signUpErr } = await supabaseClient.auth.signUp({
-    email: email.value,
-    password: password.value
-  });
-  if (signUpErr) { setAuthError(signUpErr.message); return; }
-
-  const { error: signInErr } = await supabaseClient.auth.signInWithPassword({
-    email: email.value,
-    password: password.value
-  });
-  if (signInErr) {
-    setAuthError(signInErr.message);
-    authHint.textContent = "Pokud máš zapnuté potvrzení emailu, musíš nejdřív potvrdit registraci.";
-    return;
-  }
-
-  const { data: sess } = await supabaseClient.auth.getSession();
-  const user = sess.session?.user;
-  if (!user) return;
-
-  const { error: profErr } = await supabaseClient
-    .from('profiles')
-    .insert([{ id: user.id, country_code: selected }]);
-
-  if (profErr && profErr.code !== '23505') setAuthError(profErr.message);
-};
-
-document.getElementById('logout-btn').onclick = async () => {
-  await supabaseClient.auth.signOut();
-};
-
-supabaseClient.auth.onAuthStateChange(async () => {
-  await updateAuthUI();
-  if (currentEventId) await refreshVoteAndStats();
-});
-
-async function updateAuthUI() {
-  const { data } = await supabaseClient.auth.getSession();
-  const user = data.session?.user;
-
-  if (user) {
-    authForms.style.display = "none";
-    authLogged.style.display = "block";
-    authMessage.textContent = `Přihlášen jako: ${user.email}`;
-    authHint.textContent = "";
-    await loadMyProfile();
-    authCountry.textContent = currentUserCountryCode ? `Země: ${currentUserCountryCode}` : "Země: (nenastavena)";
-  } else {
-    authForms.style.display = "block";
-    authLogged.style.display = "none";
-    authMessage.textContent = "";
-    authCountry.textContent = "";
-    authHint.textContent = "";
-    currentUserCountryCode = null;
-
-    voteButtons.style.display = "none";
-    setVoteMessage("");
-  }
+  // for registration select
+  countrySelect.innerHTML = ['<option value="">Vyber zemi (pro registraci)</option>']
+    .concat(countries.map(c => `<option value="${c.code}">${c.name} (${c.code})</option>`)).join('');
 }
 
-/* ================== TOP 3 (GLOBÁLNĚ) ================== */
-async function loadTop3Global() {
+/* ================== HOME: Top 3 ================== */
+async function loadTop3(){
   top3Div.innerHTML = '<div class="muted">Načítám…</div>';
 
-  const { data: votes, error: vErr } = await supabaseClient
-    .from('votes')
-    .select('event_id');
-
-  if (vErr) { top3Div.innerHTML = '<div class="muted">Nelze načíst TOP události.</div>'; return; }
+  const { data: votes, error: vErr } = await supabaseClient.from('votes').select('event_id');
+  if (vErr) { top3Div.innerHTML = '<div class="muted">Nelze načíst TOP.</div>'; return; }
 
   const counts = new Map();
   for (const v of (votes || [])) counts.set(v.event_id, (counts.get(v.event_id) || 0) + 1);
@@ -377,21 +409,20 @@ async function loadTop3Global() {
   const top = [...counts.entries()].sort((a,b) => b[1] - a[1]).slice(0, 3);
   const ids = top.map(t => t[0]);
 
-  const { data: evs, error: eErr } = await supabaseClient
-    .from('events')
-    .select('id, title, description, country_code')
+  const { data: evs, error: eErr } = await supabaseClient.from('events')
+    .select('id,title,description,country_code,is_active')
     .in('id', ids);
 
-  if (eErr) { top3Div.innerHTML = '<div class="muted">Nelze načíst detail TOP událostí.</div>'; return; }
+  if (eErr) { top3Div.innerHTML = '<div class="muted">Nelze načíst TOP detail.</div>'; return; }
 
-  const byId = new Map((evs || []).map(e => [e.id, e]));
+  const byId = new Map((evs||[]).map(e => [e.id, e]));
   const cards = [];
 
-  for (const [id, cnt] of top) {
+  for (const [id, cnt] of top){
     const e = byId.get(id);
     if (!e) continue;
     cards.push(`
-      <div class="topCard" data-event-id="${e.id}">
+      <div class="topCard" data-id="${e.id}">
         <strong>${e.title}</strong>
         <div class="muted" style="margin-top:6px;">${e.description || ""}</div>
         <div class="topCount">Hlasů: <strong>${cnt}</strong> • Země: ${e.country_code || "?"}</div>
@@ -400,208 +431,193 @@ async function loadTop3Global() {
   }
 
   top3Div.innerHTML = cards.join('');
-  for (const el of top3Div.querySelectorAll('.topCard')) {
+
+  for (const el of top3Div.querySelectorAll('.topCard')){
     el.addEventListener('click', async () => {
-      const eventId = Number(el.getAttribute('data-event-id'));
-      await openEventFromTop(eventId);
+      const id = Number(el.getAttribute('data-id'));
+      await openEvent(id);
     });
   }
 }
-document.getElementById('refresh-top').onclick = loadTop3Global;
+refreshTop.onclick = loadTop3;
 
-async function openEventFromTop(eventId) {
+/* ================== COUNTRY: Events list ================== */
+async function loadEvents(){
+  eventsDiv.innerHTML = "";
+
+  let q = supabaseClient
+    .from('events')
+    .select('id,title,description,country_code,created_at')
+    .eq('is_active', true);
+
+  if (selectedCountryCode) q = q.eq('country_code', selectedCountryCode);
+
+  // search: filter by title/description (client-side for MVP)
+  const { data, error } = await q.order('created_at', { ascending: false });
+  if (error) { eventsDiv.innerHTML = '<div class="muted" style="margin:0 16px;">Nelze načíst události.</div>'; return; }
+
+  let list = data || [];
+  const term = (search.value || "").trim().toLowerCase();
+  if (term) {
+    list = list.filter(e =>
+      (e.title || "").toLowerCase().includes(term) ||
+      (e.description || "").toLowerCase().includes(term)
+    );
+  }
+
+  if (!list.length){
+    eventsDiv.innerHTML = '<div class="muted" style="margin:0 16px;">Žádné události pro tento výběr / hledání.</div>';
+    return;
+  }
+
+  for (const e of list){
+    const div = document.createElement('div');
+    div.className = 'event';
+    div.innerHTML = `<strong>${e.title}</strong><small>${e.description || ""}</small>`;
+    div.onclick = async () => { await openEvent(e.id); };
+    eventsDiv.appendChild(div);
+  }
+}
+
+search.addEventListener('input', async () => {
+  if (screen === "COUNTRY") await loadEvents();
+});
+
+/* ================== EVENT: Detail ================== */
+async function openEvent(eventId){
+  // načti event
   const { data: evt, error } = await supabaseClient
     .from('events')
-    .select('id, country_code')
+    .select('id,title,description,country_code,is_active')
     .eq('id', eventId)
     .maybeSingle();
 
   if (error || !evt) return;
 
-  selectedCountryCode = evt.country_code || "";
-  countryFilter.value = selectedCountryCode;
+  currentEventId = evt.id;
+  currentEventCountryCode = evt.country_code || "";
 
-  const label = countryFilter.options[countryFilter.selectedIndex]?.text || selectedCountryCode;
-  setSelectedCountryUI(selectedCountryCode, cleanCountryLabel(label));
+  // nastav country kontext (aby dávalo smysl, odkud se na událost přišlo)
+  selectedCountryCode = currentEventCountryCode || selectedCountryCode;
+  selectedCountryName = selectedCountryCode ? getCountryNameByCode(selectedCountryCode) : "";
+  setCountryPill();
 
-  await loadEventsList();
+  // přepni screen
+  showScreen("EVENT");
 
-  currentEventId = eventId;
-  currentEventCountryCode = evt.country_code;
+  // vykresli detail
+  await refreshEventDetail(eventId);
 
-  document.getElementById('vote-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  await refreshVoteAndStats();
+  // zjemnění: zavřít auth card, pokud je otevřená
+  authCard.style.display = "none";
 }
 
-/* ================== EVENTS LIST ================== */
-async function loadEventsList() {
-  const eventsDiv = document.getElementById('events');
-  eventsDiv.innerHTML = "";
-
-  let q = supabaseClient
-    .from('events')
-    .select('id, title, description, country_code, created_at')
-    .eq('is_active', true);
-
-  if (selectedCountryCode) q = q.eq('country_code', selectedCountryCode);
-
-  const { data, error } = await q.order('created_at', { ascending: false });
-
-  if (error) {
-    eventsDiv.innerHTML = '<div class="muted" style="margin:0 16px;">Nelze načíst události.</div>';
-    return;
-  }
-
-  if (!data.length) {
-    eventsDiv.innerHTML = '<div class="muted" style="margin:0 16px;">Žádné aktivní události pro tento filtr.</div>';
-    currentEventId = null;
-    voteTitle.textContent = "Vyber událost";
-    voteSubtitle.textContent = "";
-    voteButtons.style.display = "none";
-    voteStats.textContent = "Vyber událost.";
-    miniBadge.textContent = "Země události: —";
-    updateMiniMapSelected("");
-    return;
-  }
-
-  currentEventId = data[0].id;
-  currentEventCountryCode = data[0].country_code;
-
-  for (const e of data) {
-    const div = document.createElement('div');
-    div.className = 'event';
-    div.innerHTML = `<strong>${e.title}</strong><small>${e.description || ""}</small>`;
-    div.onclick = async () => {
-      currentEventId = e.id;
-      currentEventCountryCode = e.country_code;
-      await refreshVoteAndStats();
-      document.getElementById('vote-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
-    eventsDiv.appendChild(div);
-  }
-
-  await refreshVoteAndStats();
-}
-
-/* ================== VOTE + STATS ================== */
-async function refreshVoteAndStats() {
+async function refreshEventDetail(eventId){
   voteButtons.style.display = "none";
-  setVoteMessage("");
+  voteMsg.textContent = "";
+  stats.textContent = "Načítám…";
 
-  if (!currentEventId) return;
-
-  const { data: evt, error: evtErr } = await supabaseClient
+  const { data: evt, error } = await supabaseClient
     .from('events')
-    .select('id, title, description, country_code')
-    .eq('id', currentEventId)
+    .select('id,title,description,country_code')
+    .eq('id', eventId)
     .maybeSingle();
 
-  if (evtErr || !evt) return;
+  if (error || !evt) return;
 
-  currentEventCountryCode = evt.country_code;
-  voteTitle.textContent = evt.title || "Hlasování";
-  voteSubtitle.textContent = evt.description || "";
+  currentEventCountryCode = evt.country_code || "";
+  eventTitle.textContent = evt.title || "—";
+  eventDesc.textContent = evt.description || "";
 
-  // update mini map
-  const cc = currentEventCountryCode || "";
-  miniBadge.textContent = cc ? `Země události: ${cc}` : "Země události: —";
-  updateMiniMapSelected(cc);
+  // mini map update
+  miniBadge.textContent = currentEventCountryCode ? `Země události: ${currentEventCountryCode}` : "Země události: —";
+  updateMiniMapSelected(currentEventCountryCode || "");
 
-  await loadVoteStats(currentEventId, currentEventCountryCode);
+  // stats
+  await loadStats(eventId, currentEventCountryCode);
 
+  // vote availability
   const { data: sess } = await supabaseClient.auth.getSession();
   const user = sess.session?.user;
-  if (!user) {
-    setVoteMessage("Pro hlasování se přihlas.");
+
+  if (!user){
+    voteMsg.textContent = "Pro hlasování se přihlas.";
     return;
   }
 
-  if (!currentUserCountryCode) await loadMyProfile();
+  if (!userCountryCode) await refreshAuthPill();
 
   const { data: existing } = await supabaseClient
     .from('votes')
     .select('vote')
     .eq('user_id', user.id)
-    .eq('event_id', currentEventId)
+    .eq('event_id', eventId)
     .maybeSingle();
 
-  if (existing) {
-    setVoteMessage(`Už jste hlasoval (${existing.vote}).`);
+  if (existing){
+    voteMsg.textContent = `Už jste hlasoval (${existing.vote}).`;
     voteButtons.style.display = "none";
   } else {
     voteButtons.style.display = "block";
   }
 }
 
-async function submitVote(value) {
-  setVoteMessage("");
+document.getElementById('voteYes').onclick = () => submitVote("Ano");
+document.getElementById('voteNo').onclick = () => submitVote("Ne");
+document.getElementById('voteNeutral').onclick = () => submitVote("Nemám názor");
+
+async function submitVote(value){
+  voteMsg.textContent = "";
 
   const { data: sess } = await supabaseClient.auth.getSession();
   const user = sess.session?.user;
-  if (!user) { setVoteMessage("Musíš být přihlášen."); return; }
+  if (!user){ voteMsg.textContent = "Musíš být přihlášen."; return; }
 
-  if (!currentUserCountryCode) await loadMyProfile();
-  if (!currentUserCountryCode) { setVoteMessage("Nemáš nastavenou zemi v profilu."); return; }
+  if (!userCountryCode) await refreshAuthPill();
+  if (!userCountryCode){ voteMsg.textContent = "Nemáš nastavenou zemi v profilu."; return; }
 
-  const { error } = await supabaseClient
-    .from('votes')
-    .insert({
-      user_id: user.id,
-      event_id: currentEventId,
-      vote: value,
-      country_code: currentUserCountryCode
-    });
+  const { error } = await supabaseClient.from('votes').insert({
+    user_id: user.id,
+    event_id: currentEventId,
+    vote: value,
+    country_code: userCountryCode
+  });
 
-  if (error) {
-    if (error.code === "23505") {
-      setVoteMessage("Už jste hlasoval pro tuto událost.");
+  if (error){
+    if (error.code === "23505"){
+      voteMsg.textContent = "Už jste hlasoval pro tuto událost.";
       voteButtons.style.display = "none";
     } else {
-      setVoteMessage(error.message);
+      voteMsg.textContent = error.message;
     }
     return;
   }
 
   voteButtons.style.display = "none";
-  setVoteMessage("Hlas uložen.");
-  await loadTop3Global();
-  await refreshVoteAndStats();
+  voteMsg.textContent = "Hlas uložen.";
+  await loadTop3(); // může změnit pořadí
+  await refreshEventDetail(currentEventId);
 }
 
-document.getElementById('vote-yes').onclick = () => submitVote('Ano');
-document.getElementById('vote-no').onclick = () => submitVote('Ne');
-document.getElementById('vote-neutral').onclick = () => submitVote('Nemám názor');
-
-function barHTML(label, count, total) {
-  const pct = safePct(count, total);
-  return `
-    <div class="barRow">
-      <div class="barLabel">${label}</div>
-      <div class="barOuter"><div class="barInner" style="width:${pct}%; background:#111;"></div></div>
-      <div class="barValue">${count} (${pct}%)</div>
-    </div>
-  `;
-}
-
-async function loadVoteStats(eventId, eventCountryCode) {
+/* ================== Stats ================== */
+async function loadStats(eventId, eventCountryCode){
   const { data, error } = await supabaseClient
     .from('votes')
-    .select('vote, country_code')
+    .select('vote,country_code')
     .eq('event_id', eventId);
 
-  if (error) { voteStats.textContent = "Nelze načíst statistiky."; return; }
+  if (error){ stats.textContent = "Nelze načíst statistiky."; return; }
 
-  const total = data.length;
+  const total = (data||[]).length;
 
-  const yes = data.filter(v => v.vote === 'Ano').length;
-  const no = data.filter(v => v.vote === 'Ne').length;
-  const neutral = data.filter(v => v.vote === 'Nemám názor').length;
+  const yes = (data||[]).filter(v => v.vote === 'Ano').length;
+  const no = (data||[]).filter(v => v.vote === 'Ne').length;
+  const neutral = (data||[]).filter(v => v.vote === 'Nemám názor').length;
 
-  const citizens = eventCountryCode ? data.filter(v => v.country_code === eventCountryCode) : [];
-  const others = eventCountryCode ? data.filter(v => v.country_code !== eventCountryCode) : data;
+  const citizens = eventCountryCode ? (data||[]).filter(v => v.country_code === eventCountryCode) : [];
+  const others = eventCountryCode ? (data||[]).filter(v => v.country_code !== eventCountryCode) : (data||[]);
 
-  const cTotal = citizens.length;
-  const oTotal = others.length;
+  const cTotal = citizens.length, oTotal = others.length;
 
   const cYes = citizens.filter(v => v.vote === 'Ano').length;
   const cNo = citizens.filter(v => v.vote === 'Ne').length;
@@ -611,7 +627,7 @@ async function loadVoteStats(eventId, eventCountryCode) {
   const oNo = others.filter(v => v.vote === 'Ne').length;
   const oNeutral = others.filter(v => v.vote === 'Nemám názor').length;
 
-  voteStats.innerHTML = `
+  stats.innerHTML = `
     <div><strong>Celkem:</strong> ${total} hlasů</div>
     <div class="barWrap">
       ${barHTML('Ano', yes, total)}
@@ -635,176 +651,169 @@ async function loadVoteStats(eventId, eventCountryCode) {
   `;
 }
 
-/* ================== FILTER UI ================== */
-countryFilter.onchange = async () => {
-  selectedCountryCode = countryFilter.value || "";
-  const name = countryFilter.options[countryFilter.selectedIndex]?.text || "";
-  setSelectedCountryUI(selectedCountryCode, cleanCountryLabel(name));
-  await loadEventsList();
-};
-
-clearCountryBtn.onclick = async () => {
+/* ================== HOME: Map (select country) ================== */
+clearCountry.onclick = () => {
   selectedCountryCode = "";
-  countryFilter.value = "";
-  setSelectedCountryUI("", "");
-  await loadEventsList();
+  selectedCountryName = "";
+  setCountryPill();
+  // zůstáváme na home, jen zrušíme highlight
+  setBigMapSelected("");
 };
 
-/* ================== MAPBOX (BIG MAP) ================== */
-const map = new mapboxgl.Map({
-  container: 'map',
-  style: 'mapbox://styles/mapbox/light-v11',
-  center: [10, 20],
-  zoom: 1.2
-});
+let map, miniMap;
 
-map.on('load', () => {
-  map.addSource('countryBoundaries', { type: 'vector', url: 'mapbox://mapbox.country-boundaries-v1' });
+function selectCountry(code){
+  selectedCountryCode = code || "";
+  selectedCountryName = selectedCountryCode ? getCountryNameByCode(selectedCountryCode) : "";
+  setCountryPill();
+  countrySubtitle.textContent = selectedCountryCode
+    ? `Vybraná země: ${selectedCountryName} (${selectedCountryCode})`
+    : "Vyber z mapy zemi, nebo použij vyhledávání.";
 
-  map.addLayer({
-    id: 'country-fill',
-    type: 'fill',
-    source: 'countryBoundaries',
-    'source-layer': 'country_boundaries',
-    paint: { 'fill-color': '#000', 'fill-opacity': 0.05 }
-  });
+  showScreen("COUNTRY");
+  loadEvents();
+}
 
-  map.addLayer({
-    id: 'country-line',
-    type: 'line',
-    source: 'countryBoundaries',
-    'source-layer': 'country_boundaries',
-    paint: { 'line-color': '#000', 'line-width': 1, 'line-opacity': 0.15 }
-  });
-
-  map.addLayer({
-    id: 'country-hover',
-    type: 'fill',
-    source: 'countryBoundaries',
-    'source-layer': 'country_boundaries',
-    paint: { 'fill-color': '#000', 'fill-opacity': 0.12 },
-    filter: ['==', ['get', 'iso_3166_1'], '']
-  });
-
-  map.addLayer({
-    id: 'country-selected',
-    type: 'fill',
-    source: 'countryBoundaries',
-    'source-layer': 'country_boundaries',
-    paint: { 'fill-color': '#000', 'fill-opacity': 0.18 },
-    filter: ['==', ['get', 'iso_3166_1'], '']
-  });
-
-  let hoveredISO = "";
-
-  map.on('mousemove', 'country-fill', (e) => {
-    const iso = e.features?.[0]?.properties?.iso_3166_1 || "";
-    if (iso !== hoveredISO) {
-      hoveredISO = iso;
-      map.setFilter('country-hover', ['==', ['get', 'iso_3166_1'], hoveredISO]);
-    }
-    map.getCanvas().style.cursor = 'pointer';
-  });
-
-  map.on('mouseleave', 'country-fill', () => {
-    hoveredISO = "";
-    map.setFilter('country-hover', ['==', ['get', 'iso_3166_1'], '']);
-    map.getCanvas().style.cursor = '';
-  });
-
-  map.on('click', 'country-fill', async (e) => {
-    const iso = e.features?.[0]?.properties?.iso_3166_1 || "";
-    if (!iso) return;
-
-    selectedCountryCode = iso;
-    countryFilter.value = iso;
-
-    map.setFilter('country-selected', ['==', ['get', 'iso_3166_1'], iso]);
-
-    const label = countryFilter.options[countryFilter.selectedIndex]?.text || iso;
-    setSelectedCountryUI(iso, cleanCountryLabel(label));
-
-    await loadEventsList();
-  });
-});
-
-/* ================== MINI MAP ================== */
-const miniMap = new mapboxgl.Map({
-  container: 'mini-map',
-  style: 'mapbox://styles/mapbox/light-v11',
-  center: [10, 20],
-  zoom: 0.6,
-  interactive: false
-});
-
-miniMap.on('load', () => {
-  miniMap.addSource('miniCountryBoundaries', { type: 'vector', url: 'mapbox://mapbox.country-boundaries-v1' });
-
-  miniMap.addLayer({
-    id: 'mini-country-fill',
-    type: 'fill',
-    source: 'miniCountryBoundaries',
-    'source-layer': 'country_boundaries',
-    paint: { 'fill-color': '#000', 'fill-opacity': 0.05 }
-  });
-
-  miniMap.addLayer({
-    id: 'mini-country-selected',
-    type: 'fill',
-    source: 'miniCountryBoundaries',
-    'source-layer': 'country_boundaries',
-    paint: { 'fill-color': '#000', 'fill-opacity': 0.25 },
-    filter: ['==', ['get', 'iso_3166_1'], '']
-  });
-
-  miniMap.addLayer({
-    id: 'mini-country-line',
-    type: 'line',
-    source: 'miniCountryBoundaries',
-    'source-layer': 'country_boundaries',
-    paint: { 'line-color': '#000', 'line-width': 1, 'line-opacity': 0.2 }
-  });
-});
+function setBigMapSelected(code){
+  if (!map || !map.getLayer('country-selected')) return;
+  map.setFilter('country-selected', ['==', ['get', 'iso_3166_1'], code || '']);
+}
 
 function updateMiniMapSelected(countryCode){
   if (!miniMap || !miniMap.getLayer('mini-country-selected')) return;
   miniMap.setFilter('mini-country-selected', ['==', ['get', 'iso_3166_1'], countryCode || '']);
 
-  // Jemné přiblížení/centrování: použijeme query na feature a fitBounds
   if (!countryCode) return;
-
-  const features = miniMap.querySourceFeatures('miniCountryBoundaries', {
+  const feats = miniMap.querySourceFeatures('miniCountryBoundaries', {
     sourceLayer: 'country_boundaries',
     filter: ['==', ['get', 'iso_3166_1'], countryCode]
   });
+  if (!feats || !feats.length) return;
 
-  if (!features || !features.length) return;
-
-  // vypočítat bbox
-  let minX = 180, minY = 90, maxX = -180, maxY = -90;
-  const geom = features[0].geometry;
-
-  function scanCoords(coords){
-    if (typeof coords[0] === 'number') {
-      const x = coords[0], y = coords[1];
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+  // bbox
+  let minX=180, minY=90, maxX=-180, maxY=-90;
+  const geom = feats[0].geometry;
+  function scan(coords){
+    if (typeof coords[0] === 'number'){
+      const x=coords[0], y=coords[1];
+      minX=Math.min(minX,x); maxX=Math.max(maxX,x);
+      minY=Math.min(minY,y); maxY=Math.max(maxY,y);
       return;
     }
-    for (const c of coords) scanCoords(c);
+    for (const c of coords) scan(c);
   }
-  scanCoords(geom.coordinates);
+  scan(geom.coordinates);
+  miniMap.fitBounds([[minX,minY],[maxX,maxY]], { padding:18, duration:300 });
+}
 
-  miniMap.fitBounds([[minX, minY],[maxX, maxY]], { padding: 18, duration: 300 });
+/* Big map init */
+function initMaps(){
+  map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/light-v11',
+    center: [10, 20],
+    zoom: 1.2
+  });
+
+  map.on('load', () => {
+    map.addSource('countryBoundaries', { type:'vector', url:'mapbox://mapbox.country-boundaries-v1' });
+
+    map.addLayer({
+      id: 'country-fill',
+      type: 'fill',
+      source: 'countryBoundaries',
+      'source-layer': 'country_boundaries',
+      paint: { 'fill-color': '#000', 'fill-opacity': 0.05 }
+    });
+
+    map.addLayer({
+      id: 'country-selected',
+      type: 'fill',
+      source: 'countryBoundaries',
+      'source-layer': 'country_boundaries',
+      paint: { 'fill-color': '#000', 'fill-opacity': 0.18 },
+      filter: ['==', ['get', 'iso_3166_1'], '']
+    });
+
+    let hoveredISO = "";
+    map.addLayer({
+      id: 'country-hover',
+      type: 'fill',
+      source: 'countryBoundaries',
+      'source-layer': 'country_boundaries',
+      paint: { 'fill-color': '#000', 'fill-opacity': 0.12 },
+      filter: ['==', ['get', 'iso_3166_1'], '']
+    });
+
+    map.on('mousemove','country-fill',(e)=>{
+      const iso = e.features?.[0]?.properties?.iso_3166_1 || "";
+      if (iso !== hoveredISO){
+        hoveredISO = iso;
+        map.setFilter('country-hover', ['==', ['get', 'iso_3166_1'], hoveredISO]);
+      }
+      map.getCanvas().style.cursor='pointer';
+    });
+
+    map.on('mouseleave','country-fill',()=>{
+      hoveredISO="";
+      map.setFilter('country-hover', ['==', ['get', 'iso_3166_1'], '']);
+      map.getCanvas().style.cursor='';
+    });
+
+    map.on('click','country-fill',(e)=>{
+      const iso = e.features?.[0]?.properties?.iso_3166_1 || "";
+      if (!iso) return;
+      setBigMapSelected(iso);
+      selectCountry(iso);
+    });
+  });
+
+  // mini map
+  miniMap = new mapboxgl.Map({
+    container: 'mini-map',
+    style: 'mapbox://styles/mapbox/light-v11',
+    center: [10,20],
+    zoom: 0.6,
+    interactive: false
+  });
+
+  miniMap.on('load', () => {
+    miniMap.addSource('miniCountryBoundaries', { type:'vector', url:'mapbox://mapbox.country-boundaries-v1' });
+
+    miniMap.addLayer({
+      id: 'mini-country-fill',
+      type: 'fill',
+      source: 'miniCountryBoundaries',
+      'source-layer': 'country_boundaries',
+      paint: { 'fill-color': '#000', 'fill-opacity': 0.05 }
+    });
+
+    miniMap.addLayer({
+      id: 'mini-country-selected',
+      type: 'fill',
+      source: 'miniCountryBoundaries',
+      'source-layer': 'country_boundaries',
+      paint: { 'fill-color': '#000', 'fill-opacity': 0.25 },
+      filter: ['==', ['get', 'iso_3166_1'], '']
+    });
+
+    miniMap.addLayer({
+      id: 'mini-country-line',
+      type: 'line',
+      source: 'miniCountryBoundaries',
+      'source-layer': 'country_boundaries',
+      paint: { 'line-color': '#000', 'line-width': 1, 'line-opacity': 0.2 }
+    });
+  });
 }
 
 /* ================== INIT ================== */
 (async function init(){
   await loadCountries();
-  setSelectedCountryUI("", "");
-  await updateAuthUI();
-  await loadEventsList();
-  await loadTop3Global();
+  await refreshAuthPill();
+  setCountryPill();
+  initMaps();
+  await loadTop3();
 })();
 </script>
 
