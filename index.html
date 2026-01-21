@@ -127,14 +127,19 @@ function setVoteMessage(msg) { voteMessage.textContent = msg || ''; }
 
 /* ================== NAČTI ZEMĚ DO SELECTU ================== */
 async function loadCountriesForSelect() {
-  // Aby tohle fungovalo, musí být na `countries` povolený SELECT pro anon/authenticated.
   const { data, error } = await supabaseClient
     .from('countries')
     .select('code, name')
     .order('name', { ascending: true });
 
   if (error) {
-    countrySelect.innerHTML = '<option value="">Země nelze načíst</option>';
+    console.error('LOAD COUNTRIES ERROR:', error);
+    countrySelect.innerHTML = '<option value="">Země nelze načíst (chyba v konzoli)</option>';
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    countrySelect.innerHTML = '<option value="">Žádné země v databázi</option>';
     return;
   }
 
