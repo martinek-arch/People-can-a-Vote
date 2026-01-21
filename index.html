@@ -1,20 +1,21 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="cs">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>People can a Vote</title>
 
 <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet"/>
 
 <style>
-body { margin:0; font-family:Arial,sans-serif; background:#f4f6f8; }
+body { margin:0; font-family:Arial, sans-serif; background:#f4f6f8; }
 header { background:#fff; padding:20px; box-shadow:0 2px 4px rgba(0,0,0,.1); }
 section { padding:20px; }
-.event { background:#fff; padding:15px; border-radius:6px; margin-bottom:10px; cursor:pointer; }
-#map { height:500px; }
+.event { background:#fff; padding:12px; border-radius:6px; margin-bottom:10px; cursor:pointer; }
 button { padding:6px 12px; margin-right:6px; cursor:pointer; }
+#map { height:450px; }
 </style>
 </head>
+
 <body>
 
 <header>
@@ -29,6 +30,7 @@ button { padding:6px 12px; margin-right:6px; cursor:pointer; }
     <button id="signup-btn">Registrovat</button>
     <button id="login-btn">Přihlásit</button>
   </div>
+
   <div id="auth-logged" style="display:none;">
     <span id="auth-message"></span>
     <button id="logout-btn">Odhlásit</button>
@@ -36,14 +38,18 @@ button { padding:6px 12px; margin-right:6px; cursor:pointer; }
 </section>
 
 <section id="events">
-  <h2>Aktuální hlasovací události</h2>
+  <h2>Hlasovací události</h2>
 </section>
 
-<section id="vote-buttons" style="display:none; background:#fff; border-radius:6px; margin:20px;">
-  <h3>Hlasujte</h3>
-  <button id="vote-yes">Ano</button>
-  <button id="vote-no">Ne</button>
-  <button id="vote-neutral">Nemám názor</button>
+<section id="vote-section" style="background:#fff; border-radius:6px; margin:20px; padding:15px;">
+  <h3>Hlasování</h3>
+
+  <div id="vote-buttons" style="display:none;">
+    <button id="vote-yes">Ano</button>
+    <button id="vote-no">Ne</button>
+    <button id="vote-neutral">Nemám názor</button>
+  </div>
+
   <p id="vote-message"></p>
 </section>
 
@@ -55,104 +61,113 @@ button { padding:6px 12px; margin-right:6px; cursor:pointer; }
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-/* SUPABASE */
-const client = supabase.createClient(
+/* ================= SUPABASE ================= */
+const supabaseClient = supabase.createClient(
   'https://jqoomnhpyuikbntnrukw.supabase.co',
   'sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h'
 );
 
 let currentEventId = null;
 
+/* ================= ELEMENTY ================= */
 const voteButtons = document.getElementById('vote-buttons');
 const voteMessage = document.getElementById('vote-message');
 const voteStats = document.getElementById('vote-stats');
 
-/* výchozí stav */
 voteButtons.style.display = 'none';
 
-
-/* AUTH */
+/* ================= AUTH ================= */
 const email = document.getElementById('email');
 const password = document.getElementById('password');
 
-document.getElementById('signup-btn').onclick = async () => {
-  const { error } = await client.auth.signUp({
-    email: email.value,
-    password: password.value
-  });
-
-  if (error) {
-    alert(error.message);
-  }
-};
-
-
 document.getElementById('login-btn').onclick = async () => {
-  const { error } = await client.auth.signInWithPassword({
+  const { error } = await supabaseClient.auth.signInWithPassword({
     email: email.value,
     password: password.value
   });
-
-  if (error) {
-    alert(error.message);
-  }
+  if (error) alert(error.message);
 };
 
+document.getElementById('signup-btn').onclick = async () => {
+  const { error } = await supabaseClient.auth.signUp({
+    email: email.value,
+    password: password.value
+  });
+  if (error) alert(error.message);
+};
 
 document.getElementById('logout-btn').onclick = async () => {
-  await client.auth.signOut();
+  await supabaseClient.auth.signOut();
 };
 
+/* ================= AUTH STATE ================= */
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  updateAuthUI();
+
+  if (session && currentEventId) {
+    checkUserVote(currentEventId);
+  }
+});
+
+/* ================= UI ================= */
 async function updateAuthUI() {
-  const { data } = await client.auth.getSession();
+  const { data } = await supabaseClient.auth.getSession();
   const user = data.session?.user;
 
   if (user) {
     document.getElementById('auth-forms').style.display = 'none';
     document.getElementById('auth-logged').style.display = 'block';
-    document.getElementById('auth-message').textContent = `Přihlášen jako: ${user.email}`;
-    if (currentEventId) checkUserVote(currentEventId);
+    document.getElementById('auth-message').textContent =
+      `Přihlášen jako: ${user.email}`;
   } else {
     document.getElementById('auth-forms').style.display = 'block';
     document.getElementById('auth-logged').style.display = 'none';
     voteButtons.style.display = 'none';
+    voteMessage.textContent = '';
   }
 }
 
-/* EVENTS */
+/* ================= EVENTS ================= */
 async function loadEvents() {
-  const { data } = await client.from('events').select('*').eq('is_active', true);
+  const { data } = await supabaseClient
+    .from('events')
+    .select('*')
+    .eq('is_active', true);
+
   const container = document.getElementById('events');
 
-  data.forEach(e => {
+  data.forEach(event => {
     const div = document.createElement('div');
     div.className = 'event';
-    div.textContent = e.title;
+    div.textContent = event.title;
+
     div.onclick = () => {
-      currentEventId = e.id;
-      loadVoteStats(e.id);
-      checkUserVote(e.id);
+      currentEventId = event.id;
+      loadVoteStats(event.id);
+
+      const { data } = supabaseClient.auth.getSession();
+      if (data?.session) checkUserVote(event.id);
     };
+
     container.appendChild(div);
   });
 
   if (data.length) {
     currentEventId = data[0].id;
     loadVoteStats(currentEventId);
-    checkUserVote(currentEventId);
   }
 }
 
-/* CHECK VOTE */
+/* ================= CHECK VOTE ================= */
 async function checkUserVote(eventId) {
   voteButtons.style.display = 'none';
   voteMessage.textContent = '';
 
-  const { data } = await client.auth.getSession();
+  const { data } = await supabaseClient.auth.getSession();
   const user = data.session?.user;
-  if (!user || !eventId) return;
+  if (!user) return;
 
-  const { data: existing, error } = await client
+  const { data: existing } = await supabaseClient
     .from('votes')
     .select('vote')
     .eq('user_id', user.id)
@@ -166,13 +181,13 @@ async function checkUserVote(eventId) {
   }
 }
 
-
-/* SUBMIT VOTE – KLÍČOVÁ ČÁST */
+/* ================= SUBMIT VOTE ================= */
 async function submitVote(value) {
-  const { data } = await client.auth.getSession();
+  const { data } = await supabaseClient.auth.getSession();
   const user = data.session?.user;
+  if (!user) return;
 
-  const { error } = await client.from('votes').insert({
+  const { error } = await supabaseClient.from('votes').insert({
     user_id: user.id,
     event_id: currentEventId,
     vote: value,
@@ -181,7 +196,7 @@ async function submitVote(value) {
 
   if (error) {
     if (error.code === '23505') {
-      voteMessage.textContent = 'Už jste hlasoval pro tuto událost.';
+      voteMessage.textContent = 'Už jste hlasoval.';
       voteButtons.style.display = 'none';
     } else {
       voteMessage.textContent = error.message;
@@ -194,34 +209,35 @@ async function submitVote(value) {
   loadVoteStats(currentEventId);
 }
 
-document.getElementById('vote-yes').onclick = () => submitVote('yes');
-document.getElementById('vote-no').onclick = () => submitVote('no');
-document.getElementById('vote-neutral').onclick = () => submitVote('neutral');
+/* ================= BUTTONS ================= */
+document.getElementById('vote-yes').onclick = () => submitVote('Ano');
+document.getElementById('vote-no').onclick = () => submitVote('Ne');
+document.getElementById('vote-neutral').onclick = () => submitVote('Nemám názor');
 
-/* STATS */
+/* ================= STATS ================= */
 async function loadVoteStats(eventId) {
-  const { data } = await client.from('votes').select('vote').eq('event_id', eventId);
+  const { data } = await supabaseClient
+    .from('votes')
+    .select('vote')
+    .eq('event_id', eventId);
+
   voteStats.innerHTML = `<p>Celkem hlasů: ${data.length}</p>`;
 }
 
-/* MAP */
-mapboxgl.accessToken = 'pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ';
+/* ================= MAP ================= */
+mapboxgl.accessToken =
+  'pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ';
+
 new mapboxgl.Map({
-  container:'map',
-  style:'mapbox://styles/mapbox/light-v11',
-  center:[-42,72],
-  zoom:2
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [-42, 72],
+  zoom: 2
 });
 
-/* INIT */
+/* ================= INIT ================= */
 updateAuthUI();
 loadEvents();
-
-client.auth.onAuthStateChange((event, session) => {
-  updateAuthUI();
-});
-
-
 </script>
 
 </body>
