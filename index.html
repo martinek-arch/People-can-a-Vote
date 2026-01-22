@@ -286,7 +286,7 @@ const I18N = {
         yes:"Yes", no:"No", neutral:"No opinion", searchPh:"Search country or event…",
         clearCountry:"Clear selection", chooseCountry:"Select a country on the map or search.",
         noEvents:"No events for this selection.",
-        countryPrefix:"Country:", eventBreadcrumb:"Event"
+        countryPrefix:"Country:", eventBreadcrumb:"Event", signedAs:"Signed in as"
   },
   cs: { home:"Home", back:"Zpět", events:"Události", stats:"Statistiky", map:"Mapa", top3:"TOP 3 události (globálně)",
         top3Sub:"Události s největším počtem hlasů.", mapSub:"Klikni na zemi → uvidíš události pro danou zemi.",
@@ -296,7 +296,7 @@ const I18N = {
         yes:"Ano", no:"Ne", neutral:"Nemám názor", searchPh:"Hledej zemi nebo událost…",
         clearCountry:"Zrušit výběr", chooseCountry:"Vyber z mapy zemi, nebo použij vyhledávání.",
         noEvents:"Žádné události pro tento výběr.",
-        countryPrefix:"Země:", eventBreadcrumb:"Událost"
+        countryPrefix:"Země:", eventBreadcrumb:"Událost", signedAs:"Přihlášen jako"
   },
   es: { home:"Inicio", back:"Atrás", events:"Eventos", stats:"Estadísticas", map:"Mapa", top3:"Top 3 eventos (global)",
         top3Sub:"Eventos con más votos.", mapSub:"Haz clic en un país → ver eventos de ese país.",
@@ -470,10 +470,17 @@ function showScreen(next){
   screenCountry.classList.toggle('active', next === "COUNTRY");
   screenEvent.classList.toggle('active', next === "EVENT");
 
-  if (next === "HOME") crumb.textContent = t('home');
-  if (next === "COUNTRY") crumb.textContent = selectedCountryCode ? `${t('countryPrefix')} ${selectedCountryName} (${selectedCountryCode})` : t('events');
-  if (next === "EVENT") crumb.textContent = t('eventBreadcrumb');
+  // crumb: na HOME schovat
+  if (next === "HOME") {
+    crumb.style.display = "none";
+    crumb.textContent = "";
+  } else {
+    crumb.style.display = "inline-block";
+    if (next === "COUNTRY") crumb.textContent = selectedCountryCode ? `${t('countryPrefix')} ${selectedCountryName} (${selectedCountryCode})` : t('events');
+    if (next === "EVENT") crumb.textContent = t('eventBreadcrumb');
+  }
 }
+
 
 function goHome(){
   currentEventId = null;
@@ -519,6 +526,16 @@ function escapeHtml(s){
   return (s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
 }
 
+function norm(s){
+  return (s || "")
+    .toString()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // pryč diakritika
+    .trim();
+}
+
+
 /* ================== Search suggest ================== */
 function hideSuggest(){
   suggest.style.display = "none";
@@ -531,20 +548,26 @@ function showSuggest(items){
 }
 
 function buildSuggest(term){
-  term = (term||"").trim().toLowerCase();
+  term = norm(term);
   if (term.length < 2) { hideSuggest(); return; }
 
   const maxItems = 10;
 
   const cMatches = countries
-    .filter(c => c.name.toLowerCase().includes(term) || c.code.toLowerCase().startsWith(term))
-    .slice(0, 5)
-    .map(c => ({
-      type: "country",
-      key: c.code,
-      title: `${c.name} (${c.code})`,
-      sub: t('events')
-    }));
+  .filter(c => {
+    const name = norm(c.name);
+    const code = norm(c.code);
+    // obsahuje kdekoliv + začíná na kód
+    return name.includes(term) || code.startsWith(term);
+  })
+  .slice(0, 5)
+  .map(c => ({
+    type: "country",
+    key: c.code,
+    title: `${c.name} (${c.code})`,
+    sub: t('events')
+  }));
+
 
   const eMatches = eventsCache
     .filter(e =>
@@ -596,15 +619,22 @@ document.addEventListener('click', (e) => {
 });
 
 /* ================== Auth ================== */
-openAuthBtn.onclick = () => { authCard.style.display = "block"; };
+openAuthBtn.onclick = async () => {
+  authCard.style.display = "block";
+  if (!countries.length) await loadCountries();
+};
 closeAuthBtn.onclick = () => { authCard.style.display = "none"; };
 logoutBtn.onclick = async () => { await supabaseClient.auth.signOut(); };
 
 loginBtn.onclick = async () => {
   authError.textContent = "";
   const { error } = await supabaseClient.auth.signInWithPassword({ email: email.value, password: password.value });
-  if (error) authError.textContent = error.message;
-};
+if (error) {
+  authError.textContent = error.message;
+} else {
+  authCard.style.display = "none";
+}
+
 
 signupBtn.onclick = async () => {
   authError.textContent = "";
@@ -613,6 +643,11 @@ signupBtn.onclick = async () => {
   if (!cc) { authError.textContent = "Pick a country for registration."; return; }
 
   const lang = languageSelect?.value || 'en';
+  currentLang = lang;
+    applyI18n();
+    showScreen(screen);
+    setCountryPill();
+
 
   const { error: e1 } = await supabaseClient.auth.signUp({ email: email.value, password: password.value });
   if (e1) { authError.textContent = e1.message; return; }
@@ -624,9 +659,16 @@ signupBtn.onclick = async () => {
   const user = sess.session?.user;
   if (!user) return;
 
-  const { error: e3 } = await supabaseClient.from('profiles').insert([{ id: user.id, country_code: cc, language: lang }]);
-  if (e3 && e3.code !== '23505') authError.textContent = e3.message;
-};
+ const { error: e3 } = await supabaseClient.from('profiles').insert([{ id: user.id, country_code: cc, language: lang }]);
+if (e3 && e3.code !== '23505') {
+  authError.textContent = e3.message;
+  return;
+}
+
+// zavřít panel + načíst profil z DB (aby se jazyk potvrdil)
+authCard.style.display = "none";
+await refreshAuthPill();
+
 
 supabaseClient.auth.onAuthStateChange(async () => {
   await refreshAuthPill();
@@ -669,13 +711,22 @@ async function refreshAuthPill(){
   showScreen(screen);
   setCountryPill();
 
-  authPill.textContent = userCountryCode ? `${t('loggedIn')} • ${userCountryCode}` : t('loggedIn');
+  authPill.textContent = `${t('signedAs')}: ${user.email}`;
 }
 
 /* ================== Data loading ================== */
 async function loadCountries(){
-  const { data, error } = await supabaseClient.from('countries').select('code,name').order('name', { ascending:true });
-  if (error) return;
+  const { data, error } = await supabaseClient
+    .from('countries')
+    .select('code,name')
+    .order('name', { ascending:true });
+
+  if (error) {
+    console.error("loadCountries error:", error);
+    countrySelect.innerHTML = '<option value="">Nelze načíst země</option>';
+    return;
+  }
+
   countries = data || [];
 
   countrySelect.innerHTML = ['<option value="">Select country (required for sign up)</option>']
