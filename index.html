@@ -1,46 +1,104 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>People can a Vote</title>
+
 <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet"/>
+
 <style>
-body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8}
-.wrap{max-width:1100px;margin:0 auto}
-header{background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.1);position:sticky;top:0}
-.nav{display:flex;justify-content:space-between;align-items:center;padding:12px 16px}
-.nav-left,.nav-right{display:flex;align-items:center;gap:10px}
-button{padding:8px 12px;border-radius:10px;border:0;cursor:pointer}
-button.ghost{background:#eee}
-button.primary{background:#111;color:#fff}
-.card{background:#fff;padding:16px;border-radius:12px;margin:16px}
-#map{height:460px;border-radius:12px}
-.screen{display:none}
-.screen.active{display:block}
+  body { margin:0; font-family: Arial, sans-serif; background:#f4f6f8; }
+  .wrap { max-width:1100px; margin:0 auto; }
+  header { background:#fff; box-shadow:0 2px 4px rgba(0,0,0,.08); position:sticky; top:0; z-index:30; }
+  .nav { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; }
+  .nav-left, .nav-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .brand { display:flex; flex-direction:column; }
+  .brand h1 { margin:0; font-size:18px; }
+  .brand .muted { margin:2px 0 0; font-size:12px; color:#666; }
+
+  button { padding:8px 12px; border:0; border-radius:10px; cursor:pointer; }
+  button.ghost { background:#eee; }
+  button.primary { background:#111; color:#fff; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+
+  input { padding:9px 10px; border-radius:10px; border:1px solid #ddd; min-width:260px; }
+  .pill { background:#f1f1f1; padding:6px 10px; border-radius:999px; font-size:12px; color:#333; }
+  .card { background:#fff; padding:16px; border-radius:12px; margin:16px; }
+  .muted { color:#666; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+  /* Continent bar */
+  #continentsBarWrap { padding:6px 16px; }
+  #continentsBar {
+    display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+    background:#fff; border:1px solid #eee; border-radius:12px; padding:8px 10px;
+  }
+  #continentsBar button { padding:6px 10px; font-size:13px; }
+
+  /* Search suggest */
+  .searchWrap { position:relative; }
+  #searchSuggest{
+    position:absolute; top:42px; left:0; right:0;
+    background:#fff; border:1px solid #ddd; border-radius:12px;
+    display:none; max-height:320px; overflow:auto;
+    box-shadow:0 10px 25px rgba(0,0,0,.12);
+    z-index:50;
+  }
+  .sItem { padding:10px 12px; cursor:pointer; border-top:1px solid #f1f1f1; display:flex; justify-content:space-between; gap:10px; }
+  .sItem:first-child{ border-top:none; }
+  .sItem:hover{ background:#f6f6f6; }
+  .sLeft { display:flex; flex-direction:column; gap:2px; }
+  .sTitle { font-weight:600; }
+  .sSub { font-size:12px; color:#666; }
+  .tag { font-size:11px; color:#555; background:#f1f1f1; padding:4px 8px; border-radius:999px; white-space:nowrap; align-self:flex-start; }
+
+  /* Screens */
+  .screen { display:none; }
+  .screen.active { display:block; }
+
+  #map { height:460px; border-radius:12px; overflow:hidden; }
+
+  .eventItem { background:#fff; border:1px solid #eee; border-radius:12px; padding:14px; margin:10px 16px; cursor:pointer; }
+  .eventItem:hover { border-color:#ddd; }
+  .eventItem small { display:block; color:#666; margin-top:6px; }
+
+  .titleRow { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .backInline { padding:8px 12px; border-radius:10px; background:#eee; }
+
+  @media (max-width: 700px){
+    input{ min-width:180px; }
+  }
 </style>
 </head>
+
 <body>
 
 <header>
   <div class="wrap nav">
     <div class="nav-left">
-      <strong>People can a Vote</strong>
+      <div class="brand">
+        <h1>People can a Vote</h1>
+        <div class="muted">Global view of opinions from around the world</div>
+      </div>
       <button class="ghost" id="homeBtn">Home</button>
     </div>
+
     <div class="nav-right">
-      <input id="search" placeholder="Search country or event…">
-      <span id="selectedCountryPill">Country: (all)</span>
-      <span id="selectedContinentPill">Continent: All</span>
-      <span id="authPill">Not signed in</span>
-      <button class="ghost" id="openAuthBtn">Log in</button>
+      <div class="searchWrap">
+        <input id="search" placeholder="Search country or event…" autocomplete="off" />
+        <div id="searchSuggest"></div>
+      </div>
+
+      <span class="pill" id="selectedCountryPill">Country: (all)</span>
+      <span class="pill" id="selectedContinentPill">Continent: All</span>
     </div>
   </div>
 </header>
 
-<div class="wrap" style="padding:6px 16px">
-  <div id="continentsBar" style="display:flex;gap:8px;background:#fff;padding:8px;border-radius:12px">
-    <button class="ghost" data-cont="ALL">All</button>
+<div class="wrap" id="continentsBarWrap">
+  <div id="continentsBar">
+    <button class="ghost" data-cont="ALL">🌍 All</button>
     <button class="ghost" data-cont="Europe">Europe</button>
     <button class="ghost" data-cont="Asia">Asia</button>
     <button class="ghost" data-cont="Africa">Africa</button>
@@ -51,48 +109,462 @@ button.primary{background:#111;color:#fff}
 </div>
 
 <div class="wrap">
+
+  <!-- HOME -->
   <section id="screenHome" class="screen active">
-    <div class="card"><h3>Map</h3><div id="map"></div></div>
+    <section class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <h3 style="margin:0 0 6px 0;">Map</h3>
+          <div class="muted">Click a country to see its events. Or use search.</div>
+        </div>
+        <button class="ghost" id="clearCountryBtn">Clear country</button>
+      </div>
+      <div id="map" style="margin-top:12px;"></div>
+    </section>
   </section>
+
+  <!-- COUNTRY -->
+  <section id="screenCountry" class="screen">
+    <section class="card">
+      <div class="titleRow">
+        <button class="backInline" id="backFromCountry">← Back</button>
+        <h2 id="countryTitle" style="margin:0;">Events</h2>
+      </div>
+      <div class="muted" id="countrySubtitle" style="margin-top:8px;"></div>
+    </section>
+    <div id="eventsList"></div>
+  </section>
+
+  <!-- EVENT -->
+  <section id="screenEvent" class="screen">
+    <section class="card">
+      <div class="titleRow">
+        <button class="backInline" id="backFromEvent">← Back</button>
+        <h2 id="eventTitle" style="margin:0;">—</h2>
+      </div>
+      <div class="muted" id="eventMeta" style="margin-top:8px;"></div>
+      <div id="eventDesc" style="margin-top:12px; white-space:pre-wrap;"></div>
+    </section>
+
+    <section class="card">
+      <div class="muted">Voting and statistics will be added next.</div>
+    </section>
+  </section>
+
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
 <script>
-const supabaseClient=supabase.createClient(
- "https://jqoomnhpyuikbntnrukw.supabase.co",
- "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h"
+/* ================== CONFIG ================== */
+const supabaseClient = supabase.createClient(
+  "https://jqoomnhpyuikbntnrukw.supabase.co",
+  "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h"
 );
-mapboxgl.accessToken="pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ";
 
-let continentsById={},countries=[],selectedContinent="ALL";
+mapboxgl.accessToken = "pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ";
 
-document.getElementById("continentsBar").onclick=e=>{
- const b=e.target.closest("button[data-cont]");
- if(!b)return;
- selectedContinent=b.dataset.cont;
- document.getElementById("selectedContinentPill").textContent="Continent: "+selectedContinent;
+/* ================== STATE ================== */
+let continentsById = {};   // {id: name}
+let countries = [];        // [{code,name,continent_id,continent_name}]
+let countriesByCode = {};  // { "US": {...} }
+let eventsCache = [];      // active events for search [{id,title,description,country_code}]
+let selectedContinent = "ALL";
+let selectedCountryCode = "";
+let selectedCountryName = "";
+let currentEventId = null;
+
+let map;
+
+/* ================== Helpers ================== */
+function escapeHtml(s){
+  return (s||"").toString()
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;");
+}
+function norm(s){
+  return (s||"").toString().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+}
+function countriesForSearch(){
+  if (selectedContinent === "ALL") return countries;
+  return countries.filter(c => (c.continent_name || "") === selectedContinent);
+}
+function continentOfCountry(code){
+  return countriesByCode[code]?.continent_name || "";
+}
+function eventsForSearch(){
+  if (selectedContinent === "ALL") return eventsCache;
+  return eventsCache.filter(e => continentOfCountry(e.country_code) === selectedContinent);
+}
+
+/* ================== UI refs ================== */
+const screenHome = document.getElementById("screenHome");
+const screenCountry = document.getElementById("screenCountry");
+const screenEvent = document.getElementById("screenEvent");
+
+const selectedCountryPill = document.getElementById("selectedCountryPill");
+const selectedContinentPill = document.getElementById("selectedContinentPill");
+
+const continentsBar = document.getElementById("continentsBar");
+
+const searchInput = document.getElementById("search");
+const suggestBox = document.getElementById("searchSuggest");
+
+const countryTitle = document.getElementById("countryTitle");
+const countrySubtitle = document.getElementById("countrySubtitle");
+const eventsList = document.getElementById("eventsList");
+
+const eventTitle = document.getElementById("eventTitle");
+const eventMeta = document.getElementById("eventMeta");
+const eventDesc = document.getElementById("eventDesc");
+
+/* ================== Navigation ================== */
+function showScreen(name){
+  screenHome.classList.toggle("active", name === "HOME");
+  screenCountry.classList.toggle("active", name === "COUNTRY");
+  screenEvent.classList.toggle("active", name === "EVENT");
+  if (name === "HOME" && map) setTimeout(() => map.resize(), 0);
+}
+document.getElementById("homeBtn").onclick = () => {
+  currentEventId = null;
+  hideSuggest();
+  showScreen("HOME");
+};
+document.getElementById("backFromCountry").onclick = () => {
+  hideSuggest();
+  showScreen("HOME");
+};
+document.getElementById("backFromEvent").onclick = () => {
+  hideSuggest();
+  showScreen("COUNTRY");
+};
+document.getElementById("clearCountryBtn").onclick = () => {
+  selectedCountryCode = "";
+  selectedCountryName = "";
+  setCountryPill();
+  setBigMapSelected("");
 };
 
-async function loadContinents(){
- const {data}=await supabaseClient.from("continents").select("id,name");
- (data||[]).forEach(c=>continentsById[c.id]=c.name);
+/* ================== Pills ================== */
+function setCountryPill(){
+  selectedCountryPill.textContent = selectedCountryCode
+    ? `Country: ${selectedCountryName} (${selectedCountryCode})`
+    : "Country: (all)";
 }
-async function loadCountries(){
- const {data}=await supabaseClient.from("countries").select("code,name,continent_id");
- countries=(data||[]).map(c=>({...c,continent:continentsById[c.continent_id]}));
+function setContinentPill(){
+  selectedContinentPill.textContent = `Continent: ${selectedContinent === "ALL" ? "All" : selectedContinent}`;
 }
 
-new mapboxgl.Map({
- container:"map",
- style:"mapbox://styles/mapbox/light-v11",
- center:[10,20],
- zoom:1.2
+/* ================== Continents bar ================== */
+(function bindContinentBar(){
+  continentsBar.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-cont]");
+    if (!btn) return;
+
+    selectedContinent = btn.getAttribute("data-cont") || "ALL";
+    setContinentPill();
+
+    // visual active
+    for (const b of continentsBar.querySelectorAll("button[data-cont]")){
+      const active = (b === btn);
+      b.style.border = active ? "1px solid #bbb" : "0";
+      b.style.background = active ? "#ddd" : "#eee";
+    }
+
+    // reset country selection when continent changes
+    selectedCountryCode = "";
+    selectedCountryName = "";
+    setCountryPill();
+    setBigMapSelected("");
+
+    hideSuggest();
+    showScreen("HOME");
+  });
+})();
+
+/* ================== Search suggest ================== */
+function hideSuggest(){
+  suggestBox.style.display = "none";
+  suggestBox.innerHTML = "";
+}
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".searchWrap")) hideSuggest();
 });
 
-(async()=>{
- await loadContinents();
- await loadCountries();
+searchInput.addEventListener("input", () => buildSuggest(searchInput.value));
+searchInput.addEventListener("focus", () => buildSuggest(searchInput.value));
+
+function buildSuggest(raw){
+  const term = norm(raw);
+  if (term.length < 2){ hideSuggest(); return; }
+
+  const cMatches = countriesForSearch()
+    .filter(c => norm(c.name).includes(term) || norm(c.code).startsWith(term))
+    .slice(0, 6)
+    .map(c => ({
+      type: "country",
+      key: c.code,
+      title: `${c.name} (${c.code})`,
+      sub: c.continent_name || ""
+    }));
+
+  const eMatches = eventsForSearch()
+    .filter(e => norm(e.title).includes(term) || norm(e.description).includes(term))
+    .slice(0, 6)
+    .map(e => ({
+      type: "event",
+      key: String(e.id),
+      title: e.title || "(no title)",
+      sub: e.country_code ? `${e.country_code} • ${countriesByCode[e.country_code]?.name || ""}` : ""
+    }));
+
+  const merged = [...cMatches, ...eMatches].slice(0, 10);
+  if (!merged.length){ hideSuggest(); return; }
+
+  suggestBox.innerHTML = merged.map(item => `
+    <div class="sItem" data-type="${item.type}" data-key="${escapeHtml(item.key)}">
+      <div class="sLeft">
+        <div class="sTitle">${escapeHtml(item.title)}</div>
+        <div class="sSub">${escapeHtml(item.sub)}</div>
+      </div>
+      <div class="tag">${item.type === "country" ? "Country" : "Event"}</div>
+    </div>
+  `).join("");
+
+  suggestBox.style.display = "block";
+
+  for (const el of suggestBox.querySelectorAll(".sItem")){
+    el.addEventListener("click", async () => {
+      const type = el.getAttribute("data-type");
+      const key = el.getAttribute("data-key");
+      hideSuggest();
+      searchInput.value = "";
+
+      if (type === "country") {
+        await selectCountry(key);
+      } else {
+        await openEvent(Number(key));
+      }
+    });
+  }
+}
+
+/* ================== Country selection + events list ================== */
+async function selectCountry(code){
+  selectedCountryCode = code || "";
+  selectedCountryName = countriesByCode[selectedCountryCode]?.name || selectedCountryCode;
+  setCountryPill();
+  setBigMapSelected(selectedCountryCode);
+
+  countryTitle.textContent = `Events`;
+  countrySubtitle.textContent = selectedCountryCode
+    ? `${selectedCountryName} (${selectedCountryCode})`
+    : "Select a country.";
+
+  showScreen("COUNTRY");
+  await loadEventsForCountry(selectedCountryCode);
+}
+
+async function loadEventsForCountry(code){
+  eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">Loading…</div>`;
+
+  if (!code){
+    eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">No country selected.</div>`;
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("events")
+    .select("id,title,description,country_code,created_at,is_active")
+    .eq("is_active", true)
+    .eq("country_code", code)
+    .order("created_at", { ascending:false });
+
+  if (error){
+    console.error("loadEventsForCountry error:", error);
+    eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">Cannot load events.</div>`;
+    return;
+  }
+
+  const list = data || [];
+  if (!list.length){
+    eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">No events for this country yet.</div>`;
+    return;
+  }
+
+  eventsList.innerHTML = "";
+  for (const e of list){
+    const div = document.createElement("div");
+    div.className = "eventItem";
+    div.innerHTML = `<strong>${escapeHtml(e.title||"")}</strong><small>${escapeHtml(e.description||"")}</small>`;
+    div.onclick = async () => openEvent(e.id);
+    eventsList.appendChild(div);
+  }
+}
+
+/* ================== Event detail ================== */
+async function openEvent(id){
+  if (!id) return;
+  currentEventId = id;
+
+  // Try cache first
+  let evt = eventsCache.find(x => x.id === id);
+  if (!evt){
+    const { data, error } = await supabaseClient
+      .from("events")
+      .select("id,title,description,country_code,created_at,is_active")
+      .eq("id", id)
+      .maybeSingle();
+    if (error || !data) return;
+    evt = data;
+  }
+
+  // ensure country pill sync
+  if (evt.country_code){
+    selectedCountryCode = evt.country_code;
+    selectedCountryName = countriesByCode[selectedCountryCode]?.name || selectedCountryCode;
+    setCountryPill();
+    setBigMapSelected(selectedCountryCode);
+  }
+
+  eventTitle.textContent = evt.title || "—";
+  const cName = evt.country_code ? (countriesByCode[evt.country_code]?.name || "") : "";
+  eventMeta.textContent = evt.country_code ? `Country: ${cName} (${evt.country_code})` : "";
+  eventDesc.textContent = evt.description || "";
+
+  showScreen("EVENT");
+}
+
+/* ================== Data loading ================== */
+async function loadContinents(){
+  const { data, error } = await supabaseClient.from("continents").select("id,name").order("id", { ascending:true });
+  if (error){ console.error("loadContinents error:", error); continentsById = {}; return; }
+  continentsById = {};
+  for (const c of (data || [])) continentsById[c.id] = c.name;
+}
+
+async function loadCountries(){
+  const { data, error } = await supabaseClient
+    .from("countries")
+    .select("code,name,continent_id")
+    .order("name", { ascending:true });
+
+  if (error){ console.error("loadCountries error:", error); countries = []; countriesByCode = {}; return; }
+
+  countries = (data || []).map(c => ({
+    ...c,
+    continent_name: continentsById[c.continent_id] || ""
+  }));
+
+  countriesByCode = {};
+  for (const c of countries) countriesByCode[c.code] = c;
+}
+
+async function loadEventsCache(){
+  const { data, error } = await supabaseClient
+    .from("events")
+    .select("id,title,description,country_code,is_active,created_at")
+    .eq("is_active", true)
+    .order("created_at", { ascending:false })
+    .limit(1000);
+
+  if (error){ console.error("loadEventsCache error:", error); eventsCache = []; return; }
+  eventsCache = data || [];
+}
+
+/* ================== Map ================== */
+function initMap(){
+  map = new mapboxgl.Map({
+    container: "map",
+    style: "mapbox://styles/mapbox/light-v11",
+    center: [10, 20],
+    zoom: 1.2
+  });
+
+  map.on("load", () => {
+    map.addSource("countryBoundaries", { type:"vector", url:"mapbox://mapbox.country-boundaries-v1" });
+
+    map.addLayer({
+      id: "country-fill",
+      type: "fill",
+      source: "countryBoundaries",
+      "source-layer": "country_boundaries",
+      paint: { "fill-color":"#000", "fill-opacity":0.05 }
+    });
+
+    map.addLayer({
+      id: "country-selected",
+      type: "fill",
+      source: "countryBoundaries",
+      "source-layer": "country_boundaries",
+      paint: { "fill-color":"#000", "fill-opacity":0.18 },
+      filter: ["==", ["get","iso_3166_1"], ""]
+    });
+
+    let hoveredISO = "";
+    map.addLayer({
+      id: "country-hover",
+      type: "fill",
+      source: "countryBoundaries",
+      "source-layer": "country_boundaries",
+      paint: { "fill-color":"#000", "fill-opacity":0.12 },
+      filter: ["==", ["get","iso_3166_1"], ""]
+    });
+
+    map.on("mousemove", "country-fill", (e) => {
+      const iso = e.features?.[0]?.properties?.iso_3166_1 || "";
+      if (iso !== hoveredISO){
+        hoveredISO = iso;
+        map.setFilter("country-hover", ["==", ["get","iso_3166_1"], hoveredISO]);
+      }
+      map.getCanvas().style.cursor = "pointer";
+    });
+
+    map.on("mouseleave", "country-fill", () => {
+      hoveredISO = "";
+      map.setFilter("country-hover", ["==", ["get","iso_3166_1"], ""]);
+      map.getCanvas().style.cursor = "";
+    });
+
+    map.on("click", "country-fill", async (e) => {
+      const iso = e.features?.[0]?.properties?.iso_3166_1 || "";
+      if (!iso) return;
+
+      // If continent filter is active, ignore clicks outside it
+      if (selectedContinent !== "ALL"){
+        const cont = continentOfCountry(iso);
+        if (cont !== selectedContinent){
+          // brief feedback
+          console.log("Country outside selected continent:", iso, cont, "selected:", selectedContinent);
+          return;
+        }
+      }
+
+      await selectCountry(iso);
+    });
+  });
+}
+
+function setBigMapSelected(code){
+  if (!map || !map.getLayer("country-selected")) return;
+  map.setFilter("country-selected", ["==", ["get","iso_3166_1"], code || ""]);
+}
+
+/* ================== INIT ================== */
+(async function init(){
+  // default pills
+  setContinentPill();
+  setCountryPill();
+
+  await loadContinents();
+  await loadCountries();
+  await loadEventsCache();
+
+  initMap();
 })();
 </script>
 
