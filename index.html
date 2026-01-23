@@ -53,6 +53,19 @@
   .sSub { font-size:12px; color:#666; }
   .tag { font-size:11px; color:#555; background:#f1f1f1; padding:4px 8px; border-radius:999px; white-space:nowrap; align-self:flex-start; }
 
+
+  .countryChip{
+    padding:6px 10px;
+    border-radius:999px;
+    border:1px solid #e6e6e6;
+    background:#fafafa;
+    cursor:pointer;
+    font-size:13px;
+  }
+  .countryChip:hover{ border-color:#cfcfcf; background:#f3f3f3; }
+  .countryChip.active{ background:#e9e9e9; border-color:#bdbdbd; }
+
+
   /* Screens */
   .screen { display:none; }
   .screen.active { display:block; }
@@ -105,6 +118,19 @@
     <button class="ghost" data-cont="North America">North America</button>
     <button class="ghost" data-cont="South America">South America</button>
     <button class="ghost" data-cont="Oceania">Oceania</button>
+  </div>
+</div>
+
+<div class="wrap" id="continentCountriesWrap" style="padding:0 16px 10px 16px; display:none;">
+  <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:10px 12px;">
+    <div class="row" style="justify-content:space-between;">
+      <div>
+        <strong id="continentCountriesTitle">Countries</strong>
+        <div class="muted" id="continentCountriesSub" style="margin-top:2px;font-size:12px;">Pick a country to see events.</div>
+      </div>
+      <button class="ghost" id="hideCountriesBtn" style="padding:6px 10px;">Hide</button>
+    </div>
+    <div id="continentCountriesList" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;"></div>
   </div>
 </div>
 
@@ -222,6 +248,75 @@ const eventTitle = document.getElementById("eventTitle");
 const eventMeta = document.getElementById("eventMeta");
 const eventDesc = document.getElementById("eventDesc");
 
+
+/* ================== Continent countries UI ================== */
+const continentCountriesWrap = document.getElementById("continentCountriesWrap");
+const continentCountriesTitle = document.getElementById("continentCountriesTitle");
+const continentCountriesSub = document.getElementById("continentCountriesSub");
+const continentCountriesList = document.getElementById("continentCountriesList");
+const hideCountriesBtn = document.getElementById("hideCountriesBtn");
+
+hideCountriesBtn.onclick = () => {
+  continentCountriesWrap.style.display = "none";
+};
+
+/* Rough map bounds per continent (lng/lat). We can refine later. */
+const CONTINENT_BOUNDS = {
+  "Europe": [[-25, 34], [45, 72]],
+  "Asia": [[25, -10], [180, 80]],
+  "Africa": [[-25, -40], [60, 38]],
+  "North America": [[-170, 7], [-50, 83]],
+  "South America": [[-92, -56], [-30, 13]],
+  "Oceania": [[110, -50], [180, 5]],
+};
+
+function renderContinentCountries(){
+  if (selectedContinent === "ALL"){
+    continentCountriesWrap.style.display = "none";
+    continentCountriesList.innerHTML = "";
+    return;
+  }
+
+  const list = countriesForSearch().slice().sort((a,b)=>a.name.localeCompare(b.name));
+  continentCountriesTitle.textContent = `Countries in ${selectedContinent}`;
+  continentCountriesSub.textContent = `Found: ${list.length}. Click a country to see its events.`;
+  continentCountriesWrap.style.display = "block";
+
+  continentCountriesList.innerHTML = list.map(c => {
+    const active = c.code === selectedCountryCode ? "active" : "";
+    return `<button class="countryChip ${active}" data-cc="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${escapeHtml(c.code)})</button>`;
+  }).join("");
+
+  for (const btn of continentCountriesList.querySelectorAll("button[data-cc]")){
+    btn.addEventListener("click", async () => {
+      const cc = btn.getAttribute("data-cc");
+      await selectCountry(cc);
+      // keep the list visible; update active state
+      renderContinentCountries();
+    });
+  }
+}
+
+let pendingContinentView = "ALL";
+function applyContinentView(){
+  // Called when continent changes; zoom map if available.
+  const c = selectedContinent;
+  pendingContinentView = c;
+
+  if (!map) return;
+
+  if (c === "ALL"){
+    map.easeTo({ center:[10,20], zoom:1.2, duration:450 });
+    return;
+  }
+
+  const b = CONTINENT_BOUNDS[c];
+  if (b){
+    map.fitBounds(b, { padding: 30, duration: 450 });
+  }
+}
+
+
 /* ================== Navigation ================== */
 function showScreen(name){
   screenHome.classList.toggle("active", name === "HOME");
@@ -247,6 +342,7 @@ document.getElementById("clearCountryBtn").onclick = () => {
   selectedCountryName = "";
   setCountryPill();
   setBigMapSelected("");
+  renderContinentCountries();
 };
 
 /* ================== Pills ================== */
@@ -283,6 +379,10 @@ function setContinentPill(){
 
     hideSuggest();
     showScreen("HOME");
+
+    // show list of countries under the continent bar and zoom map
+    renderContinentCountries();
+    applyContinentView();
   });
 })();
 
@@ -346,6 +446,7 @@ function buildSuggest(raw){
 
       if (type === "country") {
         await selectCountry(key);
+        renderContinentCountries();
       } else {
         await openEvent(Number(key));
       }
@@ -437,6 +538,7 @@ async function openEvent(id){
   eventDesc.textContent = evt.description || "";
 
   showScreen("EVENT");
+  renderContinentCountries();
 }
 
 /* ================== Data loading ================== */
@@ -486,6 +588,9 @@ function initMap(){
   });
 
   map.on("load", () => {
+    // apply continent view after style loads
+    setTimeout(() => applyContinentView(), 0);
+
     map.addSource("countryBoundaries", { type:"vector", url:"mapbox://mapbox.country-boundaries-v1" });
 
     map.addLayer({
@@ -565,6 +670,8 @@ function setBigMapSelected(code){
   await loadEventsCache();
 
   initMap();
+  renderContinentCountries();
+  applyContinentView();
 })();
 </script>
 
