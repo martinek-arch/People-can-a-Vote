@@ -153,6 +153,23 @@
   </div>
 </header>
 
+<!-- CONTINENTS BAR (small, not sticky) -->
+<div class="wrap" id="continentsBarWrap" style="padding:6px 16px;">
+  <div id="continentsBar" style="
+    display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+    background:#fff; border:1px solid #eee; border-radius:12px;
+    padding:8px 10px;
+  ">
+    <button class="ghost" data-cont="ALL" style="padding:6px 10px;">🌍 All</button>
+    <button class="ghost" data-cont="Europe" style="padding:6px 10px;">Europe</button>
+    <button class="ghost" data-cont="Asia" style="padding:6px 10px;">Asia</button>
+    <button class="ghost" data-cont="Africa" style="padding:6px 10px;">Africa</button>
+    <button class="ghost" data-cont="North America" style="padding:6px 10px;">North America</button>
+    <button class="ghost" data-cont="South America" style="padding:6px 10px;">South America</button>
+    <button class="ghost" data-cont="Oceania" style="padding:6px 10px;">Oceania</button>
+  </div>
+</div>
+  
 <div class="wrap">
 
   <!-- AUTH -->
@@ -422,6 +439,7 @@ let currentEventCountryCode = null;
 let userCountryCode = null;
 
 let countries = [];
+let selectedContinent = "ALL";
 let eventsCache = [];
 
 const VOTE_VALUES = { YES: "YES", NO: "NO", NEUTRAL: "NEUTRAL" };
@@ -486,6 +504,11 @@ function norm(s){
     .trim();
 }
 
+function countriesForSearch(){
+  if (selectedContinent === "ALL") return countries;
+  return countries.filter(c => (c.continent || "") === selectedContinent);
+}
+  
 function showScreen(next){
   screen = next;
   screenHome.classList.toggle('active', next === "HOME");
@@ -564,7 +587,7 @@ function buildSuggest(termRaw){
   const term = norm(termRaw);
   if (term.length < 2) { hideSuggest(); return; }
 
-  const cMatches = countries
+  const cMatches = countriesForSearch()
     .filter(c => norm(c.name).includes(term) || norm(c.code).startsWith(term))
     .slice(0, 5)
     .map(c => ({
@@ -713,7 +736,7 @@ async function refreshAuthPill(){
 async function loadCountries(){
   const { data, error } = await supabaseClient
     .from('countries')
-    .select('code,name')
+    .select('code,name,continent_name')
     .order('name', { ascending:true });
 
   if (error) {
@@ -1144,6 +1167,29 @@ function initMaps(){
   await loadEventsCache();
   await refreshAuthPill();
 
+    // Continents bar handlers
+  const bar = document.getElementById('continentsBar');
+  bar.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-cont]');
+    if (!btn) return;
+
+    selectedContinent = btn.getAttribute('data-cont') || "ALL";
+
+    // visual active
+    for (const b of bar.querySelectorAll('button[data-cont]')){
+      b.style.border = (b === btn) ? "1px solid #bbb" : "0";
+    }
+
+    // clear selected country when switching continent
+    selectedCountryCode = "";
+    selectedCountryName = "";
+    setCountryPill();
+    setBigMapSelected("");
+
+    // go home (continent works mainly for exploration + search)
+    goHome();
+  });
+  
   initMaps();
   await loadTop3();
 })();
