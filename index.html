@@ -105,8 +105,35 @@
 
       <span class="pill" id="selectedCountryPill">Country: (all)</span>
       <span class="pill" id="selectedContinentPill">Continent: All</span>
+    
+      <span class="pill" id="authPill">Not signed in</span>
+      <button class="ghost" id="loginToggleBtn">Log in</button>
+      <button class="ghost" id="registerNavBtn">Register</button>
+      <button class="ghost" id="logoutBtn" style="display:none;">Log out</button>
+</div>
+  </div>
+</header>
+
+<!-- LOGIN PANEL (inline dropdown) -->
+<div class="wrap" id="loginPanelWrap" style="padding:0 16px; display:none;">
+  <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:12px 12px; margin-top:10px;">
+    <div class="row" style="justify-content:space-between;">
+      <strong>Log in</strong>
+      <button class="ghost" id="loginCloseBtn" style="padding:6px 10px;">Close</button>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <input id="loginEmail" type="email" placeholder="Email" style="min-width:240px;">
+      <input id="loginPassword" type="password" placeholder="Password" style="min-width:200px;">
+      <button class="primary" id="loginBtn">Log in</button>
+    </div>
+    <div id="loginError" style="color:#b00020; margin-top:10px;"></div>
+    <div class="muted" style="margin-top:10px; font-size:12px;">
+      New here? Click <strong>Register</strong> in the top bar.
     </div>
   </div>
+</div>
+
+
 </header>
 
 <div class="wrap" id="continentsBarWrap">
@@ -176,7 +203,64 @@
     <section class="card">
       <div class="muted">Voting and statistics will be added next.</div>
     </section>
+  
+  <!-- REGISTER -->
+  <section id="screenRegister" class="screen">
+    <section class="card">
+      <div class="titleRow">
+        <button class="backInline" id="backFromRegister">← Back</button>
+        <h2 style="margin:0;">Create account</h2>
+      </div>
+      <div class="muted" style="margin-top:8px;">
+        We’ll send you a verification email. After confirming, you’ll be redirected back here.
+      </div>
+
+      <div class="row" style="margin-top:14px;">
+        <input id="regEmail" type="email" placeholder="Email" style="min-width:280px;">
+        <input id="regPassword" type="password" placeholder="Password" style="min-width:220px;">
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <select id="regCountry" style="min-width:280px;">
+          <option value="">Select your country</option>
+        </select>
+        <select id="regLanguage" style="min-width:220px;">
+          <option value="en">English</option>
+          <option value="cs">Čeština</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="ar">العربية</option>
+          <option value="ru">Русский</option>
+          <option value="zh">中文</option>
+        </select>
+      </div>
+
+      <div class="row" style="margin-top:12px;">
+        <button class="primary" id="regSubmitBtn">Register</button>
+        <button class="ghost" id="regCancelBtn">Cancel</button>
+      </div>
+
+      <div id="regError" style="color:#b00020; margin-top:10px;"></div>
+      <div class="muted" style="margin-top:10px; font-size:12px;">
+        Tip: use a real email — verification is required before voting.
+      </div>
+    </section>
   </section>
+
+  <!-- VERIFIED -->
+  <section id="screenVerified" class="screen">
+    <section class="card">
+      <h2 style="margin:0;">Your account was verified ✅</h2>
+      <div class="muted" style="margin-top:8px;">
+        You can now vote. We’ll take you back to the home page automatically.
+      </div>
+      <div class="row" style="margin-top:14px;">
+        <button class="primary" id="verifiedGoHomeBtn">Go to Home</button>
+      </div>
+    </section>
+  </section>
+
+</section>
 
 </div>
 
@@ -201,6 +285,62 @@ let selectedContinent = "ALL";
 let selectedCountryCode = "";
 let selectedCountryName = "";
 let currentEventId = null;
+
+/* ================== AUTH (Supabase) ================== */
+let currentUser = null;      // supabase user
+let currentSession = null;   // session
+
+const authPill = document.getElementById("authPill");
+const loginToggleBtn = document.getElementById("loginToggleBtn");
+const registerNavBtn = document.getElementById("registerNavBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+
+const loginPanelWrap = document.getElementById("loginPanelWrap");
+const loginCloseBtn = document.getElementById("loginCloseBtn");
+const loginBtn = document.getElementById("loginBtn");
+const loginEmail = document.getElementById("loginEmail");
+const loginPassword = document.getElementById("loginPassword");
+const loginError = document.getElementById("loginError");
+
+const screenRegister = document.getElementById("screenRegister");
+const screenVerified = document.getElementById("screenVerified");
+const backFromRegister = document.getElementById("backFromRegister");
+const regCancelBtn = document.getElementById("regCancelBtn");
+const regSubmitBtn = document.getElementById("regSubmitBtn");
+const regEmail = document.getElementById("regEmail");
+const regPassword = document.getElementById("regPassword");
+const regCountry = document.getElementById("regCountry");
+const regLanguage = document.getElementById("regLanguage");
+const regError = document.getElementById("regError");
+const verifiedGoHomeBtn = document.getElementById("verifiedGoHomeBtn");
+
+function safeHideSuggest(){
+  try{ if (typeof hideSuggest === "function") hideSuggest(); }catch(e){}
+}
+
+function setAuthUI(){
+  if (!currentUser){
+    authPill.textContent = "Not signed in";
+    loginToggleBtn.style.display = "inline-block";
+    registerNavBtn.style.display = "inline-block";
+    logoutBtn.style.display = "none";
+  } else {
+    authPill.textContent = `Signed in as: ${currentUser.email}`;
+    loginToggleBtn.style.display = "none";
+    registerNavBtn.style.display = "none";
+    logoutBtn.style.display = "inline-block";
+    loginPanelWrap.style.display = "none";
+    loginError.textContent = "";
+  }
+}
+
+function openRegister(){
+  loginPanelWrap.style.display = "none";
+  safeHideSuggest();
+  showScreen("REGISTER");
+}
+
+
 
 let map;
 
@@ -357,6 +497,8 @@ function showScreen(name){
   screenCountry.classList.toggle("active", name === "COUNTRY");
   screenEvent.classList.toggle("active", name === "EVENT");
   if (name === "HOME" && map) setTimeout(() => map.resize(), 0);
+  screenRegister.classList.toggle("active", name === "REGISTER");
+  screenVerified.classList.toggle("active", name === "VERIFIED");
 }
 document.getElementById("homeBtn").onclick = () => {
   currentEventId = null;
@@ -370,6 +512,62 @@ document.getElementById("backFromCountry").onclick = () => {
 document.getElementById("backFromEvent").onclick = () => {
   hideSuggest();
   showScreen("COUNTRY");
+};
+
+registerNavBtn.onclick = () => openRegister();
+loginToggleBtn.onclick = () => {
+  loginError.textContent = "";
+  loginPanelWrap.style.display = (loginPanelWrap.style.display === "none" || loginPanelWrap.style.display === "") ? "block" : "none";
+  safeHideSuggest();
+};
+loginCloseBtn.onclick = () => { loginPanelWrap.style.display = "none"; };
+logoutBtn.onclick = async () => { await supabaseClient.auth.signOut(); };
+
+backFromRegister.onclick = () => { showScreen("HOME"); };
+regCancelBtn.onclick = () => { showScreen("HOME"); };
+
+verifiedGoHomeBtn.onclick = () => { showScreen("HOME"); };
+
+loginBtn.onclick = async () => {
+  loginError.textContent = "";
+  const em = (loginEmail.value || "").trim();
+  const pw = loginPassword.value || "";
+  if (!em || !pw){ loginError.textContent = "Enter email and password."; return; }
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email: em, password: pw });
+  if (error){ loginError.textContent = error.message; return; }
+
+  currentSession = data.session || null;
+  currentUser = data.user || currentSession?.user || null;
+  setAuthUI();
+  loginPanelWrap.style.display = "none";
+};
+
+regSubmitBtn.onclick = async () => {
+  regError.textContent = "";
+  const em = (regEmail.value || "").trim();
+  const pw = regPassword.value || "";
+  const cc = regCountry.value || "";
+  const lang = regLanguage.value || "en";
+
+  if (!em || !pw){ regError.textContent = "Enter email and password."; return; }
+  if (!cc){ regError.textContent = "Select your country."; return; }
+
+  const redirectTo = window.location.origin + window.location.pathname + "#verified";
+
+  const { error } = await supabaseClient.auth.signUp({
+    email: em,
+    password: pw,
+    options: {
+      emailRedirectTo: redirectTo,
+      data: { country_code: cc, language: lang }
+    }
+  });
+
+  if (error){ regError.textContent = error.message; return; }
+
+  alert("Verification email sent. Please check your inbox and confirm your account.");
+  showScreen("HOME");
 };
 document.getElementById("clearCountryBtn").onclick = () => {
   selectedCountryCode = "";
@@ -598,6 +796,12 @@ async function loadCountries(){
 
   countriesByCode = {};
   for (const c of countries) countriesByCode[c.code] = c;
+
+  // Populate registration country dropdown
+  if (regCountry){
+    regCountry.innerHTML = '<option value="">Select your country</option>' +
+      countries.map(c => `<option value="${c.code}">${escapeHtml(c.name)} (${c.code})</option>`).join("");
+  }
 }
 
 async function loadEventsCache(){
@@ -699,6 +903,51 @@ function setBigMapSelected(code){
   setContinentPill();
   setCountryPill();
 
+
+  // If arriving from email confirmation, Supabase may include ?code=... (PKCE)
+  // Try exchanging the code for a session.
+  try{
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("code");
+    if (code){
+      const { data, error } = await supabaseClient.auth.exchangeCodeForSession(code);
+      if (!error){
+        currentSession = data.session || null;
+        currentUser = data.user || currentSession?.user || null;
+        // Clean URL (remove code params)
+        url.searchParams.delete("code");
+        url.searchParams.delete("type");
+        window.history.replaceState({}, document.title, url.toString());
+      }
+    }
+  }catch(e){}
+
+  // Read current session (if already logged in)
+  const { data: sessData } = await supabaseClient.auth.getSession();
+  currentSession = sessData.session || null;
+  currentUser = currentSession?.user || null;
+  setAuthUI();
+
+  // Upsert profile after verification/login using user_metadata
+  if (currentUser){
+    const meta = currentUser.user_metadata || {};
+    const cc = meta.country_code;
+    const lang = meta.language;
+    if (cc || lang){
+      const { error: pErr } = await supabaseClient
+        .from("profiles")
+        .upsert([{ id: currentUser.id, country_code: cc || null, language: lang || null }], { onConflict: "id" });
+      if (pErr) console.warn("profiles upsert error:", pErr);
+    }
+  }
+
+  // If hash indicates verified, show confirmation screen briefly.
+  if (window.location.hash === "#verified"){
+    showScreen("VERIFIED");
+    setTimeout(() => showScreen("HOME"), 2200);
+  }
+
+
   await loadContinents();
   await loadCountries();
   await loadEventsCache();
@@ -707,6 +956,14 @@ function setBigMapSelected(code){
   renderContinentCountries();
   applyContinentView();
 })();
+
+<script>
+// Auth state listener
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  currentSession = session || null;
+  currentUser = session?.user || null;
+  setAuthUI();
+});
 </script>
 
 </body>
