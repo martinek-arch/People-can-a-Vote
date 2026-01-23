@@ -144,7 +144,7 @@
         <div id="suggest"></div>
       </div>
 
-      <span class="pill" id="selectedCountryPill">Country: (all)</span>
+      <span class="pill" id="selectedContinentPill">Continent: All</span>
 
       <span class="pill" id="authPill">Not signed in</span>
       <button class="ghost" id="openAuthBtn">Log in</button>
@@ -428,6 +428,7 @@ function applyI18n(){
   document.getElementById('voteNeutral').textContent = t('neutral');
 
   setCountryPill();
+  setContinentPill();
 }
 
 /* ================== STATE ================== */
@@ -487,6 +488,12 @@ const loginBtn = document.getElementById('loginBtn');
 const signupBtn = document.getElementById('signupBtn');
 
 const selectedCountryPill = document.getElementById('selectedCountryPill');
+const selectedContinentPill = document.getElementById('selectedContinentPill');
+
+function setContinentPill(){
+  selectedContinentPill.textContent = `Continent: ${selectedContinent}`;
+}
+
 
 /* ================== Helpers ================== */
 function escapeHtml(s){
@@ -1193,6 +1200,41 @@ function initMaps(){
   initMaps();
   await loadTop3();
 })();
+ 
+   // Continents bar handlers (outside init to avoid placement issues)
+(function bindContinentBar(){
+  const bar = document.getElementById('continentsBar');
+  if (!bar) {
+    console.warn("continentsBar not found");
+    return;
+  }
+
+  bar.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-cont]');
+    if (!btn) return;
+
+    selectedContinent = btn.getAttribute('data-cont') || "ALL";
+    setContinentPill();
+
+    // visual active
+    for (const b of bar.querySelectorAll('button[data-cont]')){
+      b.style.border = (b === btn) ? "1px solid #bbb" : "0";
+      b.style.background = (b === btn) ? "#ddd" : "#eee";
+    }
+
+    // clear selected country
+    selectedCountryCode = "";
+    selectedCountryName = "";
+    setCountryPill();
+    setBigMapSelected("");
+
+    // go home
+    goHome();
+
+    console.log("Selected continent:", selectedContinent);
+  });
+})();
+
 </script>
 
 </body>
