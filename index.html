@@ -271,27 +271,61 @@ const CONTINENT_BOUNDS = {
 };
 
 function renderContinentCountries(){
+  // Only show this panel when a specific continent is selected
   if (selectedContinent === "ALL"){
     continentCountriesWrap.style.display = "none";
     continentCountriesList.innerHTML = "";
     return;
   }
 
+  continentCountriesWrap.style.display = "block";
+
+  // If a country is selected, collapse to a single chip + back button (more room for events)
+  if (selectedCountryCode){
+    const c = countriesByCode[selectedCountryCode];
+    const label = c ? `${c.name} (${c.code})` : selectedCountryCode;
+
+    continentCountriesTitle.textContent = `Selected country`;
+    continentCountriesSub.textContent = `Click back to choose another country in ${selectedContinent}.`;
+
+    // two-column layout: left selected country chip, right back button
+    continentCountriesList.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;">
+        <button class="countryChip active" data-cc="${escapeHtml(selectedCountryCode)}" style="cursor:default;">${escapeHtml(label)}</button>
+        <button class="ghost" id="continentBackBtn" style="padding:6px 10px;">← Back</button>
+      </div>
+    `;
+
+    const backBtn = document.getElementById("continentBackBtn");
+    if (backBtn){
+      backBtn.onclick = async () => {
+        // clear current selection but keep continent
+        selectedCountryCode = "";
+        selectedCountryName = "";
+        setCountryPill();
+        setBigMapSelected("");
+        // go back to country list + home (so user can pick again)
+        showScreen("HOME");
+        renderContinentCountries();
+      };
+    }
+    return;
+  }
+
+  // Otherwise render all countries for this continent
   const list = countriesForSearch().slice().sort((a,b)=>a.name.localeCompare(b.name));
   continentCountriesTitle.textContent = `Countries in ${selectedContinent}`;
   continentCountriesSub.textContent = `Found: ${list.length}. Click a country to see its events.`;
-  continentCountriesWrap.style.display = "block";
 
   continentCountriesList.innerHTML = list.map(c => {
-    const active = c.code === selectedCountryCode ? "active" : "";
-    return `<button class="countryChip ${active}" data-cc="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${escapeHtml(c.code)})</button>`;
+    return `<button class="countryChip" data-cc="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${escapeHtml(c.code)})</button>`;
   }).join("");
 
   for (const btn of continentCountriesList.querySelectorAll("button[data-cc]")){
     btn.addEventListener("click", async () => {
       const cc = btn.getAttribute("data-cc");
       await selectCountry(cc);
-      // keep the list visible; update active state
+      // collapse to selected view
       renderContinentCountries();
     });
   }
