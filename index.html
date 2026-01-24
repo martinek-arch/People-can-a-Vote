@@ -148,6 +148,17 @@
       <button class="ghost" id="loginToggleBtn">Log in</button>
       <button class="ghost" id="registerNavBtn">Register</button>
       <button class="ghost" id="logoutBtn" style="display:none;">Log out</button>
+
+      <select id="langSelect" style="padding:8px 10px;border-radius:10px;border:1px solid #ddd;">
+        <option value="en">EN</option>
+        <option value="cs">CS</option>
+        <option value="es">ES</option>
+        <option value="fr">FR</option>
+        <option value="de">DE</option>
+        <option value="ar">AR</option>
+        <option value="ru">RU</option>
+        <option value="zh">ZH</option>
+      </select>
 </div>
   </div>
 </header>
@@ -298,6 +309,7 @@
           <option value="cs">Čeština</option>
           <option value="es">Español</option>
           <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
           <option value="ar">العربية</option>
           <option value="ru">Русский</option>
           <option value="zh">中文</option>
@@ -469,12 +481,12 @@ function safeHideSuggest(){
 
 function setAuthUI(){
   if (!currentUser){
-    authPill.textContent = "Not signed in";
+    authPill.textContent = t("not_signed_in");
     loginToggleBtn.style.display = "inline-block";
     registerNavBtn.style.display = "inline-block";
     logoutBtn.style.display = "none";
   } else {
-    authPill.textContent = `Signed in as: ${currentUser.email}`;
+    authPill.textContent = t("signed_in_as", { email: currentUser.email });
     loginToggleBtn.style.display = "none";
     registerNavBtn.style.display = "none";
     logoutBtn.style.display = "inline-block";
@@ -504,6 +516,431 @@ function norm(s){
   return (s||"").toString().toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
 }
+
+
+/* ================== i18n ================== */
+const I18N = {
+  en: {
+    brand_sub: "Global view of opinions from around the world",
+    home: "Home",
+    map_title: "Map",
+    map_sub: "Click a country to see its events. Or use search.",
+    clear_country: "Clear country",
+    top3_title: "Top 3 events",
+    top3_sub: "Most voted events right now",
+    refresh: "Refresh",
+    search_ph: "Search country or event…",
+    country_pill_all: t("country_pill_all"),
+    continent_pill_all: "Continent: All",
+    not_signed_in: "Not signed in",
+    signed_in_as: "Signed in as: {email}",
+    login: "Log in",
+    logout: "Log out",
+    register: "Register",
+    login_title: "Log in",
+    close: "Close",
+    email: "Email",
+    password: "Password",
+    register_title: "Create account",
+    register_sub: "We’ll send you a verification email. After confirming, you’ll be redirected back here.",
+    select_country: "Select your country",
+    cancel: "Cancel",
+    verified_title: "Your account was verified ✅",
+    verified_sub: "You can now vote. We’ll take you back to the home page automatically.",
+    go_home: "Go to Home",
+    back: "← Back",
+    events: "Events",
+    loading: "Loading…",
+    no_events: "No events for this country yet.",
+    vote_title: "Vote",
+    vote_yes: "Yes",
+    vote_no: "No",
+    vote_neutral: "No opinion",
+    vote_need_login: "Please log in to vote.",
+    vote_need_verify: "Please verify your email to vote.",
+    voted_already: "You already voted on this event.",
+    voted_saved: "Vote saved ✅",
+    stats_title: "Statistics",
+    stats_total_votes: "Total votes:",
+    citizens_of: "Citizens of {country} ({code})",
+    other_countries: "Other countries",
+    location: "Location",
+    countries_in: "Countries in {continent}",
+    selected_country: "Selected country",
+    found_countries: "Found: {n}. Click a country to see its events.",
+    pick_country_sub: "Pick a country to see events.",
+    back_to_countries: "Click back to choose another country in {continent}."
+  },
+  cs: {
+    brand_sub: "Globální pohled na názory lidí z celého světa",
+    home: "Domů",
+    map_title: "Mapa",
+    map_sub: "Klikni na zemi a zobraz události. Nebo použij vyhledávání.",
+    clear_country: "Zrušit zemi",
+    top3_title: "TOP 3 události",
+    top3_sub: "Nejvíc hlasované události",
+    refresh: "Obnovit",
+    search_ph: "Hledej zemi nebo událost…",
+    country_pill_all: "Země: (vše)",
+    continent_pill_all: "Kontinent: Vše",
+    not_signed_in: "Nepřihlášen",
+    signed_in_as: "Přihlášen jako: {email}",
+    login: "Přihlásit",
+    logout: "Odhlásit",
+    register: "Registrace",
+    login_title: "Přihlášení",
+    close: "Zavřít",
+    email: "Email",
+    password: "Heslo",
+    register_title: "Vytvořit účet",
+    register_sub: "Pošleme ti ověřovací email. Po potvrzení se vrátíš zpět na web.",
+    select_country: "Vyber svou zemi",
+    cancel: "Zrušit",
+    verified_title: "Účet byl ověřen ✅",
+    verified_sub: "Teď můžeš hlasovat. Za chvíli tě vrátíme na hlavní stránku.",
+    go_home: "Domů",
+    back: "← Zpět",
+    events: "Události",
+    loading: "Načítám…",
+    no_events: "Pro tuto zemi zatím nejsou události.",
+    vote_title: "Hlasování",
+    vote_yes: "Ano",
+    vote_no: "Ne",
+    vote_neutral: "Nemám názor",
+    vote_need_login: "Pro hlasování se prosím přihlas.",
+    vote_need_verify: "Nejdřív ověř email, abys mohl hlasovat.",
+    voted_already: "Pro tuto událost jste již hlasoval.",
+    voted_saved: "Hlas byl uložen ✅",
+    stats_title: "Statistiky",
+    stats_total_votes: "Celkem hlasů:",
+    citizens_of: "Občané {country} ({code})",
+    other_countries: "Ostatní státy",
+    location: "Lokace",
+    countries_in: "Země v kontinentu {continent}",
+    selected_country: "Vybraná země",
+    found_countries: "Nalezeno: {n}. Klikni na zemi pro události.",
+    pick_country_sub: "Vyber zemi pro zobrazení událostí.",
+    back_to_countries: "Klikni na zpět pro výběr jiné země v {continent}."
+  },
+  es: {
+    brand_sub: "Visión global de opiniones de todo el mundo",
+    home: "Inicio",
+    map_title: "Mapa",
+    map_sub: "Haz clic en un país para ver sus eventos. O usa la búsqueda.",
+    clear_country: "Quitar país",
+    top3_title: "Top 3 eventos",
+    top3_sub: "Eventos con más votos",
+    refresh: "Actualizar",
+    search_ph: "Buscar país o evento…",
+    country_pill_all: "País: (todos)",
+    continent_pill_all: "Continente: Todos",
+    not_signed_in: "Sin sesión",
+    signed_in_as: "Conectado como: {email}",
+    login: "Iniciar sesión",
+    logout: "Cerrar sesión",
+    register: "Registrarse",
+    login_title: "Iniciar sesión",
+    close: "Cerrar",
+    email: "Email",
+    password: "Contraseña",
+    register_title: "Crear cuenta",
+    register_sub: "Te enviaremos un email de verificación. Tras confirmar, volverás aquí.",
+    select_country: "Selecciona tu país",
+    cancel: "Cancelar",
+    verified_title: "Cuenta verificada ✅",
+    verified_sub: "Ya puedes votar. Volveremos a Inicio automáticamente.",
+    go_home: "Ir a Inicio",
+    back: "← Atrás",
+    events: "Eventos",
+    loading: "Cargando…",
+    no_events: "Aún no hay eventos para este país.",
+    vote_title: "Votar",
+    vote_yes: "Sí",
+    vote_no: "No",
+    vote_neutral: "Sin opinión",
+    vote_need_login: "Inicia sesión para votar.",
+    vote_need_verify: "Verifica tu email para votar.",
+    voted_already: "Ya votaste en este evento.",
+    voted_saved: "Voto guardado ✅",
+    stats_title: "Estadísticas",
+    stats_total_votes: "Votos totales:",
+    citizens_of: "Ciudadanos de {country} ({code})",
+    other_countries: "Otros países",
+    location: "Ubicación",
+    countries_in: "Países en {continent}",
+    selected_country: "País seleccionado",
+    found_countries: "Encontrados: {n}. Haz clic en un país.",
+    pick_country_sub: "Elige un país para ver eventos.",
+    back_to_countries: "Pulsa atrás para elegir otro país en {continent}."
+  },
+  fr: {
+    brand_sub: "Vue globale des opinions du monde entier",
+    home: "Accueil",
+    map_title: "Carte",
+    map_sub: "Cliquez sur un pays pour voir ses événements, ou utilisez la recherche.",
+    clear_country: "Effacer le pays",
+    top3_title: "Top 3 événements",
+    top3_sub: "Événements les plus votés",
+    refresh: "Rafraîchir",
+    search_ph: "Rechercher un pays ou un événement…",
+    country_pill_all: "Pays : (tous)",
+    continent_pill_all: "Continent : Tous",
+    not_signed_in: "Non connecté",
+    signed_in_as: "Connecté : {email}",
+    login: "Connexion",
+    logout: "Déconnexion",
+    register: "Inscription",
+    login_title: "Connexion",
+    close: "Fermer",
+    email: "Email",
+    password: "Mot de passe",
+    register_title: "Créer un compte",
+    register_sub: "Nous enverrons un email de vérification. Après confirmation, vous reviendrez ici.",
+    select_country: "Choisissez votre pays",
+    cancel: "Annuler",
+    verified_title: "Compte vérifié ✅",
+    verified_sub: "Vous pouvez voter. Retour à l’accueil automatiquement.",
+    go_home: "Aller à l’accueil",
+    back: "← Retour",
+    events: "Événements",
+    loading: "Chargement…",
+    no_events: "Aucun événement pour ce pays.",
+    vote_title: "Voter",
+    vote_yes: "Oui",
+    vote_no: "Non",
+    vote_neutral: "Sans avis",
+    vote_need_login: "Connectez‑vous pour voter.",
+    vote_need_verify: "Vérifiez votre email pour voter.",
+    voted_already: "Vous avez déjà voté.",
+    voted_saved: "Vote enregistré ✅",
+    stats_title: "Statistiques",
+    stats_total_votes: "Total des votes :",
+    citizens_of: "Citoyens de {country} ({code})",
+    other_countries: "Autres pays",
+    location: "Lieu",
+    countries_in: "Pays en {continent}",
+    selected_country: "Pays sélectionné",
+    found_countries: "Trouvés : {n}. Cliquez sur un pays.",
+    pick_country_sub: "Choisissez un pays pour voir les événements.",
+    back_to_countries: "Retour pour choisir un autre pays en {continent}."
+  },
+  de: {
+    brand_sub: "Globale Sicht auf Meinungen aus aller Welt",
+    home: "Start",
+    map_title: "Karte",
+    map_sub: "Klicke auf ein Land, um Ereignisse zu sehen – oder nutze die Suche.",
+    clear_country: "Land löschen",
+    top3_title: "Top 3 Ereignisse",
+    top3_sub: "Meistgewählte Ereignisse",
+    refresh: "Aktualisieren",
+    search_ph: "Land oder Ereignis suchen…",
+    country_pill_all: "Land: (alle)",
+    continent_pill_all: "Kontinent: Alle",
+    not_signed_in: "Nicht angemeldet",
+    signed_in_as: "Angemeldet als: {email}",
+    login: "Anmelden",
+    logout: "Abmelden",
+    register: "Registrieren",
+    login_title: "Anmelden",
+    close: "Schließen",
+    email: "E‑Mail",
+    password: "Passwort",
+    register_title: "Konto erstellen",
+    register_sub: "Wir senden eine Bestätigungs‑E‑Mail. Danach wirst du zurückgeleitet.",
+    select_country: "Wähle dein Land",
+    cancel: "Abbrechen",
+    verified_title: "Konto bestätigt ✅",
+    verified_sub: "Du kannst jetzt abstimmen. Weiterleitung zur Startseite…",
+    go_home: "Zur Startseite",
+    back: "← Zurück",
+    events: "Ereignisse",
+    loading: "Lädt…",
+    no_events: "Noch keine Ereignisse für dieses Land.",
+    vote_title: "Abstimmen",
+    vote_yes: "Ja",
+    vote_no: "Nein",
+    vote_neutral: "Keine Meinung",
+    vote_need_login: "Bitte anmelden, um abzustimmen.",
+    vote_need_verify: "Bitte E‑Mail bestätigen, um abzustimmen.",
+    voted_already: "Du hast bereits abgestimmt.",
+    voted_saved: "Stimme gespeichert ✅",
+    stats_title: "Statistiken",
+    stats_total_votes: "Stimmen gesamt:",
+    citizens_of: "Bürger von {country} ({code})",
+    other_countries: "Andere Länder",
+    location: "Ort",
+    countries_in: "Länder in {continent}",
+    selected_country: "Ausgewähltes Land",
+    found_countries: "Gefunden: {n}. Klicke auf ein Land.",
+    pick_country_sub: "Wähle ein Land, um Ereignisse zu sehen.",
+    back_to_countries: "Zurück, um ein anderes Land in {continent} zu wählen."
+  },
+  ar: {
+    brand_sub: "نظرة عالمية على آراء الناس حول العالم",
+    home: "الرئيسية",
+    map_title: "الخريطة",
+    map_sub: "اضغط على دولة لرؤية الأحداث أو استخدم البحث.",
+    clear_country: "إزالة الدولة",
+    top3_title: "أفضل 3 أحداث",
+    top3_sub: "الأكثر تصويتًا الآن",
+    refresh: "تحديث",
+    search_ph: "ابحث عن دولة أو حدث…",
+    country_pill_all: "الدولة: (الكل)",
+    continent_pill_all: "القارة: الكل",
+    not_signed_in: "غير مسجّل",
+    signed_in_as: "مسجّل كـ: {email}",
+    login: "تسجيل الدخول",
+    logout: "تسجيل الخروج",
+    register: "إنشاء حساب",
+    login_title: "تسجيل الدخول",
+    close: "إغلاق",
+    email: "البريد",
+    password: "كلمة المرور",
+    register_title: "إنشاء حساب",
+    register_sub: "سنرسل رسالة تحقق. بعد التأكيد ستعود إلى هنا.",
+    select_country: "اختر دولتك",
+    cancel: "إلغاء",
+    verified_title: "تم التحقق من الحساب ✅",
+    verified_sub: "يمكنك التصويت الآن. سنعيدك للصفحة الرئيسية.",
+    go_home: "اذهب للرئيسية",
+    back: "← رجوع",
+    events: "الأحداث",
+    loading: "جارٍ التحميل…",
+    no_events: "لا توجد أحداث لهذه الدولة بعد.",
+    vote_title: "التصويت",
+    vote_yes: "نعم",
+    vote_no: "لا",
+    vote_neutral: "لا رأي",
+    vote_need_login: "سجّل الدخول للتصويت.",
+    vote_need_verify: "تحقق من بريدك للتصويت.",
+    voted_already: "لقد صوّتت بالفعل.",
+    voted_saved: "تم حفظ الصوت ✅",
+    stats_title: "الإحصائيات",
+    stats_total_votes: "إجمالي الأصوات:",
+    citizens_of: "مواطنو {country} ({code})",
+    other_countries: "دول أخرى",
+    location: "الموقع",
+    countries_in: "دول في {continent}",
+    selected_country: "الدولة المختارة",
+    found_countries: "تم العثور على {n}. اختر دولة.",
+    pick_country_sub: "اختر دولة لرؤية الأحداث.",
+    back_to_countries: "ارجع لاختيار دولة أخرى في {continent}."
+  },
+  ru: {
+    brand_sub: "Глобальный взгляд на мнения людей со всего мира",
+    home: "Главная",
+    map_title: "Карта",
+    map_sub: "Нажмите на страну, чтобы увидеть события, или используйте поиск.",
+    clear_country: "Сбросить страну",
+    top3_title: "Топ‑3 событий",
+    top3_sub: "Самые голосуемые сейчас",
+    refresh: "Обновить",
+    search_ph: "Искать страну или событие…",
+    country_pill_all: "Страна: (все)",
+    continent_pill_all: "Континент: Все",
+    not_signed_in: "Не вошли",
+    signed_in_as: "Вошли как: {email}",
+    login: "Войти",
+    logout: "Выйти",
+    register: "Регистрация",
+    login_title: "Вход",
+    close: "Закрыть",
+    email: "Email",
+    password: "Пароль",
+    register_title: "Создать аккаунт",
+    register_sub: "Мы отправим письмо для подтверждения. После подтверждения вы вернётесь сюда.",
+    select_country: "Выберите страну",
+    cancel: "Отмена",
+    verified_title: "Аккаунт подтверждён ✅",
+    verified_sub: "Теперь вы можете голосовать. Сейчас вернём на главную.",
+    go_home: "На главную",
+    back: "← Назад",
+    events: "События",
+    loading: "Загрузка…",
+    no_events: "Пока нет событий для этой страны.",
+    vote_title: "Голосование",
+    vote_yes: "Да",
+    vote_no: "Нет",
+    vote_neutral: "Нет мнения",
+    vote_need_login: "Войдите, чтобы голосовать.",
+    vote_need_verify: "Подтвердите email, чтобы голосовать.",
+    voted_already: "Вы уже голосовали.",
+    voted_saved: "Голос сохранён ✅",
+    stats_title: "Статистика",
+    stats_total_votes: "Всего голосов:",
+    citizens_of: "Граждане {country} ({code})",
+    other_countries: "Другие страны",
+    location: "Локация",
+    countries_in: "Страны в {continent}",
+    selected_country: "Выбрана страна",
+    found_countries: "Найдено: {n}. Нажмите на страну.",
+    pick_country_sub: "Выберите страну для событий.",
+    back_to_countries: "Назад, чтобы выбрать другую страну в {continent}."
+  },
+  zh: {
+    brand_sub: "来自世界各地的全球意见视图",
+    home: "主页",
+    map_title: "地图",
+    map_sub: "点击国家查看事件，或使用搜索。",
+    clear_country: "清除国家",
+    top3_title: "Top 3 事件",
+    top3_sub: "当前投票最多的事件",
+    refresh: "刷新",
+    search_ph: "搜索国家或事件…",
+    country_pill_all: "国家： (全部)",
+    continent_pill_all: "洲：全部",
+    not_signed_in: "未登录",
+    signed_in_as: "已登录：{email}",
+    login: "登录",
+    logout: "退出",
+    register: "注册",
+    login_title: "登录",
+    close: "关闭",
+    email: "邮箱",
+    password: "密码",
+    register_title: "创建账号",
+    register_sub: "我们会发送验证邮件。确认后会跳回此页面。",
+    select_country: "选择你的国家",
+    cancel: "取消",
+    verified_title: "账号已验证 ✅",
+    verified_sub: "现在可以投票。将自动返回主页。",
+    go_home: "返回主页",
+    back: "← 返回",
+    events: "事件",
+    loading: "加载中…",
+    no_events: "该国家暂无事件。",
+    vote_title: "投票",
+    vote_yes: "是",
+    vote_no: "否",
+    vote_neutral: "无意见",
+    vote_need_login: "请登录后投票。",
+    vote_need_verify: "请验证邮箱后投票。",
+    voted_already: "你已对此事件投票。",
+    voted_saved: "投票已保存 ✅",
+    stats_title: "统计",
+    stats_total_votes: "总票数：",
+    citizens_of: "{country}（{code}）公民",
+    other_countries: "其他国家",
+    location: "位置",
+    countries_in: "{continent} 的国家",
+    selected_country: "已选国家",
+    found_countries: "找到：{n}。点击国家查看。",
+    pick_country_sub: "选择国家查看事件。",
+    back_to_countries: "返回以选择 {continent} 的其他国家。"
+  }
+};
+
+let currentLang = "en";
+function t(key, vars={}){
+  const dict = I18N[currentLang] || I18N.en;
+  let s = (dict[key] ?? I18N.en[key] ?? key);
+  for (const [k,v] of Object.entries(vars)){
+    s = s.replaceAll(`{${k}}`, String(v));
+  }
+  return s;
+}
+
+
 function countriesForSearch(){
   if (selectedContinent === "ALL") return countries;
   return countries.filter(c => (c.continent_name || "") === selectedContinent);
@@ -536,6 +973,91 @@ const eventsList = document.getElementById("eventsList");
 const eventTitle = document.getElementById("eventTitle");
 const eventMeta = document.getElementById("eventMeta");
 const eventDesc = document.getElementById("eventDesc");
+
+
+function applyI18n(){
+  // header
+  document.querySelector(".brand .muted").textContent = t("brand_sub");
+  document.getElementById("homeBtn").textContent = t("home");
+  document.getElementById("search").placeholder = t("search_ph");
+
+  // home
+  const mapTitle = document.querySelector("#screenHome h3");
+  if (mapTitle) mapTitle.textContent = t("map_title");
+  const mapSub = document.querySelector("#screenHome .muted");
+  if (mapSub) mapSub.textContent = t("map_sub");
+  const clearBtn = document.getElementById("clearCountryBtn");
+  if (clearBtn) clearBtn.textContent = t("clear_country");
+
+  // top3
+  const topTitle = document.querySelector("#top3Box")?.closest(".card")?.querySelector("h3");
+  if (topTitle) topTitle.textContent = t("top3_title");
+  const topSub = document.querySelector("#top3Box")?.closest(".card")?.querySelector(".muted");
+  if (topSub) topSub.textContent = t("top3_sub");
+  const refreshTop = document.getElementById("refreshTopBtn");
+  if (refreshTop) refreshTop.textContent = t("refresh");
+
+  // auth
+  document.getElementById("loginToggleBtn").textContent = t("login");
+  document.getElementById("registerNavBtn").textContent = t("register");
+  document.getElementById("logoutBtn").textContent = t("logout");
+
+  // login panel
+  const lpTitle = document.querySelector("#loginPanelWrap strong");
+  if (lpTitle) lpTitle.textContent = t("login_title");
+  document.getElementById("loginCloseBtn").textContent = t("close");
+  document.getElementById("loginEmail").placeholder = t("email");
+  document.getElementById("loginPassword").placeholder = t("password");
+  document.getElementById("loginBtn").textContent = t("login");
+
+  // register screen
+  const regH2 = document.querySelector("#screenRegister h2");
+  if (regH2) regH2.textContent = t("register_title");
+  const regSub = document.querySelector("#screenRegister .muted");
+  if (regSub) regSub.textContent = t("register_sub");
+  document.getElementById("regEmail").placeholder = t("email");
+  document.getElementById("regPassword").placeholder = t("password");
+  const regCountry = document.getElementById("regCountry");
+  if (regCountry && regCountry.options.length){
+    regCountry.options[0].textContent = t("select_country");
+  }
+  document.getElementById("regCancelBtn").textContent = t("cancel");
+  document.getElementById("regSubmitBtn").textContent = t("register");
+  document.getElementById("backFromRegister").textContent = t("back");
+
+  // verified
+  const vH2 = document.querySelector("#screenVerified h2");
+  if (vH2) vH2.textContent = t("verified_title");
+  const vSub = document.querySelector("#screenVerified .muted");
+  if (vSub) vSub.textContent = t("verified_sub");
+  document.getElementById("verifiedGoHomeBtn").textContent = t("go_home");
+
+  // country / event nav
+  document.getElementById("backFromCountry").textContent = t("back");
+  document.getElementById("backFromEvent").textContent = t("back");
+
+  // vote / stats
+  const voteH3 = document.querySelector("#screenEvent #voteArea")?.closest(".card")?.querySelector("h3");
+  if (voteH3) voteH3.textContent = t("vote_title");
+  document.getElementById("voteYesBtn").textContent = t("vote_yes");
+  document.getElementById("voteNoBtn").textContent = t("vote_no");
+  document.getElementById("voteNeutralBtn").textContent = t("vote_neutral");
+  const statsH3 = document.querySelector("#statsBox")?.closest(".card")?.querySelector("h3");
+  if (statsH3) statsH3.textContent = t("stats_title");
+
+  // minimap label
+  const locLabel = document.querySelector("#miniMap")?.parentElement?.querySelector(".muted");
+  if (locLabel) locLabel.textContent = t("location");
+
+  // pills (default text; actual value set by functions)
+  setContinentPill();
+  setCountryPill();
+
+  // auth pill refresh
+  setAuthUI();
+  try{ applyI18n(); }catch(e){}
+}
+
 
 /* ================== Voting UI refs ================== */
 const voteYesBtn = document.getElementById("voteYesBtn");
@@ -609,12 +1131,12 @@ function isEmailVerified(){
 function setVoteUIState(state){
   if (state === "NEED_LOGIN"){
     voteButtonsRow.style.display = "none";
-    voteMsg.textContent = "Please log in to vote.";
+    voteMsg.textContent = t("vote_need_login");
     return;
   }
   if (state === "NEED_VERIFY"){
     voteButtonsRow.style.display = "none";
-    voteMsg.textContent = "Please verify your email to vote.";
+    voteMsg.textContent = t("vote_need_verify");
     return;
   }
   if (state === "ALREADY_VOTED"){
@@ -663,7 +1185,7 @@ async function refreshStats(eventId, eventCountryCode){
 
   statsBox.innerHTML = `
     <div class="stats-wide">
-      <div><strong>Total votes:</strong> ${total}</div>
+      <div><strong>${t("stats_total_votes")}</strong> ${total}</div>
       <div class="barWrap bars-large">
         ${barHTML("Yes", yes, total)}
         ${barHTML("No", no, total)}
@@ -672,7 +1194,7 @@ async function refreshStats(eventId, eventCountryCode){
     </div>
 
     <div class="stats-medium" style="margin-top:14px;">
-      <div><strong>Citizens of ${escapeHtml(countryLabel)} (${escapeHtml(eventCountryCode||"")})</strong>: ${cTotal}</div>
+      <div><strong>${t("citizens_of", {country: escapeHtml(countryLabel), code: escapeHtml(eventCountryCode||"")})}</strong>: ${cTotal}</div>
       <div class="barWrap bars-medium">
         ${barHTML("Yes", cYes, cTotal)}
         ${barHTML("No", cNo, cTotal)}
@@ -681,7 +1203,7 @@ async function refreshStats(eventId, eventCountryCode){
     </div>
 
     <div class="stats-narrow" style="margin-top:14px;">
-      <div><strong>Other countries</strong>: ${oTotal}</div>
+      <div><strong>${t("other_countries")}</strong>: ${oTotal}</div>
       <div class="barWrap bars-small">
         ${barHTML("Yes", oYes, oTotal)}
         ${barHTML("No", oNo, oTotal)}
@@ -729,7 +1251,7 @@ async function refreshVoteArea(eventId, eventCountryCode){
   if (already){
     setVoteUIState("ALREADY_VOTED");
     voteMsg.classList.add("okText");
-    voteMsg.textContent = "Pro tuto událost jste již hlasoval.";
+    voteMsg.textContent = t("voted_already");
     return;
   }
 
@@ -765,7 +1287,7 @@ async function submitVote(value){
     if (error.code === "23505" || error.status === 409){
       voteMsg.classList.add("okText");
       voteMsg.classList.add("okText");
-    voteMsg.textContent = "Pro tuto událost jste již hlasoval.";
+    voteMsg.textContent = t("voted_already");
       await refreshVoteArea(currentEventId, currentEventCountryCode || "");
       return;
     }
@@ -778,7 +1300,7 @@ async function submitVote(value){
 
   votedLocal.add(currentEventId);
   voteMsg.classList.add("okText");
-  voteMsg.textContent = "Hlas byl uložen ✅";
+  voteMsg.textContent = t("voted_saved");
   setVoteUIState("ALREADY_VOTED");
   await refreshStats(currentEventId, currentEventCountryCode || "");
   try{ await loadTop3(); }catch(e){}
@@ -827,8 +1349,8 @@ function renderContinentCountries(){
     const c = countriesByCode[selectedCountryCode];
     const label = c ? `${c.name} (${c.code})` : selectedCountryCode;
 
-    continentCountriesTitle.textContent = `Selected country`;
-    continentCountriesSub.textContent = `Click back to choose another country in ${selectedContinent}.`;
+    continentCountriesTitle.textContent = t("selected_country");
+    continentCountriesSub.textContent = t("back_to_countries", { continent: selectedContinent });
 
     // two-column layout: left selected country chip, right back button
     continentCountriesList.innerHTML = `
@@ -856,8 +1378,8 @@ function renderContinentCountries(){
 
   // Otherwise render all countries for this continent
   const list = countriesForSearch().slice().sort((a,b)=>a.name.localeCompare(b.name));
-  continentCountriesTitle.textContent = `Countries in ${selectedContinent}`;
-  continentCountriesSub.textContent = `Found: ${list.length}. Click a country to see its events.`;
+  continentCountriesTitle.textContent = t("countries_in", { continent: selectedContinent });
+  continentCountriesSub.textContent = t("found_countries", { n: list.length });
 
   continentCountriesList.innerHTML = list.map(c => {
     return `<button class="countryChip" data-cc="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${escapeHtml(c.code)})</button>`;
@@ -989,10 +1511,10 @@ document.getElementById("clearCountryBtn").onclick = () => {
 function setCountryPill(){
   selectedCountryPill.textContent = selectedCountryCode
     ? `Country: ${selectedCountryName} (${selectedCountryCode})`
-    : "Country: (all)";
+    : t("country_pill_all");
 }
 function setContinentPill(){
-  selectedContinentPill.textContent = `Continent: ${selectedContinent === "ALL" ? "All" : selectedContinent}`;
+  selectedContinentPill.textContent = `${t("continent_pill_all").split(":")[0]}: ${selectedContinent === "ALL" ? t("continent_pill_all").split(":")[1].trim() : selectedContinent}`;
 }
 
 /* ================== Continents bar ================== */
@@ -1111,7 +1633,7 @@ async function selectCountry(code){
 }
 
 async function loadEventsForCountry(code){
-  eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">Loading…</div>`;
+  eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">${t("loading")}</div>`;
 
   if (!code){
     eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">No country selected.</div>`;
@@ -1133,7 +1655,7 @@ async function loadEventsForCountry(code){
 
   const list = data || [];
   if (!list.length){
-    eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">No events for this country yet.</div>`;
+    eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">${t("no_events")}</div>`;
     return;
   }
 
@@ -1433,6 +1955,27 @@ function setBigMapSelected(code){
   currentSession = sessData.session || null;
   currentUser = currentSession?.user || null;
   setAuthUI();
+
+  // Language: profile -> metadata -> default
+  try{
+    let lang = "en";
+    if (currentUser){
+      // try profile
+      const prof = await getMyProfile();
+      lang = (prof?.language || currentUser.user_metadata?.language || "en");
+    }
+    if (!I18N[lang]) lang = "en";
+    currentLang = lang;
+    const ls = document.getElementById("langSelect");
+    if (ls) ls.value = currentLang;
+    applyI18n();
+  }catch(e){
+    currentLang = "en";
+    const ls = document.getElementById("langSelect");
+    if (ls) ls.value = "en";
+    applyI18n();
+  }
+
 
   // Upsert profile after verification/login using user_metadata
   if (currentUser){
