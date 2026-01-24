@@ -957,14 +957,13 @@ function setBigMapSelected(code){
   applyContinentView();
 })();
 
-<script>
 // Auth state listener
 supabaseClient.auth.onAuthStateChange((event, session) => {
   currentSession = session || null;
   currentUser = session?.user || null;
   setAuthUI();
 });
-</script>
 
+</script>
 </body>
 </html>
