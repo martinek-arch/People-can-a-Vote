@@ -101,6 +101,17 @@
   .bars-small .barLabel{ font-size:13px; }
   .bars-small .barValue{ font-size:12px; }
 
+  /* Answer colors */
+  .barYes .barInner{ background:#2e7d32; }     /* green */
+  .barNo .barInner{ background:#c62828; }      /* red */
+  .barNeutral .barInner{ background:#6d6d6d; } /* gray */
+
+  /* Width groups for stats sections */
+  .stats-wide{ max-width:100%; }
+  .stats-medium{ max-width:85%; }
+  .stats-narrow{ max-width:70%; }
+
+
 
   .backInline { padding:8px 12px; border-radius:10px; background:#eee; }
 
@@ -457,8 +468,12 @@ const votedLocal = new Set();
 function pct(part, total){ return total ? Math.round((part/total)*100) : 0; }
 function barHTML(label, count, total){
   const p = pct(count, total);
+  let cls = "barNeutral";
+  if (label === "Yes") cls = "barYes";
+  if (label === "No") cls = "barNo";
+
   return `
-    <div class="barRow">
+    <div class="barRow ${cls}">
       <div class="barLabel">${escapeHtml(label)}</div>
       <div class="barOuter"><div class="barInner" style="width:${p}%;"></div></div>
       <div class="barValue">${count} (${p}%)</div>
@@ -562,25 +577,31 @@ async function refreshStats(eventId, eventCountryCode){
   const countryLabel = eventCountryCode ? (countriesByCode[eventCountryCode]?.name || eventCountryCode) : "";
 
   statsBox.innerHTML = `
-    <div><strong>Total votes:</strong> ${total}</div>
-    <div class="barWrap bars-large">
-      ${barHTML("Yes", yes, total)}
-      ${barHTML("No", no, total)}
-      ${barHTML("No opinion", neutral, total)}
+    <div class="stats-wide">
+      <div><strong>Total votes:</strong> ${total}</div>
+      <div class="barWrap bars-large">
+        ${barHTML("Yes", yes, total)}
+        ${barHTML("No", no, total)}
+        ${barHTML("No opinion", neutral, total)}
+      </div>
     </div>
 
-    <div style="margin-top:10px;"><strong>Citizens of ${escapeHtml(countryLabel)} (${escapeHtml(eventCountryCode||"")})</strong>: ${cTotal}</div>
-    <div class="barWrap bars-medium">
-      ${barHTML("Yes", cYes, cTotal)}
-      ${barHTML("No", cNo, cTotal)}
-      ${barHTML("No opinion", cNeutral, cTotal)}
+    <div class="stats-medium" style="margin-top:14px;">
+      <div><strong>Citizens of ${escapeHtml(countryLabel)} (${escapeHtml(eventCountryCode||"")})</strong>: ${cTotal}</div>
+      <div class="barWrap bars-medium">
+        ${barHTML("Yes", cYes, cTotal)}
+        ${barHTML("No", cNo, cTotal)}
+        ${barHTML("No opinion", cNeutral, cTotal)}
+      </div>
     </div>
 
-    <div style="margin-top:10px;"><strong>Other countries</strong>: ${oTotal}</div>
-    <div class="barWrap bars-small">
-      ${barHTML("Yes", oYes, oTotal)}
-      ${barHTML("No", oNo, oTotal)}
-      ${barHTML("No opinion", oNeutral, oTotal)}
+    <div class="stats-narrow" style="margin-top:14px;">
+      <div><strong>Other countries</strong>: ${oTotal}</div>
+      <div class="barWrap bars-small">
+        ${barHTML("Yes", oYes, oTotal)}
+        ${barHTML("No", oNo, oTotal)}
+        ${barHTML("No opinion", oNeutral, oTotal)}
+      </div>
     </div>
   `;
 }
