@@ -77,6 +77,14 @@
   .eventItem small { display:block; color:#666; margin-top:6px; }
 
   .titleRow { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+  .barWrap{ margin:10px 0 14px; }
+  .barRow{ display:flex; align-items:center; gap:10px; margin:8px 0; }
+  .barLabel{ width:170px; font-size:14px; }
+  .barOuter{ flex:1; background:#eee; border-radius:999px; overflow:hidden; height:14px; }
+  .barInner{ height:100%; width:0%; background:#111; }
+  .barValue{ width:170px; text-align:right; font-size:13px; color:#333; }
+
   .backInline { padding:8px 12px; border-radius:10px; background:#eee; }
 
   @media (max-width: 700px){
@@ -200,9 +208,24 @@
       <div id="eventDesc" style="margin-top:12px; white-space:pre-wrap;"></div>
     </section>
 
-    <section class="card">
-      <div class="muted">Voting and statistics will be added next.</div>
-    </section>
+    
+<section class="card">
+  <h3 style="margin:0 0 10px 0;">Vote</h3>
+  <div id="voteArea">
+    <div class="row" id="voteButtonsRow" style="margin-top:6px;">
+      <button class="primary" id="voteYesBtn">Yes</button>
+      <button class="primary" id="voteNoBtn">No</button>
+      <button class="primary" id="voteNeutralBtn">No opinion</button>
+    </div>
+    <div id="voteMsg" class="muted" style="margin-top:10px;"></div>
+  </div>
+</section>
+
+<section class="card">
+  <h3 style="margin:0 0 10px 0;">Statistics</h3>
+  <div id="statsBox" class="muted">Loading…</div>
+</section>
+
   
   <!-- REGISTER -->
   <section id="screenRegister" class="screen">
@@ -285,6 +308,7 @@ let selectedContinent = "ALL";
 let selectedCountryCode = "";
 let selectedCountryName = "";
 let currentEventId = null;
+let currentEventCountryCode = null;
 
 /* ================== AUTH (Supabase) ================== */
 let currentUser = null;      // supabase user
@@ -387,6 +411,207 @@ const eventsList = document.getElementById("eventsList");
 const eventTitle = document.getElementById("eventTitle");
 const eventMeta = document.getElementById("eventMeta");
 const eventDesc = document.getElementById("eventDesc");
+
+/* ================== Voting UI refs ================== */
+const voteYesBtn = document.getElementById("voteYesBtn");
+const voteNoBtn = document.getElementById("voteNoBtn");
+const voteNeutralBtn = document.getElementById("voteNeutralBtn");
+const voteButtonsRow = document.getElementById("voteButtonsRow");
+const voteMsg = document.getElementById("voteMsg");
+const statsBox = document.getElementById("statsBox");
+
+const VOTE = { YES: "YES", NO: "NO", NEUTRAL: "NEUTRAL" };
+
+function pct(part, total){ return total ? Math.round((part/total)*100) : 0; }
+function barHTML(label, count, total){
+  const p = pct(count, total);
+  return `
+    <div class="barRow">
+      <div class="barLabel">${escapeHtml(label)}</div>
+      <div class="barOuter"><div class="barInner" style="width:${p}%;"></div></div>
+      <div class="barValue">${count} (${p}%)</div>
+    </div>
+  `;
+}
+
+async function getMyProfile(){
+  if (!currentUser) return null;
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("country_code, language")
+    .eq("id", currentUser.id)
+    .maybeSingle();
+  if (error){
+    console.warn("getMyProfile error:", error);
+    return null;
+  }
+  return data || null;
+}
+
+function isEmailVerified(){
+  return !!(currentUser && (currentUser.email_confirmed_at || currentUser.confirmed_at));
+}
+
+function setVoteUIState(state){
+  if (state === "NEED_LOGIN"){
+    voteButtonsRow.style.display = "none";
+    voteMsg.textContent = "Please log in to vote.";
+    return;
+  }
+  if (state === "NEED_VERIFY"){
+    voteButtonsRow.style.display = "none";
+    voteMsg.textContent = "Please verify your email to vote.";
+    return;
+  }
+  if (state === "ALREADY_VOTED"){
+    voteButtonsRow.style.display = "none";
+    return;
+  }
+  voteButtonsRow.style.display = "flex";
+}
+
+async function refreshStats(eventId, eventCountryCode){
+  statsBox.textContent = "Loading…";
+
+  const { data, error } = await supabaseClient
+    .from("votes")
+    .select("vote,country_code")
+    .eq("event_id", eventId);
+
+  if (error){
+    console.error("refreshStats error:", error);
+    statsBox.textContent = "Cannot load statistics.";
+    return;
+  }
+
+  const rows = data || [];
+  const total = rows.length;
+
+  const yes = rows.filter(r => r.vote === VOTE.YES).length;
+  const no = rows.filter(r => r.vote === VOTE.NO).length;
+  const neutral = rows.filter(r => r.vote === VOTE.NEUTRAL).length;
+
+  const citizens = eventCountryCode ? rows.filter(r => r.country_code === eventCountryCode) : [];
+  const others = eventCountryCode ? rows.filter(r => r.country_code !== eventCountryCode) : rows;
+
+  const cTotal = citizens.length;
+  const oTotal = others.length;
+
+  const cYes = citizens.filter(r => r.vote === VOTE.YES).length;
+  const cNo = citizens.filter(r => r.vote === VOTE.NO).length;
+  const cNeutral = citizens.filter(r => r.vote === VOTE.NEUTRAL).length;
+
+  const oYes = others.filter(r => r.vote === VOTE.YES).length;
+  const oNo = others.filter(r => r.vote === VOTE.NO).length;
+  const oNeutral = others.filter(r => r.vote === VOTE.NEUTRAL).length;
+
+  const countryLabel = eventCountryCode ? (countriesByCode[eventCountryCode]?.name || eventCountryCode) : "";
+
+  statsBox.innerHTML = `
+    <div><strong>Total votes:</strong> ${total}</div>
+    <div class="barWrap">
+      ${barHTML("Yes", yes, total)}
+      ${barHTML("No", no, total)}
+      ${barHTML("No opinion", neutral, total)}
+    </div>
+
+    <div style="margin-top:8px;"><strong>Citizens of ${escapeHtml(countryLabel)} (${escapeHtml(eventCountryCode||"")})</strong>: ${cTotal}</div>
+    <div class="barWrap">
+      ${barHTML("Yes", cYes, cTotal)}
+      ${barHTML("No", cNo, cTotal)}
+      ${barHTML("No opinion", cNeutral, cTotal)}
+    </div>
+
+    <div style="margin-top:8px;"><strong>Other countries</strong>: ${oTotal}</div>
+    <div class="barWrap">
+      ${barHTML("Yes", oYes, oTotal)}
+      ${barHTML("No", oNo, oTotal)}
+      ${barHTML("No opinion", oNeutral, oTotal)}
+    </div>
+  `;
+}
+
+async function checkAlreadyVoted(eventId){
+  if (!currentUser) return false;
+  const { data, error } = await supabaseClient
+    .from("votes")
+    .select("vote")
+    .eq("user_id", currentUser.id)
+    .eq("event_id", eventId)
+    .maybeSingle();
+  if (error){
+    console.warn("checkAlreadyVoted error:", error);
+    return false;
+  }
+  return !!data;
+}
+
+async function refreshVoteArea(eventId, eventCountryCode){
+  voteMsg.textContent = "";
+
+  if (!currentUser){
+    setVoteUIState("NEED_LOGIN");
+    return;
+  }
+  if (!isEmailVerified()){
+    setVoteUIState("NEED_VERIFY");
+    return;
+  }
+
+  const already = await checkAlreadyVoted(eventId);
+  if (already){
+    setVoteUIState("ALREADY_VOTED");
+    voteMsg.textContent = "You already voted on this event.";
+    return;
+  }
+
+  setVoteUIState("CAN_VOTE");
+}
+
+async function submitVote(value){
+  if (!currentUser){ setVoteUIState("NEED_LOGIN"); return; }
+  if (!isEmailVerified()){ setVoteUIState("NEED_VERIFY"); return; }
+  if (!currentEventId){ return; }
+
+  voteMsg.textContent = "Saving…";
+  voteButtonsRow.style.display = "none";
+
+  const prof = await getMyProfile();
+  const myCountry = prof?.country_code || currentUser.user_metadata?.country_code || null;
+
+  if (!myCountry){
+    voteMsg.textContent = "Missing your country in profile. Please re-register or contact admin.";
+    return;
+  }
+
+  const { error } = await supabaseClient.from("votes").insert({
+    user_id: currentUser.id,
+    event_id: currentEventId,
+    vote: value,
+    country_code: myCountry
+  });
+
+  if (error){
+    if (error.code === "23505"){
+      voteMsg.textContent = "You already voted on this event.";
+      await refreshVoteArea(currentEventId, currentEventCountryCode || "");
+      return;
+    }
+    voteMsg.textContent = error.message;
+    voteButtonsRow.style.display = "flex";
+    return;
+  }
+
+  voteMsg.textContent = "Vote saved ✅";
+  await refreshStats(currentEventId, currentEventCountryCode || "");
+  await refreshVoteArea(currentEventId, currentEventCountryCode || "");
+}
+
+voteYesBtn.onclick = () => submitVote(VOTE.YES);
+voteNoBtn.onclick = () => submitVote(VOTE.NO);
+voteNeutralBtn.onclick = () => submitVote(VOTE.NEUTRAL);
+
+
 
 
 /* ================== Continent countries UI ================== */
@@ -769,7 +994,11 @@ async function openEvent(id){
   eventMeta.textContent = evt.country_code ? `Country: ${cName} (${evt.country_code})` : "";
   eventDesc.textContent = evt.description || "";
 
+  currentEventCountryCode = evt.country_code || null;
+
   showScreen("EVENT");
+  await refreshStats(currentEventId, currentEventCountryCode || "");
+  await refreshVoteArea(currentEventId, currentEventCountryCode || "");
   renderContinentCountries();
 }
 
@@ -962,6 +1191,15 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
   currentSession = session || null;
   currentUser = session?.user || null;
   setAuthUI();
+  // If user logs in/out while viewing an event, refresh vote/stats UI
+  try{
+    const ev = document.getElementById("screenEvent");
+    if (ev && ev.classList.contains("active") && currentEventId){
+      refreshVoteArea(currentEventId, currentEventCountryCode || "");
+      refreshStats(currentEventId, currentEventCountryCode || "");
+    }
+  }catch(e){}
+
 });
 
 </script>
