@@ -519,7 +519,7 @@ function norm(s){
 
 
 /* ================== i18n ================== */
-const I18N = {
+window.I18N = {
   en: {
     brand_sub: "Global view of opinions from around the world",
     home: "Home",
@@ -932,8 +932,8 @@ const I18N = {
 
 let currentLang = "en";
 function t(key, vars={}){
-  const dict = I18N[currentLang] || I18N.en;
-  let s = (dict[key] ?? I18N.en[key] ?? key);
+  const dict = window.I18N[currentLang] || window.I18N.en;
+  let s = (dict[key] ?? window.I18N.en[key] ?? key);
   for (const [k,v] of Object.entries(vars)){
     s = s.replaceAll(`{${k}}`, String(v));
   }
@@ -1964,7 +1964,7 @@ function setBigMapSelected(code){
       const prof = await getMyProfile();
       lang = (prof?.language || currentUser.user_metadata?.language || "en");
     }
-    if (!I18N[lang]) lang = "en";
+    if (!window.I18N[lang]) lang = "en";
     currentLang = lang;
     const ls = document.getElementById("langSelect");
     if (ls) ls.value = currentLang;
