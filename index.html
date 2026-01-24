@@ -427,6 +427,9 @@ const statsBox = document.getElementById("statsBox");
 
 const VOTE = { YES: "YES", NO: "NO", NEUTRAL: "NEUTRAL" };
 
+// Local fallback: if we know the user voted in this session, lock UI immediately
+const votedLocal = new Set();
+
 function pct(part, total){ return total ? Math.round((part/total)*100) : 0; }
 function barHTML(label, count, total){
   const p = pct(count, total);
@@ -560,15 +563,22 @@ async function refreshStats(eventId, eventCountryCode){
 
 async function checkAlreadyVoted(eventId){
   if (!currentUser) return false;
+
+  // Fast path: we already voted during this session
+  if (votedLocal.has(eventId)) return true;
+
   const { data, error } = await supabaseClient
     .from("votes")
     .select("vote")
     .eq("user_id", currentUser.id)
     .eq("event_id", eventId)
     .maybeSingle();
+
   if (error){
+    // If RLS blocks SELECT, we can’t reliably detect across refresh,
+    // but at least don’t keep the UI unlocked after a successful vote in this session.
     console.warn("checkAlreadyVoted error:", error);
-    return false;
+    return votedLocal.has(eventId);
   }
   return !!data;
 }
@@ -589,7 +599,7 @@ async function refreshVoteArea(eventId, eventCountryCode){
   if (already){
     setVoteUIState("ALREADY_VOTED");
     voteMsg.classList.add("okText");
-    voteMsg.textContent = "You already voted on this event.";
+    voteMsg.textContent = "Pro tuto událost jste již hlasoval.";
     return;
   }
 
@@ -622,10 +632,10 @@ async function submitVote(value){
   });
 
   if (error){
-    if (error.code === "23505"){
+    if (error.code === "23505" || error.status === 409){
       voteMsg.classList.add("okText");
       voteMsg.classList.add("okText");
-    voteMsg.textContent = "You already voted on this event.";
+    voteMsg.textContent = "Pro tuto událost jste již hlasoval.";
       await refreshVoteArea(currentEventId, currentEventCountryCode || "");
       return;
     }
@@ -636,10 +646,11 @@ async function submitVote(value){
     return;
   }
 
+  votedLocal.add(currentEventId);
   voteMsg.classList.add("okText");
-  voteMsg.textContent = "Vote saved ✅";
+  voteMsg.textContent = "Hlas byl uložen ✅";
+  setVoteUIState("ALREADY_VOTED");
   await refreshStats(currentEventId, currentEventCountryCode || "");
-  await refreshVoteArea(currentEventId, currentEventCountryCode || "");
 }
 
 voteYesBtn.onclick = () => submitVote(VOTE.YES);
