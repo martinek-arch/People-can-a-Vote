@@ -110,6 +110,7 @@
   .stats-wide{ max-width:100%; }
   .stats-medium{ max-width:85%; }
   .stats-narrow{ max-width:70%; }
+  @media (max-width:700px){#miniMap{height:100px;}}
 
 
 
@@ -119,6 +120,7 @@
     input{ min-width:180px; }
   }
 </style>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 </head>
 
 <body>
@@ -242,6 +244,9 @@
       <div class="titleRow">
         <button class="backInline" id="backFromEvent">← Back</button>
         <h2 id="eventTitle" style="margin:0;">—</h2>
+        <div style="margin-left:auto; width:180px;">
+          <div id="miniMap" style="width:100%;height:120px;border-radius:10px;overflow:hidden;border:1px solid #eee;"></div>
+        </div>
       </div>
       <div class="muted" id="eventMeta" style="margin-top:8px;"></div>
       <div id="eventDesc" style="margin-top:12px; white-space:pre-wrap;"></div>
@@ -349,6 +354,56 @@ let selectedCountryCode = "";
 let selectedCountryName = "";
 let currentEventId = null;
 let currentEventCountryCode = null;
+
+/* ================== MINI MAP ================== */
+let miniMap = null;
+
+function initMiniMap(){
+  if (miniMap || !document.getElementById("miniMap")) return;
+
+  miniMap = new mapboxgl.Map({
+    container: "miniMap",
+    style: "mapbox://styles/mapbox/light-v11",
+    interactive: false,
+    center: [10, 20],
+    zoom: 0.8
+  });
+
+  miniMap.on("load", () => {
+    miniMap.addSource("countries-mini", {
+      type: "geojson",
+      data: COUNTRIES_GEOJSON
+    });
+
+    miniMap.addLayer({
+      id: "countries-mini-fill",
+      type: "fill",
+      source: "countries-mini",
+      paint: { "fill-color": "#e0e0e0", "fill-opacity": 0.8 }
+    });
+
+    miniMap.addLayer({
+      id: "countries-mini-highlight",
+      type: "fill",
+      source: "countries-mini",
+      paint: { "fill-color": "#4f46e5", "fill-opacity": 0.9 },
+      filter: ["==", ["get", "iso_a2"], ""]
+    });
+  });
+}
+
+function updateMiniMap(countryCode){
+  if (!miniMap) return;
+  miniMap.setFilter("countries-mini-highlight", ["==", ["get", "iso_a2"], countryCode || ""]);
+  try{
+    const f = COUNTRIES_GEOJSON.features.find(x => x.properties.iso_a2 === countryCode);
+    if (f){
+      const b = turf.bbox(f);
+      miniMap.fitBounds(b, { padding:8, duration:300 });
+    }
+  }catch(e){}
+}
+
 
 /* ================== AUTH (Supabase) ================== */
 let currentUser = null;      // supabase user
@@ -1095,6 +1150,8 @@ async function openEvent(id){
   currentEventCountryCode = evt.country_code || null;
 
   showScreen("EVENT");
+  initMiniMap();
+  updateMiniMap(currentEventCountryCode || "");
   await refreshStats(currentEventId, currentEventCountryCode || "");
   await refreshVoteArea(currentEventId, currentEventCountryCode || "");
   renderContinentCountries();
