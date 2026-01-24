@@ -357,51 +357,81 @@ let currentEventCountryCode = null;
 
 /* ================== MINI MAP ================== */
 let miniMap = null;
+let miniMapLoaded = false;
 
 function initMiniMap(){
-  if (miniMap || !document.getElementById("miniMap")) return;
+  if (miniMapLoaded) return;
+  miniMapLoaded = true;
 
   miniMap = new mapboxgl.Map({
     container: "miniMap",
     style: "mapbox://styles/mapbox/light-v11",
-    interactive: false,
     center: [10, 20],
-    zoom: 0.8
+    zoom: 1.3,
+    interactive: false
   });
 
   miniMap.on("load", () => {
-    miniMap.addSource("countries-mini", {
-      type: "geojson",
-      data: COUNTRIES_GEOJSON
+    // Use Mapbox's country boundaries vector tiles (no need for per-country GeoJSON in DB)
+    miniMap.addSource("miniCountryBoundaries", {
+      type:"vector",
+      url:"mapbox://mapbox.country-boundaries-v1"
     });
 
+    // very light base layer for context
     miniMap.addLayer({
-      id: "countries-mini-fill",
+      id: "mini-country-base",
       type: "fill",
-      source: "countries-mini",
-      paint: { "fill-color": "#e0e0e0", "fill-opacity": 0.8 }
+      source: "miniCountryBoundaries",
+      "source-layer": "country_boundaries",
+      paint: { "fill-color":"#000", "fill-opacity": 0.04 }
     });
 
+    // selected country highlight
     miniMap.addLayer({
-      id: "countries-mini-highlight",
+      id: "mini-country-selected",
       type: "fill",
-      source: "countries-mini",
-      paint: { "fill-color": "#4f46e5", "fill-opacity": 0.9 },
-      filter: ["==", ["get", "iso_a2"], ""]
+      source: "miniCountryBoundaries",
+      "source-layer": "country_boundaries",
+      paint: { "fill-color":"#111", "fill-opacity": 0.20 },
+      filter: ["==", ["get","iso_3166_1"], "ZZ"]
+    });
+
+    // outline for selected
+    miniMap.addLayer({
+      id: "mini-country-outline",
+      type: "line",
+      source: "miniCountryBoundaries",
+      "source-layer": "country_boundaries",
+      paint: { "line-color":"#111", "line-width": 1.5, "line-opacity": 0.70 },
+      filter: ["==", ["get","iso_3166_1"], "ZZ"]
     });
   });
 }
 
-function updateMiniMap(countryCode){
+async function updateMiniMap(countryCode){
+  initMiniMap();
   if (!miniMap) return;
-  miniMap.setFilter("countries-mini-highlight", ["==", ["get", "iso_a2"], countryCode || ""]);
+
+  if (!miniMap.isStyleLoaded()){
+    await new Promise(resolve => miniMap.once("load", resolve));
+  }
+
+  const iso = (countryCode || "ZZ").toUpperCase();
+
   try{
-    const f = COUNTRIES_GEOJSON.features.find(x => x.properties.iso_a2 === countryCode);
-    if (f){
-      const b = turf.bbox(f);
-      miniMap.fitBounds(b, { padding:8, duration:300 });
-    }
+    miniMap.setFilter("mini-country-selected", ["==", ["get","iso_3166_1"], iso]);
+    miniMap.setFilter("mini-country-outline", ["==", ["get","iso_3166_1"], iso]);
   }catch(e){}
+
+  // Zoom roughly to continent of the country for better framing (fast + stable)
+  const cont = continentOfCountry(iso);
+  const b = CONTINENT_BOUNDS[cont];
+  if (b){
+    try{ miniMap.fitBounds(b, { padding: 22, duration: 0 }); }catch(e){}
+  }else{
+    try{ miniMap.easeTo({ center:[10,20], zoom:1.3, duration: 0 }); }catch(e){}
+  }
 }
 
 
