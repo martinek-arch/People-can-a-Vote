@@ -26,6 +26,10 @@
   .pill { background:#f1f1f1; padding:6px 10px; border-radius:999px; font-size:12px; color:#333; }
   .card { background:#fff; padding:16px; border-radius:12px; margin:16px; }
   .muted { color:#666; }
+
+  .errorText{ color:#b00020 !important; }
+  .okText{ color:#0b6b2e !important; }
+
   .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 
   /* Continent bar */
@@ -437,16 +441,38 @@ function barHTML(label, count, total){
 
 async function getMyProfile(){
   if (!currentUser) return null;
-  const { data, error } = await supabaseClient
-    .from("profiles")
-    .select("country_code, language")
-    .eq("id", currentUser.id)
-    .maybeSingle();
-  if (error){
-    console.warn("getMyProfile error:", error);
+
+  // Some setups use profiles.id, others profiles.user_id. We'll try both.
+  // Attempt 1: profiles.id
+  try{
+    const r1 = await supabaseClient
+      .from("profiles")
+      .select("country_code, language")
+      .eq("id", currentUser.id)
+      .maybeSingle();
+    if (!r1.error && r1.data) return r1.data;
+    if (r1.error && !String(r1.error.message||"").toLowerCase().includes("column")) {
+      // non-column error (e.g., RLS), still return null but log
+      console.warn("getMyProfile(id) error:", r1.error);
+    }
+  }catch(e){}
+
+  // Attempt 2: profiles.user_id
+  try{
+    const r2 = await supabaseClient
+      .from("profiles")
+      .select("country_code, language")
+      .eq("user_id", currentUser.id)
+      .maybeSingle();
+    if (r2.error){
+      console.warn("getMyProfile(user_id) error:", r2.error);
+      return null;
+    }
+    return r2.data || null;
+  }catch(e){
+    console.warn("getMyProfile unexpected error:", e);
     return null;
   }
-  return data || null;
 }
 
 function isEmailVerified(){
@@ -562,6 +588,7 @@ async function refreshVoteArea(eventId, eventCountryCode){
   const already = await checkAlreadyVoted(eventId);
   if (already){
     setVoteUIState("ALREADY_VOTED");
+    voteMsg.classList.add("okText");
     voteMsg.textContent = "You already voted on this event.";
     return;
   }
@@ -574,6 +601,7 @@ async function submitVote(value){
   if (!isEmailVerified()){ setVoteUIState("NEED_VERIFY"); return; }
   if (!currentEventId){ return; }
 
+  voteMsg.classList.remove("errorText","okText");
   voteMsg.textContent = "Saving…";
   voteButtonsRow.style.display = "none";
 
@@ -581,6 +609,7 @@ async function submitVote(value){
   const myCountry = prof?.country_code || currentUser.user_metadata?.country_code || null;
 
   if (!myCountry){
+    voteMsg.classList.add("errorText");
     voteMsg.textContent = "Missing your country in profile. Please re-register or contact admin.";
     return;
   }
@@ -594,15 +623,20 @@ async function submitVote(value){
 
   if (error){
     if (error.code === "23505"){
-      voteMsg.textContent = "You already voted on this event.";
+      voteMsg.classList.add("okText");
+      voteMsg.classList.add("okText");
+    voteMsg.textContent = "You already voted on this event.";
       await refreshVoteArea(currentEventId, currentEventCountryCode || "");
       return;
     }
+    console.error("Vote insert error:", error);
+    voteMsg.classList.add("errorText");
     voteMsg.textContent = error.message;
     voteButtonsRow.style.display = "flex";
     return;
   }
 
+  voteMsg.classList.add("okText");
   voteMsg.textContent = "Vote saved ✅";
   await refreshStats(currentEventId, currentEventCountryCode || "");
   await refreshVoteArea(currentEventId, currentEventCountryCode || "");
@@ -1164,9 +1198,27 @@ function setBigMapSelected(code){
     const cc = meta.country_code;
     const lang = meta.language;
     if (cc || lang){
-      const { error: pErr } = await supabaseClient
-        .from("profiles")
-        .upsert([{ id: currentUser.id, country_code: cc || null, language: lang || null }], { onConflict: "id" });
+      // Try upsert into profiles (some schemas use id, others user_id)
+      let pErr = null;
+      try{
+        const r1 = await supabaseClient
+          .from("profiles")
+          .upsert([{ id: currentUser.id, country_code: cc || null, language: lang || null }], { onConflict: "id" });
+        pErr = r1.error || null;
+      }catch(e){
+        pErr = { message: String(e) };
+      }
+
+      if (pErr){
+        try{
+          const r2 = await supabaseClient
+            .from("profiles")
+            .upsert([{ user_id: currentUser.id, country_code: cc || null, language: lang || null }], { onConflict: "user_id" });
+          pErr = r2.error || null;
+        }catch(e){
+          pErr = { message: String(e) };
+        }
+      }
       if (pErr) console.warn("profiles upsert error:", pErr);
     }
   }
