@@ -519,7 +519,7 @@ function norm(s){
 
 
 /* ================== i18n ================== */
-window.I18N = window.I18N = {
+I18N = I18N = {
   en: {
     brand_sub: "Global view of opinions from around the world",
     home: "Home",
@@ -933,8 +933,8 @@ window.I18N = window.I18N = {
 var currentLang = "en";
 function t(key, vars={}){
   if (typeof currentLang === "undefined" || !currentLang) currentLang = "en";
-  const dict = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : (window.I18N ? window.I18N.en : {});
-  let s = (dict[key] ?? I18N.en[key] ?? key);
+  const dict = (I18N && I18N[currentLang]) ? I18N[currentLang] : (I18N ? I18N.en : {});
+  let s = (dict && dict[key] != null) ? dict[key] : ((I18N && I18N.en && I18N.en[key] != null) ? I18N.en[key] : key);
   for (const [k,v] of Object.entries(vars)){
     s = s.replaceAll(`{${k}}`, String(v));
   }
