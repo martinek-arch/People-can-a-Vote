@@ -350,7 +350,13 @@
 <script>
 
 /* ===== i18n bootstrap (must be defined before anything calls t()) ===== */
-var I18N = (typeof I18N !== "undefined" && I18N) ? I18N : { en: {} };
+var I18N = (typeof I18N !== "undefined" && I18N) ? I18N : { en: {
+    top: "TOP",
+    active_events: "Active events",
+    ended_events: "Ended events",
+    event_closed: "Voting closed",
+    ends_on: "Ends on {date}",
+    ended_on: "Ended on {date}",} };
 var currentLang = (typeof currentLang !== "undefined" && currentLang) ? currentLang : "en";
 function t(key, vars){
   if (!vars) vars = {};
@@ -393,6 +399,7 @@ let selectedCountryCode = "";
 let selectedCountryName = "";
 let currentEventId = null;
 let currentEventCountryCode = null;
+let currentEventEndsAt = null;
 
 /* ================== MINI MAP ================== */
 let miniMap = null;
@@ -648,7 +655,13 @@ I18N = I18N = {
     found_countries: "Nalezeno: {n}. Klikni na zemi pro události.",
     pick_country_sub: "Vyber zemi pro zobrazení událostí.",
     back_to_countries: "Klikni na zpět pro výběr jiné země v {continent}."
-  },
+  
+    top: "TOP",
+    active_events: "Aktivní události",
+    ended_events: "Skončené události",
+    event_closed: "Hlasování ukončeno",
+    ends_on: "Končí {date}",
+    ended_on: "Skončilo {date}",},
   es: {
     brand_sub: "Visión global de opiniones de todo el mundo",
     home: "Inicio",
@@ -1257,6 +1270,20 @@ async function checkAlreadyVoted(eventId){
 async function refreshVoteArea(eventId, eventCountryCode){
   voteMsg.textContent = "";
 
+  // Closed event: allow viewing stats, but no voting
+  try{
+    if (currentEventEndsAt){
+      const d = new Date(currentEventEndsAt);
+      if (!isNaN(d) && d.getTime() <= Date.now()){
+        setVoteUIState("ALREADY_VOTED");
+        voteMsg.classList.add("okText");
+        voteMsg.textContent = t("event_closed");
+        return;
+      }
+    }
+  }catch(e){}
+
+
   if (!currentUser){
     setVoteUIState("NEED_LOGIN");
     return;
@@ -1279,6 +1306,19 @@ async function refreshVoteArea(eventId, eventCountryCode){
 
 async function submitVote(value){
   if (!currentUser){ setVoteUIState("NEED_LOGIN"); return; }
+
+  try{
+    if (currentEventEndsAt){
+      const d = new Date(currentEventEndsAt);
+      if (!isNaN(d) && d.getTime() <= Date.now()){
+        voteMsg.classList.add("errorText");
+        voteMsg.textContent = t("event_closed");
+        setVoteUIState("ALREADY_VOTED");
+        return;
+      }
+    }
+  }catch(e){}
+
   if (!isEmailVerified()){ setVoteUIState("NEED_VERIFY"); return; }
   if (!currentEventId){ return; }
 
@@ -1673,19 +1713,82 @@ async function loadEventsForCountry(code){
   }
 
   const list = data || [];
+  
   if (!list.length){
     eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">${t("no_events")}</div>`;
     return;
   }
 
-  eventsList.innerHTML = "";
-  for (const e of list){
-    const div = document.createElement("div");
-    div.className = "eventItem";
-    div.innerHTML = `<strong>${escapeHtml(e.title||"")}</strong><small>${escapeHtml(e.description||"")}</small>`;
-    div.onclick = async () => openEvent(e.id);
-    eventsList.appendChild(div);
+  const now = Date.now();
+  const isEnded = (e) => {
+    try{
+      if (e.is_active === false) return true;
+      if (!e.ends_at) return false;
+      const d = new Date(e.ends_at);
+      return (!isNaN(d) && d.getTime() <= now);
+    }catch(err){ return false; }
+  };
+
+  const top = list.filter(e => (e.is_top === true) && !isEnded(e))
+                  .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const active = list.filter(e => !(e.is_top === true) && !isEnded(e))
+                     .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const ended = list.filter(e => isEnded(e))
+                    .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+  function dateLabel(iso){
+    try{
+      const d = new Date(iso);
+      if (isNaN(d)) return "";
+      return d.toLocaleDateString(undefined, { year:"numeric", month:"short", day:"2-digit" });
+    }catch(e){ return ""; }
   }
+
+  function renderItem(e){
+    const endedFlag = isEnded(e);
+    const endText = e.ends_at ? (endedFlag ? t("ended_on",{date: dateLabel(e.ends_at)}) : t("ends_on",{date: dateLabel(e.ends_at)})) : "";
+    return `
+      <div class="eventItem" data-id="${e.id}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <strong>${escapeHtml(e.title || "")}</strong>
+          ${endedFlag ? `<span class="pill" style="background:#f2f2f2;border-color:#e6e6e6;">${escapeHtml(t("event_closed"))}</span>` : ""}
+        </div>
+        <div class="muted" style="margin-top:6px;">${escapeHtml(endText)}</div>
+        ${e.description ? `<div class="muted" style="margin-top:6px;">${escapeHtml(e.description)}</div>` : ""}
+      </div>
+    `;
+  }
+
+  let html = "";
+  if (top.length){
+    html += `<div class="muted" style="margin:0 16px 10px; font-weight:600;">${escapeHtml(t("top"))}</div>`;
+    html += top.map(renderItem).join("");
+  }
+
+  if (active.length){
+    html += `<div class="muted" style="margin:18px 16px 10px; font-weight:600;">${escapeHtml(t("active_events"))}</div>`;
+    html += active.map(renderItem).join("");
+  }
+
+  if (ended.length){
+    html += `<div style="margin:18px 16px 10px; border-top:1px solid #eee;"></div>`;
+    html += `<div class="muted" style="margin:10px 16px 10px; font-weight:600;">${escapeHtml(t("ended_events"))}</div>`;
+    html += ended.map(renderItem).join("");
+  }
+
+  eventsList.innerHTML = html;
+
+  for (const el of eventsList.querySelectorAll(".eventItem")){
+    el.addEventListener("click", async () => {
+      const eid = Number(el.getAttribute("data-id"));
+      await openEvent(eid);
+    });
+  }
+
+  setBigMapSelected(selectedCountryCode);
+
 }
 
 /* ================== Event detail ================== */
@@ -1716,9 +1819,19 @@ async function openEvent(id){
   eventTitle.textContent = evt.title || "—";
   const cName = evt.country_code ? (countriesByCode[evt.country_code]?.name || "") : "";
   eventMeta.textContent = evt.country_code ? `Country: ${cName} (${evt.country_code})` : "";
+  try{
+    const d = currentEventEndsAt ? new Date(currentEventEndsAt) : null;
+    if (d && !isNaN(d)){
+      const ds = d.toLocaleDateString(undefined, { year:"numeric", month:"short", day:"2-digit" });
+      const ended = (d.getTime() <= Date.now());
+      eventMeta.textContent += " • " + (ended ? t("ended_on", {date: ds}) : t("ends_on", {date: ds}));
+    }
+  }catch(e){}
+
   eventDesc.textContent = evt.description || "";
 
   currentEventCountryCode = evt.country_code || null;
+  currentEventEndsAt = evt.ends_at || null;
 
   showScreen("EVENT");
   initMiniMap();
