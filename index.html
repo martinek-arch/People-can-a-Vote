@@ -949,15 +949,6 @@ I18N = I18N = {
 };
 
 
-){
-  if (typeof currentLang === "undefined" || !currentLang) currentLang = "en";
-  const dict = (I18N && I18N[currentLang]) ? I18N[currentLang] : (I18N ? I18N.en : {});
-  let s = (dict && dict[key] != null) ? dict[key] : ((I18N && I18N.en && I18N.en[key] != null) ? I18N.en[key] : key);
-  for (const [k,v] of Object.entries(vars)){
-    s = s.replaceAll(`{${k}}`, String(v));
-  }
-  return s;
-}
 
 
 function countriesForSearch(){
