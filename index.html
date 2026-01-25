@@ -348,6 +348,24 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
+
+/* ===== i18n bootstrap (must be defined before anything calls t()) ===== */
+var I18N = (typeof I18N !== "undefined" && I18N) ? I18N : { en: {} };
+var currentLang = (typeof currentLang !== "undefined" && currentLang) ? currentLang : "en";
+function t(key, vars){
+  if (!vars) vars = {};
+  if (!currentLang) currentLang = "en";
+  var dict = (I18N && I18N[currentLang]) ? I18N[currentLang] : (I18N ? I18N.en : {});
+  var s = (dict && dict[key] != null) ? dict[key] : ((I18N && I18N.en && I18N.en[key] != null) ? I18N.en[key] : key);
+  for (var k in vars){
+    if (Object.prototype.hasOwnProperty.call(vars, k)){
+      s = s.split("{" + k + "}").join(String(vars[k]));
+    }
+  }
+  return s;
+}
+/* ===== end i18n bootstrap ===== */
+
 /* ================== CONFIG ================== */
 const supabaseClient = supabase.createClient(
   "https://jqoomnhpyuikbntnrukw.supabase.co",
@@ -930,8 +948,8 @@ I18N = I18N = {
   }
 };
 
-var currentLang = "en";
-function t(key, vars={}){
+
+){
   if (typeof currentLang === "undefined" || !currentLang) currentLang = "en";
   const dict = (I18N && I18N[currentLang]) ? I18N[currentLang] : (I18N ? I18N.en : {});
   let s = (dict && dict[key] != null) ? dict[key] : ((I18N && I18N.en && I18N.en[key] != null) ? I18N.en[key] : key);
