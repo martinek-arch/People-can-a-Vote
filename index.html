@@ -366,6 +366,15 @@ function t(key, vars){
 }
 /* ===== end i18n bootstrap ===== */
 
+// Persist language choice across refresh
+function getStoredLang(){
+  try{ return localStorage.getItem('pcav_lang') || ''; }catch(e){ return ''; }
+}
+function setStoredLang(lang){
+  try{ localStorage.setItem('pcav_lang', lang); }catch(e){}
+}
+
+
 /* ================== CONFIG ================== */
 const supabaseClient = supabase.createClient(
   "https://jqoomnhpyuikbntnrukw.supabase.co",
@@ -1966,16 +1975,19 @@ function setBigMapSelected(code){
   currentUser = currentSession?.user || null;
   setAuthUI();
 
-  // Language: profile -> metadata -> default
+  // Language: stored -> profile -> metadata -> default
   try{
     let lang = "en";
+    const stored = getStoredLang();
+    if (stored && I18N && I18N[stored]) lang = stored;
+
     if (currentUser){
-      // try profile
       const prof = await getMyProfile();
-      lang = (prof?.language || currentUser.user_metadata?.language || "en");
+      const fromProfile = (prof?.language || currentUser.user_metadata?.language || "");
+      if (!stored && fromProfile && I18N && I18N[fromProfile]) lang = fromProfile;
     }
-    if (!I18N[lang]) lang = "en";
-    currentLang = lang;
+
+    currentLang = (I18N && I18N[lang]) ? lang : "en";
     const ls = document.getElementById("langSelect");
     if (ls) ls.value = currentLang;
     applyI18n();
@@ -1985,6 +1997,34 @@ function setBigMapSelected(code){
     if (ls) ls.value = "en";
     applyI18n();
   }
+
+  // Language selector: apply + save + refresh
+  try{
+    const langSel = document.getElementById("langSelect");
+    if (langSel){
+      langSel.onchange = async () => {
+        const lang = (langSel.value || "en").toLowerCase();
+        currentLang = (I18N && I18N[lang]) ? lang : "en";
+        setStoredLang(currentLang);
+
+        // Save preference if logged in (best-effort)
+        if (currentUser){
+          try{
+            let r1 = await supabaseClient.from("profiles").update({ language: currentLang }).eq("id", currentUser.id);
+            let err = r1.error || null;
+            if (err){
+              let r2 = await supabaseClient.from("profiles").update({ language: currentLang }).eq("user_id", currentUser.id);
+              err = r2.error || null;
+            }
+            if (err) console.warn("save language error:", err);
+          }catch(e){}
+        }
+
+        // Refresh page so everything re-renders in selected language
+        location.reload();
+      };
+    }
+  }catch(e){}
 
 
   // Upsert profile after verification/login using user_metadata
