@@ -400,6 +400,8 @@ let selectedCountryName = "";
 let currentEventId = null;
 let currentEventCountryCode = null;
 let currentEventEndsAt = null;
+let eventTranslations = {};  // Translations cache: { [eventId]: { [lang]: { title, description } } }
+
 
 /* ================== MINI MAP ================== */
 let miniMap = null;
@@ -549,6 +551,50 @@ function escapeHtml(s){
 function norm(s){
   return (s||"").toString().toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+}
+async function loadEventTranslations(eventIds, langs){
+  if (!eventIds || !eventIds.length) return;
+  if (!langs || !langs.length) return;
+
+  // reset only for these ids (safe)
+  for (const id of eventIds){
+    if (!eventTranslations[id]) eventTranslations[id] = {};
+  }
+
+  const { data, error } = await supabaseClient
+    .from("event_translations")
+    .select("event_id, lang, title, description")
+    .in("event_id", eventIds)
+    .in("lang", langs);
+
+  if (error){
+    console.warn("loadEventTranslations error:", error);
+    return;
+  }
+
+  for (const row of (data || [])){
+    const id = row.event_id;
+    if (!eventTranslations[id]) eventTranslations[id] = {};
+    eventTranslations[id][row.lang] = {
+      title: row.title || "",
+      description: row.description || ""
+    };
+  }
+}
+
+function getEventText(evt, field){
+  // field: "title" | "description"
+  const id = evt?.id;
+  if (!id) return (evt?.[field] || "");
+
+  const pack = eventTranslations[id] || {};
+  const cur = (pack[currentLang] && pack[currentLang][field]) ? pack[currentLang][field] : "";
+  if (cur) return cur;
+
+  const en = (pack["en"] && pack["en"][field]) ? pack["en"][field] : "";
+  if (en) return en;
+
+  return (evt?.[field] || "");
 }
 
 
@@ -1739,6 +1785,14 @@ async function loadEventsForCountry(code){
   const ended = list.filter(e => isEnded(e))
                     .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
 
+    // Load translations for current language + EN fallback
+  try{
+    const ids = list.map(e => e.id);
+    const langs = Array.from(new Set([currentLang, "en"].filter(Boolean)));
+    await loadEventTranslations(ids, langs);
+  }catch(e){}
+
+
   function dateLabel(iso){
     try{
       const d = new Date(iso);
@@ -1753,7 +1807,9 @@ async function loadEventsForCountry(code){
     return `
       <div class="eventItem" data-id="${e.id}">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-          <strong>${escapeHtml(e.title || "")}</strong>
+          <strong>${escapeHtml(getEventText(e, "title") || "")}</strong>
+          ...
+          ${getEventText(e, "description") ? `<div class="muted" style="margin-top:6px;">${escapeHtml(getEventText(e, "description"))}</div>` : ""}
           ${endedFlag ? `<span class="pill" style="background:#f2f2f2;border-color:#e6e6e6;">${escapeHtml(t("event_closed"))}</span>` : ""}
         </div>
         <div class="muted" style="margin-top:6px;">${escapeHtml(endText)}</div>
@@ -1817,7 +1873,13 @@ async function openEvent(id){
     setBigMapSelected(selectedCountryCode);
   }
 
-  eventTitle.textContent = evt.title || "—";
+  // make sure translations exist for this event
+try{
+  await loadEventTranslations([evt.id], Array.from(new Set([currentLang, "en"].filter(Boolean))));
+}catch(e){}
+
+eventTitle.textContent = getEventText(evt, "title") || "—";
+
   const cName = evt.country_code ? (countriesByCode[evt.country_code]?.name || "") : "";
   eventMeta.textContent = evt.country_code ? `Country: ${cName} (${evt.country_code})` : "";
   try{
@@ -1829,7 +1891,7 @@ async function openEvent(id){
     }
   }catch(e){}
 
-  eventDesc.textContent = evt.description || "";
+  eventDesc.textContent = getEventText(evt, "description") || "";
 
   currentEventCountryCode = evt.country_code || null;
   currentEventEndsAt = evt.ends_at || null;
