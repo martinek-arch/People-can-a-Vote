@@ -584,6 +584,34 @@ function getEventText(evt, field){
   const id = evt?.id;
   if (!id) return (evt?.[field] || "");
 
+function getEventTextSource(evt, field){
+  // returns: "cur" | "en" | "orig"
+  const id = evt?.id;
+  if (!id) return "orig";
+
+  const pack = eventTranslations[id] || {};
+  const cur = (pack[currentLang] && pack[currentLang][field]) ? pack[currentLang][field] : "";
+  if (cur) return "cur";
+
+  const en = (pack["en"] && pack["en"][field]) ? pack["en"][field] : "";
+  if (en) return "en";
+
+  return "orig";
+}
+
+function fallbackBadgeHTML(evt){
+  // If current language is EN, no need to show fallback badge.
+  if ((currentLang || "en") === "en") return "";
+
+  const srcTitle = getEventTextSource(evt, "title");
+  const srcDesc  = getEventTextSource(evt, "description");
+  const src = (srcTitle === "cur" || srcDesc === "cur") ? "cur" : (srcTitle === "en" || srcDesc === "en") ? "en" : "orig";
+
+  if (src === "cur") return "";
+  if (src === "en") return `<span class="pill" style="background:#fff7e6;border-color:#ffe0b2;">EN</span>`;
+  return `<span class="pill" style="background:#f5f5f5;border-color:#e0e0e0;">ORIG</span>`;
+}
+
   const pack = eventTranslations[id] || {};
   const cur = (pack[currentLang] && pack[currentLang][field]) ? pack[currentLang][field] : "";
   if (cur) return cur;
@@ -1807,11 +1835,11 @@ async function loadEventsForCountry(code){
     return `
       <div class="eventItem" data-id="${e.id}">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-          <strong>${escapeHtml(getEventText(e, "title") || "")}</strong>
+        <strong>${escapeHtml(getEventText(e, "title") || "")}</strong>
+        <div style="display:flex; gap:8px; align-items:center;">
+          ${fallbackBadgeHTML(e)}
           ${endedFlag ? `<span class="pill" style="background:#f2f2f2;border-color:#e6e6e6;">${escapeHtml(t("event_closed"))}</span>` : ""}
         </div>
-        <div class="muted" style="margin-top:6px;">${escapeHtml(endText)}</div>
-        ${getEventText(e, "description") ? `<div class="muted" style="margin-top:6px;">${escapeHtml(getEventText(e, "description"))}</div>` : ""}
       </div>
     `;
   }
@@ -1885,6 +1913,17 @@ async function openEvent(id){
       eventMeta.textContent += " • " + (ended ? t("ended_on", {date: ds}) : t("ends_on", {date: ds}));
     }
   }catch(e){}
+  const badgeWrap = document.getElementById("eventLangBadge");
+if (badgeWrap) badgeWrap.remove();
+const h2 = document.getElementById("eventTitle");
+if (h2){
+  const span = document.createElement("span");
+  span.id = "eventLangBadge";
+  span.style.marginLeft = "10px";
+  span.innerHTML = fallbackBadgeHTML(evt);
+  h2.parentElement.appendChild(span);
+}
+
 
     eventDesc.textContent = getEventText(evt, "description") || "";
 
