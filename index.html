@@ -393,15 +393,16 @@ mapboxgl.accessToken = "pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2b
 let continentsById = {};   // {id: name}
 let countries = [];        // [{code,name,continent_id,continent_name}]
 let countriesByCode = {};  // { "US": {...} }
-let eventsCache = [];      // active events for search [{id,title,description,country_code}]
+let eventsCache = [];
+// Translations cache: { [eventId]: { [lang]: { title, description } } }
+let eventTranslations = {};
+      // active events for search [{id,title,description,country_code}]
 let selectedContinent = "ALL";
 let selectedCountryCode = "";
 let selectedCountryName = "";
 let currentEventId = null;
 let currentEventCountryCode = null;
 let currentEventEndsAt = null;
-let eventTranslations = {};  // Translations cache: { [eventId]: { [lang]: { title, description } } }
-
 
 /* ================== MINI MAP ================== */
 let miniMap = null;
@@ -548,15 +549,12 @@ function escapeHtml(s){
     .replaceAll("<","&lt;")
     .replaceAll(">","&gt;");
 }
-function norm(s){
-  return (s||"").toString().toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
-}
+
+// ================== Event translations ==================
 async function loadEventTranslations(eventIds, langs){
   if (!eventIds || !eventIds.length) return;
   if (!langs || !langs.length) return;
 
-  // reset only for these ids (safe)
   for (const id of eventIds){
     if (!eventTranslations[id]) eventTranslations[id] = {};
   }
@@ -583,7 +581,6 @@ async function loadEventTranslations(eventIds, langs){
 }
 
 function getEventText(evt, field){
-  // field: "title" | "description"
   const id = evt?.id;
   if (!id) return (evt?.[field] || "");
 
@@ -595,6 +592,10 @@ function getEventText(evt, field){
   if (en) return en;
 
   return (evt?.[field] || "");
+}
+function norm(s){
+  return (s||"").toString().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
 }
 
 
@@ -1760,6 +1761,13 @@ async function loadEventsForCountry(code){
   }
 
   const list = data || [];
+
+  // Load translations for current language + EN fallback
+  try{
+    const ids = list.map(e => e.id);
+    const langs = Array.from(new Set([currentLang, "en"].filter(Boolean)));
+    await loadEventTranslations(ids, langs);
+  }catch(e){}
   
   if (!list.length){
     eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">${t("no_events")}</div>`;
@@ -1785,14 +1793,6 @@ async function loadEventsForCountry(code){
   const ended = list.filter(e => isEnded(e))
                     .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
 
-    // Load translations for current language + EN fallback
-  try{
-    const ids = list.map(e => e.id);
-    const langs = Array.from(new Set([currentLang, "en"].filter(Boolean)));
-    await loadEventTranslations(ids, langs);
-  }catch(e){}
-
-
   function dateLabel(iso){
     try{
       const d = new Date(iso);
@@ -1808,12 +1808,10 @@ async function loadEventsForCountry(code){
       <div class="eventItem" data-id="${e.id}">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
           <strong>${escapeHtml(getEventText(e, "title") || "")}</strong>
-          ...
-          ${getEventText(e, "description") ? `<div class="muted" style="margin-top:6px;">${escapeHtml(getEventText(e, "description"))}</div>` : ""}
           ${endedFlag ? `<span class="pill" style="background:#f2f2f2;border-color:#e6e6e6;">${escapeHtml(t("event_closed"))}</span>` : ""}
         </div>
         <div class="muted" style="margin-top:6px;">${escapeHtml(endText)}</div>
-        ${e.description ? `<div class="muted" style="margin-top:6px;">${escapeHtml(e.description)}</div>` : ""}
+        ${getEventText(e, "description") ? `<div class="muted" style="margin-top:6px;">${escapeHtml(getEventText(e, "description"))}</div>` : ""}
       </div>
     `;
   }
@@ -1865,6 +1863,9 @@ async function openEvent(id){
     evt = data;
   }
 
+  // Ensure translations are available (currentLang + EN fallback)
+  try{ await loadEventTranslations([evt.id], Array.from(new Set([currentLang, "en"].filter(Boolean)))); }catch(e){}
+
   // ensure country pill sync
   if (evt.country_code){
     selectedCountryCode = evt.country_code;
@@ -1873,13 +1874,7 @@ async function openEvent(id){
     setBigMapSelected(selectedCountryCode);
   }
 
-  // make sure translations exist for this event
-try{
-  await loadEventTranslations([evt.id], Array.from(new Set([currentLang, "en"].filter(Boolean))));
-}catch(e){}
-
-eventTitle.textContent = getEventText(evt, "title") || "—";
-
+    eventTitle.textContent = getEventText(evt, "title") || "—";
   const cName = evt.country_code ? (countriesByCode[evt.country_code]?.name || "") : "";
   eventMeta.textContent = evt.country_code ? `Country: ${cName} (${evt.country_code})` : "";
   try{
@@ -1891,7 +1886,7 @@ eventTitle.textContent = getEventText(evt, "title") || "—";
     }
   }catch(e){}
 
-  eventDesc.textContent = getEventText(evt, "description") || "";
+    eventDesc.textContent = getEventText(evt, "description") || "";
 
   currentEventCountryCode = evt.country_code || null;
   currentEventEndsAt = evt.ends_at || null;
