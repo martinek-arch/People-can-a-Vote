@@ -609,7 +609,7 @@ async function loadEventTranslations(eventIds, langs){
   }
 }
 
-function getEventText(evt, field){(evt, field){
+function getEventText(evt, field){
   const id = evt?.id;
   if (!id) return (evt?.[field] || "");
 
