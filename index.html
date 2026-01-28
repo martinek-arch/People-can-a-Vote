@@ -1251,7 +1251,7 @@ async function getMyProfile(){
   try{
     const r1 = await supabaseClient
       .from("profiles")
-      .select("country_code, language")
+      .select("country_code, language, is_admin")
       .eq("id", currentUser.id)
       .maybeSingle();
     if (!r1.error && r1.data) return r1.data;
@@ -1265,7 +1265,7 @@ async function getMyProfile(){
   try{
     const r2 = await supabaseClient
       .from("profiles")
-      .select("country_code, language")
+      .select("country_code, language, is_admin")
       .eq("user_id", currentUser.id)
       .maybeSingle();
     if (r2.error){
