@@ -1239,34 +1239,17 @@ function barHTML(label, count, total){
 
 async function getMyProfile(){
   if (!currentUser) return null;
-
-  // Some setups use profiles.id, others profiles.user_id. We'll try both.
-  // Attempt 1: profiles.id
   try{
-    const r1 = await supabaseClient
+    const r = await supabaseClient
       .from("profiles")
       .select("country_code, language, is_admin")
       .eq("id", currentUser.id)
       .maybeSingle();
-    if (!r1.error && r1.data) return r1.data;
-    if (r1.error && !String(r1.error.message||"").toLowerCase().includes("column")) {
-      // non-column error (e.g., RLS), still return null but log
-      console.warn("getMyProfile(id) error:", r1.error);
-    }
-  }catch(e){}
-
-  // Attempt 2: profiles.user_id
-  try{
-    const r2 = await supabaseClient
-      .from("profiles")
-      .select("country_code, language, is_admin")
-      .eq("user_id", currentUser.id)
-      .maybeSingle();
-    if (r2.error){
-      console.warn("getMyProfile(user_id) error:", r2.error);
+    if (r.error){
+      console.warn("getMyProfile error:", r.error);
       return null;
     }
-    return r2.data || null;
+    return r.data || null;
   }catch(e){
     console.warn("getMyProfile unexpected error:", e);
     return null;
@@ -2622,19 +2605,44 @@ async function updateCountriesCount(eventId){
 })();
 
 // Auth state listener
-supabaseClient.auth.onAuthStateChange((event, session) => {
+supabaseClient.auth.onAuthStateChange(async (event, session) => {
   currentSession = session || null;
   currentUser = session?.user || null;
+
+  // Refresh profile-driven flags (admin + language) immediately after login/logout
+  try{
+    isAdmin = false;
+    if (currentUser){
+      const prof = await getMyProfile();
+      isAdmin = !!prof?.is_admin;
+
+      // If user has language in profile and no stored override, apply it
+      try{
+        const stored = (typeof getStoredLang === "function") ? getStoredLang() : "";
+        const fromProfile = prof?.language || currentUser.user_metadata?.language || "";
+        if (!stored && fromProfile && I18N && I18N[fromProfile]){
+          currentLang = fromProfile;
+          const ls = document.getElementById("langSelect");
+          if (ls) ls.value = currentLang;
+          try{ applyI18n(); }catch(e){}
+        }
+      }catch(e){}
+    }
+  }catch(e){
+    console.warn("auth profile refresh error:", e);
+  }
+
+  // Update header/auth UI (also toggles Admin button)
   setAuthUI();
+
   // If user logs in/out while viewing an event, refresh vote/stats UI
   try{
     const ev = document.getElementById("screenEvent");
     if (ev && ev.classList.contains("active") && currentEventId){
-      refreshVoteArea(currentEventId, currentEventCountryCode || "");
-      refreshStats(currentEventId, currentEventCountryCode || "");
+      await refreshVoteArea(currentEventId, currentEventCountryCode || "");
+      await refreshStats(currentEventId, currentEventCountryCode || "");
     }
   }catch(e){}
-
 });
 
 </script>
