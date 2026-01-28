@@ -159,6 +159,7 @@
         <option value="ru">RU</option>
         <option value="zh">ZH</option>
       </select>
+      <button class="ghost" id="adminBtn" style="display:none;">Admin</button>
 </div>
   </div>
 </header>
@@ -255,6 +256,7 @@
       <div class="titleRow">
         <button class="backInline" id="backFromEvent">← Back</button>
         <h2 id="eventTitle" style="margin:0; display:inline;">—</h2>
+        <button class="ghost" id="copyLinkBtn" style="margin-left:10px;">Copy link</button>
         <span id="eventLangBadge" style="margin-left:10px;"></span>
         <div style="margin-left:auto; width:180px;">
           <div id="miniMap" style="width:100%;height:120px;border-radius:10px;overflow:hidden;border:1px solid #eee;"></div>
@@ -489,7 +491,9 @@ async function updateMiniMap(countryCode){
 
 
 /* ================== AUTH (Supabase) ================== */
-let currentUser = null;      // supabase user
+let currentUser = null;
+let isAdmin = false;
+      // supabase user
 let currentSession = null;   // session
 
 const authPill = document.getElementById("authPill");
@@ -506,6 +510,16 @@ const loginError = document.getElementById("loginError");
 
 const screenRegister = document.getElementById("screenRegister");
 const screenVerified = document.getElementById("screenVerified");
+const screenAdmin = document.getElementById("screenAdmin");
+
+function showOnlyScreen(screenEl){
+  const screens = [screenHome, screenCountry, screenEvent, screenRegister, screenVerified, screenAdmin].filter(Boolean);
+  for (const s of screens){
+    s.style.display = (s === screenEl) ? "" : "none";
+  }
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
 const backFromRegister = document.getElementById("backFromRegister");
 const regCancelBtn = document.getElementById("regCancelBtn");
 const regSubmitBtn = document.getElementById("regSubmitBtn");
@@ -1326,6 +1340,7 @@ async function refreshStats(eventId, eventCountryCode){
 
   statsBox.innerHTML = `
     <div class="stats-wide">
+      <div id="countriesCount" class="muted" style="margin-top:6px;"></div>
       <div><strong>${t("stats_total_votes")}</strong> ${total}</div>
       <div class="barWrap bars-large">
         ${barHTML("Yes", yes, total)}
@@ -2184,6 +2199,336 @@ function setBigMapSelected(code){
 }
 
 /* ================== INIT ================== */
+
+
+/* ================== Admin + Share + Trust (B/C/D) ================== */
+
+// Share link button (event detail)
+const copyLinkBtn = document.getElementById("copyLinkBtn");
+if (copyLinkBtn){
+  copyLinkBtn.onclick = async () => {
+    if (!currentEventId) return;
+    const url = new URL(location.href);
+    url.searchParams.set("event", String(currentEventId));
+    if (currentEventCountryCode) url.searchParams.set("country", String(currentEventCountryCode));
+    try{
+      await navigator.clipboard.writeText(url.toString());
+      copyLinkBtn.textContent = "Copied ✅";
+      setTimeout(()=> copyLinkBtn.textContent = "Copy link", 1400);
+    }catch(e){
+      prompt("Copy this link:", url.toString());
+    }
+  };
+}
+
+// Parse deep link: ?event=123
+function getQueryParam(name){
+  try{ return new URL(location.href).searchParams.get(name); }catch(e){ return null; }
+}
+
+// Admin UI refs
+const adminBtn = document.getElementById("adminBtn");
+const adminBackBtn = document.getElementById("adminBackBtn");
+const adminCountry = document.getElementById("adminCountry");
+const adminEventsList = document.getElementById("adminEventsList");
+const adminNewEventBtn = document.getElementById("adminNewEventBtn");
+
+const admEventId = document.getElementById("admEventId");
+const admTitle = document.getElementById("admTitle");
+const admDesc = document.getElementById("admDesc");
+const admEndsAt = document.getElementById("admEndsAt");
+const admIsActive = document.getElementById("admIsActive");
+const admIsTop = document.getElementById("admIsTop");
+const admSaveEventBtn = document.getElementById("admSaveEventBtn");
+const admDeleteEventBtn = document.getElementById("admDeleteEventBtn");
+const admMsg = document.getElementById("admMsg");
+
+const admLang = document.getElementById("admLang");
+const admTrTitle = document.getElementById("admTrTitle");
+const admTrDesc = document.getElementById("admTrDesc");
+const admSaveTrBtn = document.getElementById("admSaveTrBtn");
+const admTrMsg = document.getElementById("admTrMsg");
+
+let adminSelectedEvent = null;
+
+function setAdminMsg(el, text, ok=false){
+  if (!el) return;
+  el.textContent = text || "";
+  el.classList.remove("errorText","okText");
+  if (ok) el.classList.add("okText");
+  else if (text) el.classList.add("errorText");
+}
+
+async function loadCountriesIntoSelect(selectEl){
+  if (!selectEl) return;
+  // Ensure countries cache exists
+  if (!countriesCache || !countriesCache.length){
+    try{ await loadCountries(); }catch(e){}
+  }
+  const list = (countriesCache || []).slice().sort((a,b)=> (a.name||"").localeCompare(b.name||""));
+  selectEl.innerHTML = list.map(c => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${escapeHtml(c.code)})</option>`).join("");
+}
+
+async function loadAdminEvents(countryCode){
+  if (!adminEventsList) return;
+  adminEventsList.innerHTML = `<div class="muted">Loading…</div>`;
+  const { data, error } = await supabaseClient
+    .from("events")
+    .select("id, title, description, created_at, ends_at, is_active, is_top, country_code")
+    .eq("country_code", countryCode)
+    .order("created_at", { ascending: false });
+
+  if (error){
+    adminEventsList.innerHTML = `<div class="muted">Error loading events</div>`;
+    console.warn(error);
+    return;
+  }
+  const list = data || [];
+  if (!list.length){
+    adminEventsList.innerHTML = `<div class="muted">No events</div>`;
+    return;
+  }
+  adminEventsList.innerHTML = list.map(e => `
+    <div class="eventItem" data-id="${e.id}">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+        <strong>${escapeHtml(e.title||"")}</strong>
+        <div style="display:flex;gap:8px;align-items:center;">
+          ${e.is_top ? `<span class="pill">TOP</span>` : ``}
+          ${e.is_active === false ? `<span class="pill" style="background:#f2f2f2;border-color:#e6e6e6;">OFF</span>` : ``}
+        </div>
+      </div>
+      <div class="muted" style="margin-top:6px;">#${e.id}</div>
+    </div>
+  `).join("");
+
+  for (const el of adminEventsList.querySelectorAll(".eventItem")){
+    el.onclick = async () => {
+      const id = Number(el.getAttribute("data-id"));
+      const evt = list.find(x => x.id === id);
+      if (!evt) return;
+      await adminEditEvent(evt);
+    };
+  }
+}
+
+function toDateInputValue(ts){
+  try{
+    if (!ts) return "";
+    const d = new Date(ts);
+    if (isNaN(d)) return "";
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth()+1).padStart(2,"0");
+    const dd = String(d.getDate()).padStart(2,"0");
+    return `${yyyy}-${mm}-${dd}`;
+  }catch(e){ return ""; }
+}
+
+async function adminEditEvent(evt){
+  adminSelectedEvent = evt;
+  admEventId.value = String(evt.id);
+  admTitle.value = evt.title || "";
+  admDesc.value = evt.description || "";
+  admEndsAt.value = toDateInputValue(evt.ends_at);
+  admIsActive.checked = (evt.is_active !== false);
+  admIsTop.checked = (evt.is_top === true);
+  admDeleteEventBtn.style.display = "";
+
+  // Load translation for selected lang + EN
+  await loadEventTranslations([evt.id], Array.from(new Set([admLang.value, "en"])));
+  const pack = eventTranslations[evt.id] || {};
+  const tr = pack[admLang.value];
+  admTrTitle.value = (tr && tr.title) ? tr.title : "";
+  admTrDesc.value  = (tr && tr.description) ? tr.description : "";
+  setAdminMsg(admMsg, "");
+  setAdminMsg(admTrMsg, "");
+}
+
+function adminClearEditor(){
+  adminSelectedEvent = null;
+  admEventId.value = "";
+  admTitle.value = "";
+  admDesc.value = "";
+  // default ends at +30 days
+  try{
+    const d = new Date(Date.now() + 30*24*3600*1000);
+    admEndsAt.value = toDateInputValue(d.toISOString());
+  }catch(e){ admEndsAt.value = ""; }
+  admIsActive.checked = true;
+  admIsTop.checked = false;
+  admDeleteEventBtn.style.display = "none";
+  admTrTitle.value = "";
+  admTrDesc.value = "";
+  setAdminMsg(admMsg, "");
+  setAdminMsg(admTrMsg, "");
+}
+
+async function adminSaveEvent(){
+  const countryCode = adminCountry.value;
+  const title = (admTitle.value || "").trim();
+  const description = (admDesc.value || "").trim();
+  const endsAtDate = admEndsAt.value; // yyyy-mm-dd
+  const is_active = !!admIsActive.checked;
+  const is_top = !!admIsTop.checked;
+
+  if (!countryCode){ setAdminMsg(admMsg, "Select country"); return; }
+  if (!title){ setAdminMsg(admMsg, "Title is required"); return; }
+
+  let ends_at = null;
+  if (endsAtDate){
+    // store as ISO end-of-day UTC-ish
+    ends_at = new Date(endsAtDate + "T23:59:59Z").toISOString();
+  }
+
+  const payload = { title, description, country_code: countryCode, is_active, is_top, ends_at };
+
+  if (admEventId.value){
+    const id = Number(admEventId.value);
+    const { error } = await supabaseClient.from("events").update(payload).eq("id", id);
+    if (error){ setAdminMsg(admMsg, "Save failed", false); console.warn(error); return; }
+    setAdminMsg(admMsg, "Saved ✅", true);
+    await loadAdminEvents(countryCode);
+  }else{
+    const { data, error } = await supabaseClient.from("events").insert(payload).select("id").single();
+    if (error){ setAdminMsg(admMsg, "Create failed", false); console.warn(error); return; }
+    setAdminMsg(admMsg, "Created ✅", true);
+    await loadAdminEvents(countryCode);
+    if (data?.id){
+      // fetch created row quickly
+      const { data:evt } = await supabaseClient.from("events").select("*").eq("id", data.id).single();
+      if (evt) await adminEditEvent(evt);
+    }
+  }
+}
+
+async function adminSaveTranslation(){
+  const id = admEventId.value ? Number(admEventId.value) : null;
+  if (!id){ setAdminMsg(admTrMsg, "Save event first"); return; }
+
+  const lang = (admLang.value || "en").toLowerCase();
+  const title = (admTrTitle.value || "").trim();
+  const description = (admTrDesc.value || "").trim();
+
+  if (!title){ setAdminMsg(admTrMsg, "Translated title is required"); return; }
+
+  // Upsert translation
+  const payload = { event_id: id, lang, title, description };
+  const { error } = await supabaseClient
+    .from("event_translations")
+    .upsert(payload, { onConflict: "event_id,lang" });
+
+  if (error){ setAdminMsg(admTrMsg, "Save failed", false); console.warn(error); return; }
+
+  // Update local cache
+  eventTranslations[id] = eventTranslations[id] || {};
+  eventTranslations[id][lang] = { title, description };
+  translationLoaded.add(`${id}:${lang}`);
+
+  setAdminMsg(admTrMsg, "Saved ✅", true);
+
+  // Refresh visible UI if user is on this event
+  if (currentEventId === id){
+    try{ await openEvent(id); }catch(e){}
+  }
+}
+
+if (admLang){
+  admLang.onchange = async () => {
+    const id = admEventId.value ? Number(admEventId.value) : null;
+    if (!id) return;
+    await loadEventTranslations([id], Array.from(new Set([admLang.value, "en"])));
+    const pack = eventTranslations[id] || {};
+    const tr = pack[admLang.value];
+    admTrTitle.value = (tr && tr.title) ? tr.title : "";
+    admTrDesc.value  = (tr && tr.description) ? tr.description : "";
+    setAdminMsg(admTrMsg, "");
+  };
+}
+
+if (adminBtn){
+  adminBtn.onclick = async () => {
+    showOnlyScreen(screenAdmin);
+    await loadCountriesIntoSelect(adminCountry);
+    // default to selected country if any
+    if (selectedCountryCode && adminCountry.querySelector(`option[value="${selectedCountryCode}"]`)){
+      adminCountry.value = selectedCountryCode;
+    }
+    adminClearEditor();
+    await loadAdminEvents(adminCountry.value);
+  };
+}
+
+if (adminBackBtn){
+  adminBackBtn.onclick = () => {
+    // go back to last logical screen
+    if (currentEventId) showOnlyScreen(screenEvent);
+    else if (selectedCountryCode) showOnlyScreen(screenCountry);
+    else showOnlyScreen(screenHome);
+  };
+}
+
+if (adminCountry){
+  adminCountry.onchange = async () => {
+    adminClearEditor();
+    await loadAdminEvents(adminCountry.value);
+  };
+}
+
+if (adminNewEventBtn){
+  adminNewEventBtn.onclick = () => adminClearEditor();
+}
+
+if (admSaveEventBtn){
+  admSaveEventBtn.onclick = async () => {
+    setAdminMsg(admMsg, "");
+    await adminSaveEvent();
+  };
+}
+if (admSaveTrBtn){
+  admSaveTrBtn.onclick = async () => {
+    setAdminMsg(admTrMsg, "");
+    await adminSaveTranslation();
+  };
+}
+
+// Trust metric: count distinct voter countries (requires profiles SELECT)
+async function updateCountriesCount(eventId){
+  const el = document.getElementById("countriesCount");
+  if (!el) return;
+  el.textContent = "";
+  try{
+    const { data, error } = await supabaseClient
+      .from("votes")
+      .select("user_id, profiles(country_code)")
+      .eq("event_id", eventId);
+
+    if (error){ return; }
+    const set = new Set();
+    for (const row of (data || [])){
+      const cc = row?.profiles?.country_code;
+      if (cc) set.add(cc);
+    }
+    if (set.size){
+      el.textContent = `Voted from ${set.size} countries`;
+    }
+  }catch(e){}
+}
+
+// Hook: after stats refresh is rendered, update countries count
+const _origRefreshStats = refreshStats;
+refreshStats = async function(eventId, eventCountryCode){
+  await _origRefreshStats(eventId, eventCountryCode);
+  await updateCountriesCount(eventId);
+};
+
+// After profile load in init, show admin button if is_admin
+const _origSetAuthUI = setAuthUI;
+setAuthUI = function(){
+  _origSetAuthUI();
+  try{
+    if (adminBtn) adminBtn.style.display = isAdmin ? "" : "none";
+  }catch(e){}
+};
+
 (async function init(){
   // default pills
   setContinentPill();
@@ -2222,6 +2567,8 @@ function setBigMapSelected(code){
 
     if (currentUser){
       const prof = await getMyProfile();
+      try{ isAdmin = !!prof?.is_admin; }catch(e){ isAdmin = false; }
+
       const fromProfile = (prof?.language || currentUser.user_metadata?.language || "");
       if (!stored && fromProfile && I18N && I18N[fromProfile]) lang = fromProfile;
     }
@@ -2236,6 +2583,18 @@ function setBigMapSelected(code){
     if (ls) ls.value = "en";
     applyI18n();
   }
+
+  // Deep link: open event from URL
+  try{
+    const eidStr = getQueryParam("event");
+    if (eidStr){
+      const eid = Number(eidStr);
+      if (!isNaN(eid)){
+        // Open event directly
+        await openEvent(eid);
+      }
+    }
+  }catch(e){}
 
   // Language selector: apply + save + refresh
   try{
