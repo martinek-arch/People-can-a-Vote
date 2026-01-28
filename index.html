@@ -397,6 +397,9 @@ let countriesByCode = {};  // { "US": {...} }
 let eventsCache = [];
 // Translations cache: { [eventId]: { [lang]: { title, description } } }
 let eventTranslations = {};
+// Track which (eventId, lang) pairs were already checked/loaded to avoid repeated queries
+let translationLoaded = new Set();
+
       // active events for search [{id,title,description,country_code}]
 let selectedContinent = "ALL";
 let selectedCountryCode = "";
@@ -552,23 +555,48 @@ function escapeHtml(s){
 }
 
 // ================== Event translations ==================
+
 async function loadEventTranslations(eventIds, langs){
   if (!eventIds || !eventIds.length) return;
   if (!langs || !langs.length) return;
 
-  for (const id of eventIds){
+  // Only request translations we haven't checked yet
+  const ids = Array.from(new Set(eventIds)).filter(id => id != null);
+  const langsUnique = Array.from(new Set(langs)).filter(Boolean);
+
+  const needIds = [];
+  for (const id of ids){
     if (!eventTranslations[id]) eventTranslations[id] = {};
+    let needsAny = false;
+    for (const lang of langsUnique){
+      const key = `${id}:${lang}`;
+      if (!translationLoaded.has(key)){
+        needsAny = true;
+      }
+    }
+    if (needsAny) needIds.push(id);
   }
+
+  if (!needIds.length) return;
 
   const { data, error } = await supabaseClient
     .from("event_translations")
     .select("event_id, lang, title, description")
-    .in("event_id", eventIds)
-    .in("lang", langs);
+    .in("event_id", needIds)
+    .in("lang", langsUnique);
 
   if (error){
     console.warn("loadEventTranslations error:", error);
     return;
+  }
+
+  // Mark all requested pairs as checked (even if missing in DB)
+  for (const id of needIds){
+    for (const lang of langsUnique){
+      translationLoaded.add(`${id}:${lang}`);
+      // initialize as null marker if not present; helps avoid re-fetch loops
+      if (eventTranslations[id][lang] === undefined) eventTranslations[id][lang] = null;
+    }
   }
 
   for (const row of (data || [])){
@@ -581,15 +609,17 @@ async function loadEventTranslations(eventIds, langs){
   }
 }
 
-function getEventText(evt, field){
+function getEventText(evt, field){(evt, field){
   const id = evt?.id;
   if (!id) return (evt?.[field] || "");
 
   const pack = eventTranslations[id] || {};
-  const cur = (pack[currentLang] && pack[currentLang][field]) ? pack[currentLang][field] : "";
+  const curObj = pack[currentLang];
+  const cur = (curObj && curObj[field]) ? curObj[field] : "";
   if (cur) return cur;
 
-  const en = (pack["en"] && pack["en"][field]) ? pack["en"][field] : "";
+  const enObj = pack["en"];
+  const en = (enObj && enObj[field]) ? enObj[field] : "";
   if (en) return en;
 
   return (evt?.[field] || "");
@@ -601,10 +631,12 @@ function getEventTextSource(evt, field){
   if (!id) return "orig";
 
   const pack = eventTranslations[id] || {};
-  const cur = (pack[currentLang] && pack[currentLang][field]) ? pack[currentLang][field] : "";
+  const curObj = pack[currentLang];
+  const cur = (curObj && curObj[field]) ? curObj[field] : "";
   if (cur) return "cur";
 
-  const en = (pack["en"] && pack["en"][field]) ? pack["en"][field] : "";
+  const enObj = pack["en"];
+  const en = (enObj && enObj[field]) ? enObj[field] : "";
   if (en) return "en";
 
   return "orig";
@@ -1769,6 +1801,9 @@ async function selectCountry(code){
 }
 
 async function loadEventsForCountry(code){
+  // Reset translation cache for country list (keeps app fast and bounded)
+  eventTranslations = {};
+  translationLoaded.clear();
   eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">${t("loading")}</div>`;
 
   if (!code){
