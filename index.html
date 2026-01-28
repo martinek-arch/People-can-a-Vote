@@ -513,11 +513,13 @@ const screenVerified = document.getElementById("screenVerified");
 const screenAdmin = document.getElementById("screenAdmin");
 
 function showOnlyScreen(screenEl){
-  const screens = [screenHome, screenCountry, screenEvent, screenRegister, screenVerified, screenAdmin].filter(Boolean);
-  for (const s of screens){
-    s.style.display = (s === screenEl) ? "" : "none";
-  }
-  window.scrollTo({ top: 0, behavior: "instant" });
+  if (screenEl === screenAdmin) return showScreen("ADMIN");
+  if (screenEl === screenHome) return showScreen("HOME");
+  if (screenEl === screenCountry) return showScreen("COUNTRY");
+  if (screenEl === screenEvent) return showScreen("EVENT");
+  if (screenEl === screenRegister) return showScreen("REGISTER");
+  if (screenEl === screenVerified) return showScreen("VERIFIED");
+  return showScreen("HOME");
 }
 
 const backFromRegister = document.getElementById("backFromRegister");
@@ -1606,6 +1608,7 @@ function showScreen(name){
   if (name === "HOME" && map) setTimeout(() => map.resize(), 0);
   screenRegister.classList.toggle("active", name === "REGISTER");
   screenVerified.classList.toggle("active", name === "VERIFIED");
+  if (screenAdmin) screenAdmin.classList.toggle("active", name === "ADMIN");
 }
 document.getElementById("homeBtn").onclick = () => {
   currentEventId = null;
@@ -2261,11 +2264,26 @@ function setAdminMsg(el, text, ok=false){
 
 async function loadCountriesIntoSelect(selectEl){
   if (!selectEl) return;
-  // Ensure countries cache exists
-  if (!countriesCache || !countriesCache.length){
-    try{ await loadCountries(); }catch(e){}
+
+  // Load countries directly (robust even if caches/helpers change)
+  const { data, error } = await supabaseClient
+    .from("countries")
+    .select("name, code")
+    .order("name", { ascending: true })
+    .limit(300);
+
+  if (error){
+    console.warn("admin load countries error:", error);
+    selectEl.innerHTML = `<option value="">Error loading countries</option>`;
+    return;
   }
-  const list = (countriesCache || []).slice().sort((a,b)=> (a.name||"").localeCompare(b.name||""));
+
+  const list = (data || []);
+  if (!list.length){
+    selectEl.innerHTML = `<option value="">No countries</option>`;
+    return;
+  }
+
   selectEl.innerHTML = list.map(c => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${escapeHtml(c.code)})</option>`).join("");
 }
 
@@ -2384,12 +2402,12 @@ async function adminSaveEvent(){
   if (admEventId.value){
     const id = Number(admEventId.value);
     const { error } = await supabaseClient.from("events").update(payload).eq("id", id);
-    if (error){ setAdminMsg(admMsg, "Save failed", false); console.warn(error); return; }
+    if (error){ setAdminMsg(admMsg, (error?.message || "Save failed"), false); console.warn(error); return; }
     setAdminMsg(admMsg, "Saved ✅", true);
     await loadAdminEvents(countryCode);
   }else{
     const { data, error } = await supabaseClient.from("events").insert(payload).select("id").single();
-    if (error){ setAdminMsg(admMsg, "Create failed", false); console.warn(error); return; }
+    if (error){ setAdminMsg(admMsg, (error?.message || "Create failed"), false); console.warn(error); return; }
     setAdminMsg(admMsg, "Created ✅", true);
     await loadAdminEvents(countryCode);
     if (data?.id){
@@ -2416,7 +2434,7 @@ async function adminSaveTranslation(){
     .from("event_translations")
     .upsert(payload, { onConflict: "event_id,lang" });
 
-  if (error){ setAdminMsg(admTrMsg, "Save failed", false); console.warn(error); return; }
+  if (error){ setAdminMsg(admTrMsg, (error?.message || "Save failed"), false); console.warn(error); return; }
 
   // Update local cache
   eventTranslations[id] = eventTranslations[id] || {};
@@ -2446,7 +2464,7 @@ if (admLang){
 
 if (adminBtn){
   adminBtn.onclick = async () => {
-    showOnlyScreen(screenAdmin);
+    showScreen("ADMIN");
     await loadCountriesIntoSelect(adminCountry);
     // default to selected country if any
     if (selectedCountryCode && adminCountry.querySelector(`option[value="${selectedCountryCode}"]`)){
@@ -2460,9 +2478,9 @@ if (adminBtn){
 if (adminBackBtn){
   adminBackBtn.onclick = () => {
     // go back to last logical screen
-    if (currentEventId) showOnlyScreen(screenEvent);
-    else if (selectedCountryCode) showOnlyScreen(screenCountry);
-    else showOnlyScreen(screenHome);
+    if (currentEventId) showScreen("EVENT");
+    else if (selectedCountryCode) showScreen("COUNTRY");
+    else showScreen("HOME");
   };
 }
 
@@ -2568,6 +2586,7 @@ setAuthUI = function(){
     if (currentUser){
       const prof = await getMyProfile();
       try{ isAdmin = !!prof?.is_admin; }catch(e){ isAdmin = false; }
+      try{ setAuthUI(); }catch(e){}
 
       const fromProfile = (prof?.language || currentUser.user_metadata?.language || "");
       if (!stored && fromProfile && I18N && I18N[fromProfile]) lang = fromProfile;
