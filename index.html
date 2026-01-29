@@ -385,10 +385,46 @@ function setStoredLang(lang){
 
 
 /* ================== CONFIG ================== */
-const supabaseClient = supabase.createClient(
-  "https://jqoomnhpyuikbntnrukw.supabase.co",
-  "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h"
-);
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage
+  }
+});
+async function restoreAuthFromSession(session){
+  currentSession = session || null;
+  currentUser = session?.user || null;
+
+  // default
+  isAdmin = false;
+
+  // Load profile flags if logged in (admin + language)
+  if (currentUser){
+    try{
+      const prof = await getMyProfile();
+      isAdmin = !!prof?.is_admin;
+
+      // Apply language from profile if no manual override
+      try{
+        const stored = (typeof getStoredLang === "function") ? getStoredLang() : "";
+        const fromProfile = prof?.language || currentUser.user_metadata?.language || "";
+        if (!stored && fromProfile && I18N && I18N[fromProfile]){
+          currentLang = fromProfile;
+          const ls = document.getElementById("langSelect");
+          if (ls) ls.value = currentLang;
+        }
+      }catch(e){}
+    }catch(e){
+      console.warn("getMyProfile failed:", e);
+    }
+  }
+
+  // Update UI
+  try{ setAuthUI(); }catch(e){}
+  try{ applyI18n(); }catch(e){}
+}
 
 mapboxgl.accessToken = "pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ";
 
@@ -1550,7 +1586,8 @@ function renderContinentCountries(){
       const eid = Number(eidStr);
       if (!isNaN(eid)){
         await openEvent(eid);
-        return;
+        // continue init so map/countries stay loaded
+
       }
     }
   }catch(e){}
@@ -2503,35 +2540,15 @@ try{
 
 (async function init(){
 
-// Restore session on refresh
+// Restore session on refresh (do not block app if it fails)
 try{
   const { data } = await supabaseClient.auth.getSession();
-  currentSession = data?.session || null;
-  currentUser = data?.session?.user || null;
-
-  // Load profile (language + admin) if logged in
-  if (currentUser){
-    const prof = await getMyProfile();
-    try{ isAdmin = !!prof?.is_admin; }catch(e){ isAdmin = false; }
-
-    // Apply language from profile if exists (no manual override)
-    try{
-      const stored = (typeof getStoredLang === "function") ? getStoredLang() : "";
-      const fromProfile = prof?.language || currentUser.user_metadata?.language || "";
-      if (!stored && fromProfile && I18N && I18N[fromProfile]){
-        currentLang = fromProfile;
-        const ls = document.getElementById("langSelect");
-        if (ls) ls.value = currentLang;
-      }
-    }catch(e){}
-  }else{
-    isAdmin = false;
-  }
-  setAuthUI();
-  try{ applyI18n(); }catch(e){}
+  await restoreAuthFromSession(data?.session || null);
 }catch(e){
   console.warn("session restore failed:", e);
+  try{ await restoreAuthFromSession(null); }catch(_){}
 }
+
   // default pills
   setContinentPill();
   setCountryPill();
@@ -2663,16 +2680,18 @@ try{
 })();
 
 // Auth state listener
-supabaseClient.auth.onAuthStateChange(async (event, session) => {
-  currentSession = session || null;
-  currentUser = session?.user || null;
+supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+  await restoreAuthFromSession(session);
 
-  // Refresh profile-driven flags after login/logout
-  isAdmin = false;
-  if (currentUser){
-    try{
-      const prof = await getMyProfile();
-      isAdmin = !!prof?.is_admin;
+  // If on event screen, refresh vote UI/stats
+  try{
+    if (screenEvent && screenEvent.classList.contains("active") && currentEventId){
+      await refreshVoteArea(currentEventId, currentEventCountryCode || "");
+      await refreshStats(currentEventId, currentEventCountryCode || "");
+    }
+  }catch(e){}
+});
+isAdmin = !!prof?.is_admin;
 
       // Apply language from profile if no stored override
       try{
