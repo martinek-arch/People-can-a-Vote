@@ -2502,6 +2502,36 @@ try{
 }catch(e){}
 
 (async function init(){
+
+// Restore session on refresh
+try{
+  const { data } = await supabaseClient.auth.getSession();
+  currentSession = data?.session || null;
+  currentUser = data?.session?.user || null;
+
+  // Load profile (language + admin) if logged in
+  if (currentUser){
+    const prof = await getMyProfile();
+    try{ isAdmin = !!prof?.is_admin; }catch(e){ isAdmin = false; }
+
+    // Apply language from profile if exists (no manual override)
+    try{
+      const stored = (typeof getStoredLang === "function") ? getStoredLang() : "";
+      const fromProfile = prof?.language || currentUser.user_metadata?.language || "";
+      if (!stored && fromProfile && I18N && I18N[fromProfile]){
+        currentLang = fromProfile;
+        const ls = document.getElementById("langSelect");
+        if (ls) ls.value = currentLang;
+      }
+    }catch(e){}
+  }else{
+    isAdmin = false;
+  }
+  setAuthUI();
+  try{ applyI18n(); }catch(e){}
+}catch(e){
+  console.warn("session restore failed:", e);
+}
   // default pills
   setContinentPill();
   setCountryPill();
@@ -2642,6 +2672,34 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
   if (currentUser){
     try{
       const prof = await getMyProfile();
+      isAdmin = !!prof?.is_admin;
+
+      // Apply language from profile if no stored override
+      try{
+        const stored = (typeof getStoredLang === "function") ? getStoredLang() : "";
+        const fromProfile = prof?.language || currentUser.user_metadata?.language || "";
+        if (!stored && fromProfile && I18N && I18N[fromProfile]){
+          currentLang = fromProfile;
+          const ls = document.getElementById("langSelect");
+          if (ls) ls.value = currentLang;
+        }
+      }catch(e){}
+    }catch(e){
+      console.warn("profile load failed:", e);
+    }
+  }
+
+  setAuthUI();
+  try{ applyI18n(); }catch(e){}
+
+  // Keep map and country lists intact; only refresh vote/stats if on event
+  try{
+    if (screenEvent && screenEvent.classList.contains("active") && currentEventId){
+      await refreshVoteArea(currentEventId, currentEventCountryCode || "");
+      await refreshStats(currentEventId, currentEventCountryCode || "");
+    }
+  }catch(e){}
+});
       isAdmin = !!prof?.is_admin;
     }catch(e){
       console.warn("profile load failed:", e);
