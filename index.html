@@ -2700,22 +2700,6 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
     }
   }catch(e){}
 });
-      isAdmin = !!prof?.is_admin;
-    }catch(e){
-      console.warn("profile load failed:", e);
-    }
-  }
-
-  setAuthUI();
-
-  // If on event screen, refresh vote UI/stats (safe)
-  try{
-    if (screenEvent && screenEvent.classList.contains("active") && currentEventId){
-      await refreshVoteArea(currentEventId, currentEventCountryCode || "");
-      await refreshStats(currentEventId, currentEventCountryCode || "");
-    }
-  }catch(e){}
-});
 </script>
 </body>
 </html>
