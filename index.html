@@ -2658,17 +2658,6 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
     }
   }catch(e){}
 });
-  // If user logs in/out while viewing an event, refresh vote/stats UI
-  try{
-    const ev = document.getElementById("screenEvent");
-    if (ev && ev.classList.contains("active") && currentEventId){
-      refreshVoteArea(currentEventId, currentEventCountryCode || "");
-      refreshStats(currentEventId, currentEventCountryCode || "");
-    }
-  }catch(e){}
-
-});
-
 </script>
 </body>
 </html>
