@@ -2175,7 +2175,17 @@ function setBigMapSelected(code){
 }
 
 /* ================== INIT ================== */
+function withTimeout(promise, ms, label){
+  let t;
+  const timeout = new Promise((_, reject) => {
+    t = setTimeout(() => reject(new Error((label || "timeout") + " after " + ms + "ms")), ms);
+  });
+  return Promise.race([promise.finally(()=>clearTimeout(t)), timeout]);
+}
+
 (async function init(){
+  try{ window.__setBoot && window.__setBoot('Init: start'); }catch(e){}
+
   // default pills
   setContinentPill();
   setCountryPill();
@@ -2187,6 +2197,7 @@ try{
 }catch(e){
   console.warn("session restore failed:", e);
   try{ await restoreAuthFromSession(null); }catch(_){}
+  try{ window.__setBoot && window.__setBoot('Init: session restored'); }catch(e){}
 }
 
   // If arriving from email confirmation, Supabase may include ?code=... (PKCE)
@@ -2310,16 +2321,31 @@ try{
     setTimeout(() => showScreen("HOME"), 2200);
   }
 
+try{ window.__setBoot && window.__setBoot('Init: loading continents…'); }catch(e){}
+try{ await withTimeout(loadContinents(), 12000, 'loadContinents'); }catch(e){ console.warn(e); }
 
-  await loadContinents();
-  await loadCountries();
-  await loadEventsCache();
+try{ window.__setBoot && window.__setBoot('Init: loading countries…'); }catch(e){}
+try{ await withTimeout(loadCountries(), 20000, 'loadCountries'); }catch(e){ console.warn(e); }
 
-  await loadTop3();
+try{ window.__setBoot && window.__setBoot('Init: loading events cache…'); }catch(e){}
+try{ await withTimeout(loadEventsCache(), 20000, 'loadEventsCache'); }catch(e){ console.warn(e); }
 
-  initMap();
-  renderContinentCountries();
-  applyContinentView();
+try{ window.__setBoot && window.__setBoot('Init: loading Top 3…'); }catch(e){}
+try{ await withTimeout(loadTop3(), 15000, 'loadTop3'); }catch(e){ console.warn(e); }
+
+try{ window.__setBoot && window.__setBoot('Init: initializing map…'); }catch(e){}
+try{
+  if (typeof mapboxgl !== "undefined" && mapboxgl){
+    initMap();
+  }else{
+    console.warn("Mapbox not available");
+  }
+}catch(e){ console.warn(e); }
+
+try{ renderContinentCountries(); }catch(e){ console.warn(e); }
+try{ applyContinentView(); }catch(e){ console.warn(e); }
+
+try{ window.__setBoot && window.__setBoot('Boot: ready'); }catch(e){}
 })();
 
 // Auth state listener
