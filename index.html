@@ -2241,26 +2241,34 @@ try{
     const langSel = document.getElementById("langSelect");
     if (langSel){
       langSel.onchange = async () => {
-        const lang = (langSel.value || "en").toLowerCase();
-        currentLang = (I18N && I18N[lang]) ? lang : "en";
-        setStoredLang(currentLang);
+  const lang = (langSel.value || "en").toLowerCase();
+  currentLang = (I18N && I18N[lang]) ? lang : "en";
+  setStoredLang(currentLang);
 
-        // Save preference if logged in (best-effort)
-        if (currentUser){
-          try{
-            let r1 = await supabaseClient.from("profiles").update({ language: currentLang }).eq("id", currentUser.id);
-            let err = r1.error || null;
-            if (err){
-              let r2 = await supabaseClient.from("profiles").update({ language: currentLang }).eq("user_id", currentUser.id);
-              err = r2.error || null;
-            }
-            if (err) console.warn("save language error:", err);
-          }catch(e){}
-        }
+  // Save preference if logged in (best-effort)
+  if (currentUser){
+    try{
+      const r = await supabaseClient.from("profiles")
+        .update({ language: currentLang })
+        .eq("id", currentUser.id);
+      if (r.error) console.warn("save language error:", r.error);
+    }catch(e){}
+  }
 
-        // Refresh page so everything re-renders in selected language
-        location.reload();
-      };
+  // Re-render UI without reloading page (prevents logout / map reset)
+  try{ applyI18n(); }catch(e){}
+  try{
+    // Re-render current view content (cheap refresh)
+    if (screenHome && screenHome.classList.contains("active")){
+      // refresh top3 label texts if present
+      await loadTop3?.();
+    } else if (screenCountry && screenCountry.classList.contains("active") && selectedCountryCode){
+      await loadEventsForCountry(selectedCountryCode);
+    } else if (screenEvent && screenEvent.classList.contains("active") && currentEventId){
+      await openEvent(currentEventId);
+    }
+  }catch(e){}
+};
     }
   }catch(e){}
 
