@@ -616,7 +616,7 @@ async function loadEventTranslations(eventIds, langs){
   }
 }
 
-function getEventText(evt, field){(evt, field){
+function getEventText(evt, field){
   const id = evt?.id;
   if (!id) return (evt?.[field] || "");
 
@@ -668,7 +668,7 @@ function norm(s){
 
 
 /* ================== i18n ================== */
-I18N = I18N = {
+I18N = {
   en: {
     brand_sub: "Global view of opinions from around the world",
     home: "Home",
@@ -679,7 +679,7 @@ I18N = I18N = {
     top3_sub: "Most voted events right now",
     refresh: "Refresh",
     search_ph: "Search country or event…",
-    country_pill_all: t("country_pill_all"),
+    country_pill_all: "Country: (all)",
     continent_pill_all: "Continent: All",
     not_signed_in: "Not signed in",
     signed_in_as: "Signed in as: {email}",
@@ -1203,7 +1203,6 @@ function applyI18n(){
 
   // auth pill refresh
   setAuthUI();
-  try{ applyI18n(); }catch(e){}
 }
 
 
@@ -2339,7 +2338,6 @@ async function restoreAuthFromSession(session){
 
   // překresli UI
   try{ setAuthUI(); }catch(e){}
-  try{ applyI18n(); }catch(e){}
 }
                                   
 supabaseClient.auth.onAuthStateChange(async (_event, session) => {
