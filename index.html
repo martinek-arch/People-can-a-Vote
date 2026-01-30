@@ -159,7 +159,6 @@
         <option value="ru">RU</option>
         <option value="zh">ZH</option>
       </select>
-      <button class="ghost" id="adminBtn" style="display:none;">Admin</button>
 </div>
   </div>
 </header>
@@ -256,7 +255,6 @@
       <div class="titleRow">
         <button class="backInline" id="backFromEvent">← Back</button>
         <h2 id="eventTitle" style="margin:0; display:inline;">—</h2>
-        <button class="ghost" id="copyLinkBtn" style="margin-left:10px;">Copy link</button>
         <span id="eventLangBadge" style="margin-left:10px;"></span>
         <div style="margin-left:auto; width:180px;">
           <div id="miniMap" style="width:100%;height:120px;border-radius:10px;overflow:hidden;border:1px solid #eee;"></div>
@@ -385,7 +383,9 @@ function setStoredLang(lang){
 
 
 /* ================== CONFIG ================== */
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+const supabaseClient = supabase.createClient(
+  "https://jqoomnhpyuikbntnrukw.supabase.co",
+  "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h", {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
@@ -393,38 +393,6 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     storage: window.localStorage
   }
 });
-async function restoreAuthFromSession(session){
-  currentSession = session || null;
-  currentUser = session?.user || null;
-
-  // default
-  isAdmin = false;
-
-  // Load profile flags if logged in (admin + language)
-  if (currentUser){
-    try{
-      const prof = await getMyProfile();
-      isAdmin = !!prof?.is_admin;
-
-      // Apply language from profile if no manual override
-      try{
-        const stored = (typeof getStoredLang === "function") ? getStoredLang() : "";
-        const fromProfile = prof?.language || currentUser.user_metadata?.language || "";
-        if (!stored && fromProfile && I18N && I18N[fromProfile]){
-          currentLang = fromProfile;
-          const ls = document.getElementById("langSelect");
-          if (ls) ls.value = currentLang;
-        }
-      }catch(e){}
-    }catch(e){
-      console.warn("getMyProfile failed:", e);
-    }
-  }
-
-  // Update UI
-  try{ setAuthUI(); }catch(e){}
-  try{ applyI18n(); }catch(e){}
-}
 
 mapboxgl.accessToken = "pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ";
 
@@ -527,10 +495,9 @@ async function updateMiniMap(countryCode){
 
 
 /* ================== AUTH (Supabase) ================== */
-let currentUser = null;
-let isAdmin = false;
-      // supabase user
 let currentSession = null;   // session
+let currentUser = null;      // supabase user
+let isAdmin = false;   // admin
 
 const authPill = document.getElementById("authPill");
 const loginToggleBtn = document.getElementById("loginToggleBtn");
@@ -649,7 +616,7 @@ async function loadEventTranslations(eventIds, langs){
   }
 }
 
-function getEventText(evt, field){
+function getEventText(evt, field){(evt, field){
   const id = evt?.id;
   if (!id) return (evt?.[field] || "");
 
@@ -1269,41 +1236,6 @@ function barHTML(label, count, total){
   `;
 }
 
-async function getMyProfile(){
-  if (!currentUser) return null;
-
-  // Some setups use profiles.id, others profiles.user_id. We'll try both.
-  // Attempt 1: profiles.id
-  try{
-    const r1 = await supabaseClient
-      .from("profiles")
-      .select("country_code, language,is_admin")
-      .eq("id", currentUser.id)
-      .maybeSingle();
-    if (!r1.error && r1.data) return r1.data;
-    if (r1.error && !String(r1.error.message||"").toLowerCase().includes("column")) {
-      // non-column error (e.g., RLS), still return null but log
-      console.warn("getMyProfile(id) error:", r1.error);
-    }
-  }catch(e){}
-
-  // Attempt 2: profiles.user_id
-  try{
-    const r2 = await supabaseClient
-      .from("profiles")
-      .select("country_code, language")
-      .eq("user_id", currentUser.id)
-      .maybeSingle();
-    if (r2.error){
-      console.warn("getMyProfile(user_id) error:", r2.error);
-      return null;
-    }
-    return r2.data || null;
-  }catch(e){
-    console.warn("getMyProfile unexpected error:", e);
-    return null;
-  }
-}
 
 function isEmailVerified(){
   return !!(currentUser && (currentUser.email_confirmed_at || currentUser.confirmed_at));
@@ -1366,7 +1298,6 @@ async function refreshStats(eventId, eventCountryCode){
 
   statsBox.innerHTML = `
     <div class="stats-wide">
-      <div id="countriesCount" class="muted" style="margin-top:6px;"></div>
       <div><strong>${t("stats_total_votes")}</strong> ${total}</div>
       <div class="barWrap bars-large">
         ${barHTML("Yes", yes, total)}
@@ -1578,21 +1509,7 @@ function renderContinentCountries(){
         setCountryPill();
         setBigMapSelected("");
         // go back to country list + home (so user can pick again)
-        // Deep link: open event if URL contains ?event=
-  try{
-    const url = new URL(location.href);
-    const eidStr = url.searchParams.get("event");
-    if (eidStr){
-      const eid = Number(eidStr);
-      if (!isNaN(eid)){
-        await openEvent(eid);
-        // continue init so map/countries stay loaded
-
-      }
-    }
-  }catch(e){}
-
-  showScreen("HOME");
+        showScreen("HOME");
         renderContinentCountries();
       };
     }
@@ -1646,8 +1563,6 @@ function showScreen(name){
   if (name === "HOME" && map) setTimeout(() => map.resize(), 0);
   screenRegister.classList.toggle("active", name === "REGISTER");
   screenVerified.classList.toggle("active", name === "VERIFIED");
-  const screenAdmin = document.getElementById("screenAdmin");
-  if (screenAdmin) screenAdmin.classList.toggle("active", name === "ADMIN");
 }
 document.getElementById("homeBtn").onclick = () => {
   currentEventId = null;
@@ -2241,306 +2156,12 @@ function setBigMapSelected(code){
 }
 
 /* ================== INIT ================== */
-/* ================== B/C/D: Admin + Share + Trust ================== */
-
-function setInlineMsg(el, text, ok=false){
-  if (!el) return;
-  el.textContent = text || "";
-  el.classList.remove("errorText","okText");
-  if (!text) return;
-  el.classList.add(ok ? "okText" : "errorText");
-}
-
-// Share button
-(function bindShare(){
-  const copyLinkBtn = document.getElementById("copyLinkBtn");
-  if (!copyLinkBtn) return;
-  copyLinkBtn.onclick = async () => {
-    if (!currentEventId) return;
-    const url = new URL(location.href);
-    url.searchParams.set("event", String(currentEventId));
-    if (currentEventCountryCode) url.searchParams.set("country", String(currentEventCountryCode));
-    try{
-      await navigator.clipboard.writeText(url.toString());
-      copyLinkBtn.textContent = "Copied ✅";
-      setTimeout(()=> copyLinkBtn.textContent = "Copy link", 1200);
-    }catch(e){
-      prompt("Copy this link:", url.toString());
-    }
-  };
-})();
-
-// Admin panel
-(function bindAdmin(){
-  const adminBtn = document.getElementById("adminBtn");
-  const adminBackBtn = document.getElementById("adminBackBtn");
-  const adminCountry = document.getElementById("adminCountry");
-  const adminEventsList = document.getElementById("adminEventsList");
-  const adminNewEventBtn = document.getElementById("adminNewEventBtn");
-
-  const admEventId = document.getElementById("admEventId");
-  const admTitle = document.getElementById("admTitle");
-  const admDesc = document.getElementById("admDesc");
-  const admEndsAt = document.getElementById("admEndsAt");
-  const admIsActive = document.getElementById("admIsActive");
-  const admIsTop = document.getElementById("admIsTop");
-  const admSaveEventBtn = document.getElementById("admSaveEventBtn");
-  const admMsg = document.getElementById("admMsg");
-
-  const admLang = document.getElementById("admLang");
-  const admTrTitle = document.getElementById("admTrTitle");
-  const admTrDesc = document.getElementById("admTrDesc");
-  const admSaveTrBtn = document.getElementById("admSaveTrBtn");
-  const admTrMsg = document.getElementById("admTrMsg");
-
-  if (!adminBtn || !adminCountry) return;
-
-  async function adminLoadCountries(){
-    // Use already loaded countries list from the app (fast, consistent)
-    if (!countries || !countries.length){
-      await loadContinents();
-      await loadCountries();
-    }
-    const list = (countries || []).slice().sort((a,b)=>(a.name||"").localeCompare(b.name||""));
-    adminCountry.innerHTML = list.map(c => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${escapeHtml(c.code)})</option>`).join("");
-  }
-
-  async function adminLoadEvents(countryCode){
-    adminEventsList.innerHTML = `<div class="muted">Loading…</div>`;
-    const { data, error } = await supabaseClient
-      .from("events")
-      .select("id,title,description,created_at,ends_at,is_active,is_top,country_code")
-      .eq("country_code", countryCode)
-      .order("created_at", { ascending:false });
-
-    if (error){
-      console.warn(error);
-      adminEventsList.innerHTML = `<div class="muted">Error: ${escapeHtml(error.message || "load failed")}</div>`;
-      return;
-    }
-
-    const list = data || [];
-    if (!list.length){
-      adminEventsList.innerHTML = `<div class="muted">No events</div>`;
-      return;
-    }
-
-    adminEventsList.innerHTML = list.map(e => `
-      <div class="eventItem" data-id="${e.id}">
-        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-          <strong>${escapeHtml(e.title||"")}</strong>
-          <div style="display:flex;gap:8px;align-items:center;">
-            ${e.is_top ? `<span class="pill">TOP</span>` : ``}
-            ${e.is_active === false ? `<span class="pill" style="background:#f2f2f2;border-color:#e6e6e6;">OFF</span>` : ``}
-          </div>
-        </div>
-        <div class="muted" style="margin-top:6px;">#${e.id}</div>
-      </div>
-    `).join("");
-
-    for (const el of adminEventsList.querySelectorAll(".eventItem")){
-      el.onclick = async () => {
-        const id = Number(el.getAttribute("data-id"));
-        const evt = list.find(x => x.id === id);
-        if (!evt) return;
-        await adminEditEvent(evt);
-      };
-    }
-  }
-
-  function toDateInputValue(ts){
-    try{
-      if (!ts) return "";
-      const d = new Date(ts);
-      if (isNaN(d)) return "";
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth()+1).padStart(2,"0");
-      const dd = String(d.getDate()).padStart(2,"0");
-      return `${yyyy}-${mm}-${dd}`;
-    }catch(e){ return ""; }
-  }
-
-  async function adminEditEvent(evt){
-    admEventId.value = String(evt.id);
-    admTitle.value = evt.title || "";
-    admDesc.value = evt.description || "";
-    admEndsAt.value = toDateInputValue(evt.ends_at);
-    admIsActive.checked = (evt.is_active !== false);
-    admIsTop.checked = (evt.is_top === true);
-
-    await loadEventTranslations([evt.id], Array.from(new Set([admLang.value, "en"])));
-    const pack = eventTranslations[evt.id] || {};
-    const tr = pack[admLang.value];
-    admTrTitle.value = (tr && tr.title) ? tr.title : "";
-    admTrDesc.value  = (tr && tr.description) ? tr.description : "";
-    setInlineMsg(admMsg, "");
-    setInlineMsg(admTrMsg, "");
-  }
-
-  function adminNewEvent(){
-    admEventId.value = "";
-    admTitle.value = "";
-    admDesc.value = "";
-    try{
-      const d = new Date(Date.now() + 30*24*3600*1000);
-      admEndsAt.value = toDateInputValue(d.toISOString());
-    }catch(e){ admEndsAt.value = ""; }
-    admIsActive.checked = true;
-    admIsTop.checked = false;
-    admTrTitle.value = "";
-    admTrDesc.value = "";
-    setInlineMsg(admMsg, "");
-    setInlineMsg(admTrMsg, "");
-  }
-
-  async function adminSaveEvent(){
-    const country_code = adminCountry.value;
-    const title = (admTitle.value || "").trim();
-    const description = (admDesc.value || "").trim();
-    if (!country_code){ setInlineMsg(admMsg, "Select country"); return; }
-    if (!title){ setInlineMsg(admMsg, "Title required"); return; }
-
-    let ends_at = null;
-    if (admEndsAt.value){
-      ends_at = new Date(admEndsAt.value + "T23:59:59Z").toISOString();
-    }
-
-    const payload = {
-      title, description, country_code,
-      is_active: !!admIsActive.checked,
-      is_top: !!admIsTop.checked,
-      ends_at
-    };
-
-    if (admEventId.value){
-      const id = Number(admEventId.value);
-      const { error } = await supabaseClient.from("events").update(payload).eq("id", id);
-      if (error){ setInlineMsg(admMsg, error.message || "Save failed"); return; }
-      setInlineMsg(admMsg, "Saved ✅", true);
-      await adminLoadEvents(country_code);
-    }else{
-      const { data, error } = await supabaseClient.from("events").insert(payload).select("id").single();
-      if (error){ setInlineMsg(admMsg, error.message || "Create failed"); return; }
-      setInlineMsg(admMsg, "Created ✅", true);
-      await adminLoadEvents(country_code);
-      if (data?.id){
-        const { data:evt } = await supabaseClient.from("events").select("*").eq("id", data.id).single();
-        if (evt) await adminEditEvent(evt);
-      }
-    }
-  }
-
-  async function adminSaveTranslation(){
-    const id = admEventId.value ? Number(admEventId.value) : null;
-    if (!id){ setInlineMsg(admTrMsg, "Save event first"); return; }
-
-    const lang = (admLang.value || "en").toLowerCase();
-    const title = (admTrTitle.value || "").trim();
-    const description = (admTrDesc.value || "").trim();
-    if (!title){ setInlineMsg(admTrMsg, "Translated title required"); return; }
-
-    const payload = { event_id: id, lang, title, description };
-    const { error } = await supabaseClient
-      .from("event_translations")
-      .upsert(payload, { onConflict: "event_id,lang" });
-
-    if (error){ setInlineMsg(admTrMsg, error.message || "Save failed"); return; }
-
-    eventTranslations[id] = eventTranslations[id] || {};
-    eventTranslations[id][lang] = { title, description };
-    translationLoaded.add(`${id}:${lang}`);
-
-    setInlineMsg(admTrMsg, "Saved ✅", true);
-
-    // refresh current event view if opened
-    if (currentEventId === id){
-      try{ await openEvent(id); }catch(e){}
-    }
-  }
-
-  adminBtn.onclick = async () => {
-    if (!currentUser || !isAdmin) return;
-    showScreen("ADMIN");
-    await adminLoadCountries();
-    // prefer currently selected country
-    if (selectedCountryCode && adminCountry.querySelector(`option[value="${selectedCountryCode}"]`)){
-      adminCountry.value = selectedCountryCode;
-    }
-    adminNewEvent();
-    await adminLoadEvents(adminCountry.value);
-  };
-
-  adminBackBtn.onclick = () => {
-    // go to previous context
-    if (screenEvent.classList.contains("active")) showScreen("EVENT");
-    else if (screenCountry.classList.contains("active")) showScreen("COUNTRY");
-    else showScreen("HOME");
-  };
-
-  adminCountry.onchange = async () => {
-    adminNewEvent();
-    await adminLoadEvents(adminCountry.value);
-  };
-
-  adminNewEventBtn.onclick = () => adminNewEvent();
-
-  admSaveEventBtn.onclick = async () => {
-    setInlineMsg(admMsg, "");
-    await adminSaveEvent();
-  };
-
-  admSaveTrBtn.onclick = async () => {
-    setInlineMsg(admTrMsg, "");
-    await adminSaveTranslation();
-  };
-
-  admLang.onchange = async () => {
-    const id = admEventId.value ? Number(admEventId.value) : null;
-    if (!id) return;
-    await loadEventTranslations([id], Array.from(new Set([admLang.value, "en"])));
-    const pack = eventTranslations[id] || {};
-    const tr = pack[admLang.value];
-    admTrTitle.value = (tr && tr.title) ? tr.title : "";
-    admTrDesc.value  = (tr && tr.description) ? tr.description : "";
-    setInlineMsg(admTrMsg, "");
-  };
-})();
-
-// Trust metric (guarded: only if logged in, and profiles RLS allows reading joined data)
-async function updateCountriesCount(eventId){
-  const el = document.getElementById("countriesCount");
-  if (!el) return;
-  el.textContent = "";
-  if (!currentUser) return;
-  try{
-    const { data, error } = await supabaseClient
-      .from("votes")
-      .select("user_id, profiles(country_code)")
-      .eq("event_id", eventId);
-
-    if (error) return;
-
-    const set = new Set();
-    for (const row of (data || [])){
-      const cc = row?.profiles?.country_code;
-      if (cc) set.add(cc);
-    }
-    if (set.size) el.textContent = `Voted from ${set.size} countries`;
-  }catch(e){}
-}
-
-// Hook refreshStats safely (only if refreshStats exists)
-try{
-  const _origRefreshStats = refreshStats;
-  refreshStats = async function(eventId, eventCountryCode){
-    await _origRefreshStats(eventId, eventCountryCode);
-    await updateCountriesCount(eventId);
-  };
-}catch(e){}
-
 (async function init(){
+  // default pills
+  setContinentPill();
+  setCountryPill();
 
-// Restore session on refresh (do not block app if it fails)
+  // Restore session on refresh (do not block app if it fails)
 try{
   const { data } = await supabaseClient.auth.getSession();
   await restoreAuthFromSession(data?.session || null);
@@ -2548,11 +2169,6 @@ try{
   console.warn("session restore failed:", e);
   try{ await restoreAuthFromSession(null); }catch(_){}
 }
-
-  // default pills
-  setContinentPill();
-  setCountryPill();
-
 
   // If arriving from email confirmation, Supabase may include ?code=... (PKCE)
   // Try exchanging the code for a session.
@@ -2680,10 +2296,56 @@ try{
 })();
 
 // Auth state listener
+async function getMyProfile(){
+  if (!currentUser) return null;
+  try{
+    const { data, error } = await supabaseClient
+      .from("profiles")
+      .select("country_code, language, is_admin")
+      .eq("id", currentUser.id)
+      .maybeSingle();
+
+    if (error){
+      console.warn("getMyProfile error:", error);
+      return null;
+    }
+    return data || null;
+  }catch(e){
+    console.warn("getMyProfile unexpected:", e);
+    return null;
+  }
+}
+
+async function restoreAuthFromSession(session){
+  currentSession = session || null;
+  currentUser = session?.user || null;
+  isAdmin = false;
+
+  if (currentUser){
+    const prof = await getMyProfile();
+    isAdmin = !!prof?.is_admin;
+
+    // nastav jazyk z profilu jen pokud uživatel ručně nevybral jazyk
+    try{
+      const stored = (typeof getStoredLang === "function") ? getStoredLang() : "";
+      const fromProfile = prof?.language || currentUser.user_metadata?.language || "";
+      if (!stored && fromProfile && typeof I18N !== "undefined" && I18N[fromProfile]){
+        currentLang = fromProfile;
+        const ls = document.getElementById("langSelect");
+        if (ls) ls.value = currentLang;
+      }
+    }catch(e){}
+  }
+
+  // překresli UI
+  try{ setAuthUI(); }catch(e){}
+  try{ applyI18n(); }catch(e){}
+}
+                                  
 supabaseClient.auth.onAuthStateChange(async (_event, session) => {
   await restoreAuthFromSession(session);
 
-  // If on event screen, refresh vote UI/stats
+  // pokud je otevřená událost, přepočítej UI hlasování
   try{
     if (screenEvent && screenEvent.classList.contains("active") && currentEventId){
       await refreshVoteArea(currentEventId, currentEventCountryCode || "");
@@ -2691,34 +2353,7 @@ supabaseClient.auth.onAuthStateChange(async (_event, session) => {
     }
   }catch(e){}
 });
-isAdmin = !!prof?.is_admin;
 
-      // Apply language from profile if no stored override
-      try{
-        const stored = (typeof getStoredLang === "function") ? getStoredLang() : "";
-        const fromProfile = prof?.language || currentUser.user_metadata?.language || "";
-        if (!stored && fromProfile && I18N && I18N[fromProfile]){
-          currentLang = fromProfile;
-          const ls = document.getElementById("langSelect");
-          if (ls) ls.value = currentLang;
-        }
-      }catch(e){}
-   
-      console.warn("profile load failed:", e);
-    }
-  }
-
-  setAuthUI();
-  try{ applyI18n(); }catch(e){}
-
-  // Keep map and country lists intact; only refresh vote/stats if on event
-  try{
-    if (screenEvent && screenEvent.classList.contains("active") && currentEventId){
-      await refreshVoteArea(currentEventId, currentEventCountryCode || "");
-      await refreshStats(currentEventId, currentEventCountryCode || "");
-    }
-  }catch(e){}
-});
 </script>
 </body>
 </html>
