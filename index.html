@@ -124,6 +124,7 @@
 </head>
 
 <body>
+<div id="bootStatus" style="position:fixed;left:10px;bottom:10px;z-index:99999;background:#111;color:#fff;padding:6px 10px;border-radius:10px;font:12px/1.2 system-ui, sans-serif;opacity:.85">Booting…</div>
 
 <header>
   <div class="wrap nav">
@@ -349,20 +350,23 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-// --- Boot diagnostics (helps catch silent failures) ---
-const bootStatus = () => document.getElementById("bootStatus");
-function boot(msg){
-  const el = bootStatus();
-  if (!el) return;
-  el.style.display = "block";
-  el.textContent = msg;
-}
-window.addEventListener("error", (e) => {
-  boot("JS error: " + (e?.message || "unknown"));
-});
-window.addEventListener("unhandledrejection", (e) => {
-  boot("Promise error: " + (e?.reason?.message || e?.reason || "unknown"));
-});
+(function(){
+  const bootEl = document.getElementById('bootStatus');
+  const setBoot = (msg) => { try{ if(bootEl) bootEl.textContent = msg; }catch(e){} };
+  setBoot('Booting… (JS running)');
+
+  window.addEventListener('error', (e) => {
+    try{ setBoot('JS error: ' + (e?.message || 'unknown')); }catch(_){}
+    console.error(e);
+  });
+
+  window.addEventListener('unhandledrejection', (e) => {
+    try{ setBoot('Promise error: ' + (e?.reason?.message || e?.reason || 'unknown')); }catch(_){}
+    console.error(e);
+  });
+
+  window.__setBoot = setBoot;
+})();
 
 
 /* ===== i18n bootstrap (must be defined before anything calls t()) ===== */
@@ -1523,7 +1527,8 @@ function renderContinentCountries(){
         setCountryPill();
         setBigMapSelected("");
         // go back to country list + home (so user can pick again)
-        showScreen("HOME");
+        try{ window.__setBoot && window.__setBoot('Boot: ready'); }catch(e){}
+  showScreen("HOME");
         renderContinentCountries();
       };
     }
@@ -2201,7 +2206,11 @@ try{
       }
     }
   }catch(e){}
-  // Session state already restored via restoreAuthFromSession()
+
+  // Read current session (if already logged in)
+  const { data: sessData } = await supabaseClient.auth.getSession();
+  currentSession = sessData.session || null;
+  currentUser = currentSession?.user || null;
   setAuthUI();
 
   // Language: stored -> profile -> metadata -> default
@@ -2294,11 +2303,11 @@ try{
   }
 
 
-  try{ await loadContinents(); }catch(e){ console.warn(e); boot("loadContinents failed"); }
-  try{ await loadCountries(); }catch(e){ console.warn(e); boot("loadCountries failed"); }
+  await loadContinents();
+  await loadCountries();
   await loadEventsCache();
 
-  try{ await loadTop3(); }catch(e){ console.warn(e); boot("loadTop3 failed"); }
+  await loadTop3();
 
   initMap();
   renderContinentCountries();
@@ -2364,6 +2373,5 @@ supabaseClient.auth.onAuthStateChange(async (_event, session) => {
 });
 
 </script>
-<div id="bootStatus" style="position:fixed;left:10px;bottom:10px;z-index:9999;background:rgba(0,0,0,.7);color:#fff;padding:6px 8px;border-radius:8px;font:12px/1.3 system-ui;display:none;"></div>
 </body>
 </html>
