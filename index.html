@@ -2220,10 +2220,7 @@ try{
     }
   }catch(e){}
 
-  // Read current session (if already logged in)
-  const { data: sessData } = await supabaseClient.auth.getSession();
-  currentSession = sessData.session || null;
-  currentUser = currentSession?.user || null;
+  // Read current session (already restored above)
   setAuthUI();
 
   // Language: stored -> profile -> metadata -> default
@@ -2301,17 +2298,6 @@ try{
         pErr = r1.error || null;
       }catch(e){
         pErr = { message: String(e) };
-      }
-
-      if (pErr){
-        try{
-          const r2 = await supabaseClient
-            .from("profiles")
-            .upsert([{ user_id: currentUser.id, country_code: cc || null, language: lang || null }], { onConflict: "user_id" });
-          pErr = r2.error || null;
-        }catch(e){
-          pErr = { message: String(e) };
-        }
       }
       if (pErr) console.warn("profiles upsert error:", pErr);
     }
