@@ -2192,11 +2192,13 @@ function withTimeout(promise, ms, label){
 
   // Restore session on refresh (do not block app if it fails)
 try{
-  const { data } = await supabaseClient.auth.getSession();
+  try{ window.__setBoot && window.__setBoot('Init: restoring session…'); }catch(e){}
+  const { data } = await withTimeout(supabaseClient.auth.getSession(), 3000, "getSession");
   await restoreAuthFromSession(data?.session || null);
 }catch(e){
   console.warn("session restore failed:", e);
   try{ await restoreAuthFromSession(null); }catch(_){}
+}finally{
   try{ window.__setBoot && window.__setBoot('Init: session restored'); }catch(e){}
 }
 
