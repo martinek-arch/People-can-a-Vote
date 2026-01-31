@@ -1959,11 +1959,45 @@ async function openEvent(id){
 }
 
 /* ================== Data loading ================== */
-async function loadContinents(){
-  const { data, error } = await supabaseClient.from("continents").select("id,name").order("id", { ascending:true });
-  if (error){ console.error("loadContinents error:", error); continentsById = {}; return; }
+async function loadContinentsRemote(){
+  const { data, error } = await supabaseClient
+    .from("continents")
+    .select("id,name")
+    .order("name", { ascending:true });
+
+  if (error){ console.error("loadContinents error:", error); return null; }
+  return data || [];
+}
+
+function applyContinents(list){
+  continents = list || [];
   continentsById = {};
-  for (const c of (data || [])) continentsById[c.id] = c.name;
+  for (const c of continents) continentsById[c.id] = c.name;
+  renderContinentsBar();
+}
+
+async function loadContinents(){
+  // 1) instant cache
+  try{
+    const cached = localStorage.getItem("pcav_continents_v1");
+    if (cached){
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length){
+        applyContinents(parsed);
+      }
+    }
+  }catch(e){}
+
+  // 2) background refresh
+  try{
+    const fresh = await withTimeout(loadContinentsRemote(), 60000, "loadContinentsRemote");
+    if (fresh && fresh.length){
+      applyContinents(fresh);
+      try{ localStorage.setItem("pcav_continents_v1", JSON.stringify(fresh)); }catch(e){}
+    }
+  }catch(e){
+    console.warn(e);
+  }
 }
 
 async function loadCountriesRemote(){
@@ -2207,6 +2241,26 @@ function setBigMapSelected(code){
 }
 
 /* ================== INIT ================== */
+function manualRestoreSessionFromStorage(){
+  try{
+    const projectRef = (SUPABASE_URL || "").split("https://")[1]?.split(".")[0] || "";
+    const key = projectRef ? `sb-${projectRef}-auth-token` : null;
+    const raw = key ? localStorage.getItem(key) : null;
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    const access_token = parsed?.access_token || parsed?.currentSession?.access_token;
+    const refresh_token = parsed?.refresh_token || parsed?.currentSession?.refresh_token;
+
+    if (access_token && refresh_token){
+      return { access_token, refresh_token };
+    }
+    return null;
+  }catch(e){
+    return null;
+  }
+}
+
 function withTimeout(promise, ms, label){
   let t;
   const timeout = new Promise((_, reject) => {
@@ -2225,7 +2279,16 @@ function withTimeout(promise, ms, label){
   // Restore session on refresh (do not block app if it fails)
 try{
   try{ window.__setBoot && window.__setBoot('Init: restoring session…'); }catch(e){}
-  const { data } = await withTimeout(supabaseClient.auth.getSession(), 3000, "getSession");
+
+  // First, try manual restore from localStorage (helps when getSession hangs)
+  try{
+    const tokens = manualRestoreSessionFromStorage();
+    if (tokens){
+      await withTimeout(supabaseClient.auth.setSession(tokens), 3000, "setSession");
+    }
+  }catch(e){}
+
+  const { data } = await withTimeout(supabaseClient.auth.getSession(), 4000, "getSession");
   await restoreAuthFromSession(data?.session || null);
 }catch(e){
   console.warn("session restore failed:", e);
