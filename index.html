@@ -1966,19 +1966,24 @@ async function loadContinents(){
   for (const c of (data || [])) continentsById[c.id] = c.name;
 }
 
-async function loadCountries(){
+async function loadCountriesRemote(){
   const { data, error } = await supabaseClient
     .from("countries")
     .select("code,name,continent_id")
     .order("name", { ascending:true });
 
-  if (error){ console.error("loadCountries error:", error); countries = []; countriesByCode = {}; return; }
+  if (error){ console.error("loadCountries error:", error); return null; }
 
-  countries = (data || []).map(c => ({
+  const list = (data || []).map(c => ({
     ...c,
     continent_name: continentsById[c.continent_id] || ""
   }));
 
+  return list;
+}
+
+function applyCountries(list){
+  countries = list || [];
   countriesByCode = {};
   for (const c of countries) countriesByCode[c.code] = c;
 
@@ -1986,6 +1991,33 @@ async function loadCountries(){
   if (regCountry){
     regCountry.innerHTML = '<option value="">Select your country</option>' +
       countries.map(c => `<option value="${c.code}">${escapeHtml(c.name)} (${c.code})</option>`).join("");
+  }
+
+  // If currently browsing continents/country list, re-render countries list
+  try{ renderCountriesForContinent(selectedContinent); }catch(e){}
+}
+
+async function loadCountries(){
+  // 1) instant: local cache
+  try{
+    const cached = localStorage.getItem("pcav_countries_v1");
+    if (cached){
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length){
+        applyCountries(parsed);
+      }
+    }
+  }catch(e){}
+
+  // 2) background refresh (do not block init)
+  try{
+    const fresh = await withTimeout(loadCountriesRemote(), 60000, "loadCountriesRemote");
+    if (fresh && fresh.length){
+      applyCountries(fresh);
+      try{ localStorage.setItem("pcav_countries_v1", JSON.stringify(fresh)); }catch(e){}
+    }
+  }catch(e){
+    console.warn(e);
   }
 }
 
@@ -2313,13 +2345,13 @@ try{ window.__setBoot && window.__setBoot('Init: loading continents…'); }catch
 try{ await withTimeout(loadContinents(), 12000, 'loadContinents'); }catch(e){ console.warn(e); }
 
 try{ window.__setBoot && window.__setBoot('Init: loading countries…'); }catch(e){}
-try{ await withTimeout(loadCountries(), 20000, 'loadCountries'); }catch(e){ console.warn(e); }
+try{ loadCountries(); }catch(e){ console.warn(e); }
 
 try{ window.__setBoot && window.__setBoot('Init: loading events cache…'); }catch(e){}
-try{ await withTimeout(loadEventsCache(), 20000, 'loadEventsCache'); }catch(e){ console.warn(e); }
+try{ loadEventsCache(); }catch(e){ console.warn(e); }
 
 try{ window.__setBoot && window.__setBoot('Init: loading Top 3…'); }catch(e){}
-try{ await withTimeout(loadTop3(), 15000, 'loadTop3'); }catch(e){ console.warn(e); }
+try{ loadTop3(); }catch(e){ console.warn(e); }
 
 try{ window.__setBoot && window.__setBoot('Init: initializing map…'); }catch(e){}
 try{
