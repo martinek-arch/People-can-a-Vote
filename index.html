@@ -7,19 +7,41 @@
 <style>
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }
   #boot { position: fixed; bottom: 10px; left: 10px; font-size: 12px; color: #555; background: rgba(255,255,255,0.9); padding: 6px 8px; border-radius: 8px; }
+  .hidden { display:none; }
+  button { padding:8px 12px; margin:4px; }
 </style>
 </head>
 <body>
 <div id="app">
   <h1>People Can Vote</h1>
-  <div id="content">Načítání…</div>
+
+  <div id="auth-status">Načítání uživatele…</div>
+
+  <div id="auth-actions">
+    <button id="loginBtn">Přihlásit</button>
+    <button id="logoutBtn" class="hidden">Odhlásit</button>
+  </div>
+
+  <hr>
+
+  <div id="stats">
+    <p><b>Statistiky</b> – viditelné pro každého.</p>
+  </div>
+
+  <div id="vote-area" class="hidden">
+    <button id="voteBtn">Hlasovat</button>
+  </div>
+
+  <div id="vote-disabled" class="hidden">
+    <p><b>Hlasování je dostupné pouze pro přihlášené a ověřené uživatele.</b></p>
+  </div>
 </div>
+
 <div id="boot">Booting…</div>
 
 <script>
-/* ====== ZÁKLADNÍ OCHRANY ====== */
 if (window.__PCV_INIT_DONE__) {
-  console.warn("PCV: init already done");
+  console.warn("PCV: duplicate init prevented");
 } else {
   window.__PCV_INIT_DONE__ = true;
 
@@ -29,12 +51,6 @@ if (window.__PCV_INIT_DONE__) {
     console.log(msg);
   }
 
-  /* ====== STUB FUNKCE (UI) ====== */
-  function renderContinentsBar() {}
-  function renderCountriesForContinent() {}
-  function setContinentPill() {}
-
-  /* ====== SUPABASE LOADER ====== */
   async function loadSupabase() {
     boot("Init: loading Supabase…");
     return new Promise((resolve, reject) => {
@@ -48,16 +64,14 @@ if (window.__PCV_INIT_DONE__) {
     });
   }
 
-  /* ====== INIT ====== */
   (async function init() {
     try {
       boot("Init: JS running");
 
       const supabaseLib = await loadSupabase();
-      if (!supabaseLib) throw new Error("Supabase not available");
 
-      const SUPABASE_URL = "https://jqoomnhpyuikbntnrukw.supabase.co";
-      const SUPABASE_ANON_KEY = "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h";
+      const SUPABASE_URL = "https://YOUR_PROJECT_ID.supabase.co";
+      const SUPABASE_ANON_KEY = "YOUR_PUBLIC_ANON_KEY";
 
       const supabaseClient = supabaseLib.createClient(
         SUPABASE_URL,
@@ -66,16 +80,38 @@ if (window.__PCV_INIT_DONE__) {
 
       boot("Init: Supabase ready");
 
-      // Session check (safe)
-      try {
-        const { data } = await supabaseClient.auth.getSession();
-        console.log("Session:", data && data.session);
-      } catch (e) {
-        console.warn("Session check failed:", e);
-      }
+      const { data: { session } } = await supabaseClient.auth.getSession();
 
-      document.getElementById("content").textContent =
-        "Aplikace běží. Nepřihlášený uživatel vidí statistiky.";
+      const authStatus = document.getElementById("auth-status");
+      const loginBtn = document.getElementById("loginBtn");
+      const logoutBtn = document.getElementById("logoutBtn");
+      const voteArea = document.getElementById("vote-area");
+      const voteDisabled = document.getElementById("vote-disabled");
+
+      if (!session) {
+        authStatus.textContent = "Nepřihlášený uživatel";
+        loginBtn.onclick = () => supabaseClient.auth.signInWithOtp({
+          email: prompt("Zadej email")
+        });
+        voteDisabled.classList.remove("hidden");
+      } else {
+        const user = session.user;
+        const verified = !!user.email_confirmed_at;
+
+        authStatus.textContent = verified
+          ? "Přihlášený a ověřený uživatel"
+          : "Přihlášený, ale NEověřený uživatel";
+
+        loginBtn.classList.add("hidden");
+        logoutBtn.classList.remove("hidden");
+        logoutBtn.onclick = () => supabaseClient.auth.signOut();
+
+        if (verified) {
+          voteArea.classList.remove("hidden");
+        } else {
+          voteDisabled.classList.remove("hidden");
+        }
+      }
 
       boot("Boot: ready");
     } catch (err) {
