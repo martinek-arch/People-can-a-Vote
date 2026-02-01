@@ -1733,7 +1733,37 @@ function setCountryPill(){
     : t("country_pill_all");
 }
 function setContinentPill(){
-  selectedContinentPill.textContent = `${t("continent_pill_all").split(":")[0]}: ${selectedContinent === "ALL" ? t("continent_pill_all").split(":")[1].trim() : selectedContinent}`;
+  if (!selectedContinentPill) return;
+  selectedContinentPill.textContent = (selectedContinent === "ALL")
+    ? t("continent_pill_all")
+    : `Continent: ${selectedContinent}`;
+}
+
+
+/* ================== Continents bar rendering ================== */
+function renderContinentsBar(){
+  if (!continentsBar) return;
+  // Keep current selection if it still exists
+  const names = (continents || []).map(c => c && c.name).filter(Boolean);
+  // Ensure ALL + unique names
+  const uniq = Array.from(new Set(names));
+  const buttons = ['ALL', ...uniq];
+
+  continentsBar.innerHTML = "";
+  for (const name of buttons){
+    const b = document.createElement("button");
+    b.className = "ghost";
+    b.setAttribute("data-cont", name);
+    b.textContent = (name === "ALL") ? "🌍 " + (t("all") || "All") : name;
+    // Simple active styling (binding also handles it on click)
+    const active = (name === selectedContinent);
+    b.style.border = active ? "1px solid #bbb" : "0";
+    b.style.background = active ? "#ddd" : "#eee";
+    continentsBar.appendChild(b);
+  }
+}
+function renderCountriesForContinent(_continentName){
+  // Optional UI hook; safe no-op for now.
 }
 
 /* ================== Continents bar ================== */
@@ -2033,7 +2063,7 @@ function applyContinents(list){
   continents = list || [];
   continentsById = {};
   for (const c of continents) continentsById[c.id] = c.name;
-  renderContinentsBar();
+  try{ renderContinentsBar(); }catch(e){ console.warn(e); }
 }
 
 async function loadContinents(){
@@ -2351,6 +2381,24 @@ function withTimeout(promise, ms, label){
     detectSessionInUrl: true,
     storage: window.localStorage
   }
+
+  // Register auth listener now that the client exists (prevents 'null auth' on load)
+  try{
+    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      await restoreAuthFromSession(session);
+
+      // pokud je otevřená událost, přepočítej UI hlasování
+      try{
+        if (screenEvent && screenEvent.classList.contains("active") && currentEventId){
+          await refreshVoteArea(currentEventId, currentEventCountryCode || "");
+          await refreshStats(currentEventId, currentEventCountryCode || "");
+        }
+      }catch(e){}
+    });
+  }catch(e){
+    console.warn("Auth listener not registered:", e);
+  }
+
 });
   }
 
@@ -2559,9 +2607,8 @@ async function restoreAuthFromSession(session){
   // překresli UI
   try{ setAuthUI(); }catch(e){}
 }
-                                  
-supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-  await restoreAuthFromSession(session);
+
+// Auth state listener is registered inside init() after supabaseClient is ready.
 
   // pokud je otevřená událost, přepočítej UI hlasování
   try{
