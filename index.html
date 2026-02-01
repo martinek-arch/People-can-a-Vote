@@ -402,9 +402,11 @@ function setStoredLang(lang){
 
 
 /* ================== CONFIG ================== */
-const supabaseClient = supabase.createClient(
-  "https://jqoomnhpyuikbntnrukw.supabase.co",
-  "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h", {
+// Supabase config (keep in one place; used by manual session restore too)
+const SUPABASE_URL = "https://jqoomnhpyuikbntnrukw.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h";
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
@@ -412,6 +414,7 @@ const supabaseClient = supabase.createClient(
     storage: window.localStorage
   }
 });
+
 
 mapboxgl.accessToken = "pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ";
 
@@ -1149,9 +1152,11 @@ function applyI18n(){
   document.getElementById("search").placeholder = t("search_ph");
 
   // home
-  const mapTitle = document.querySelector("#screenHome h3");
+  const homeCards = document.querySelectorAll("#screenHome .card");
+  const mapCard = homeCards && homeCards.length > 1 ? homeCards[1] : null;
+  const mapTitle = mapCard ? mapCard.querySelector("h3") : null;
   if (mapTitle) mapTitle.textContent = t("map_title");
-  const mapSub = document.querySelector("#screenHome .muted");
+  const mapSub = mapCard ? mapCard.querySelector(".muted") : null;
   if (mapSub) mapSub.textContent = t("map_sub");
   const clearBtn = document.getElementById("clearCountryBtn");
   if (clearBtn) clearBtn.textContent = t("clear_country");
@@ -1492,6 +1497,13 @@ const CONTINENT_BOUNDS = {
   "Oceania": [[110, -50], [180, 5]],
 };
 
+
+/* Some older helper calls are kept for backwards compatibility.
+   The continents bar is currently static in HTML, so this is a no-op. */
+function renderContinentsBar(){ /* no-op (static HTML bar) */ }
+/* Deprecated: continent country list is handled by renderContinentCountries() now. */
+function renderCountriesForContinent(_continent){ /* no-op */ }
+
 function renderContinentCountries(){
   // Only show this panel when a specific continent is selected
   if (selectedContinent === "ALL"){
@@ -1804,7 +1816,7 @@ async function loadEventsForCountry(code){
 
   const { data, error } = await supabaseClient
     .from("events")
-    .select("id,title,description,country_code,created_at,is_active")
+    .select("id,title,description,country_code,created_at,is_active,ends_at,is_top")
     .eq("is_active", true)
     .eq("country_code", code)
     .order("created_at", { ascending:false });
@@ -1912,7 +1924,7 @@ async function openEvent(id){
   if (!evt){
     const { data, error } = await supabaseClient
       .from("events")
-      .select("id,title,description,country_code,created_at,is_active")
+      .select("id,title,description,country_code,created_at,is_active,ends_at,is_top")
       .eq("id", id)
       .maybeSingle();
     if (error || !data) return;
@@ -2058,7 +2070,7 @@ async function loadCountries(){
 async function loadEventsCache(){
   const { data, error } = await supabaseClient
     .from("events")
-    .select("id,title,description,country_code,is_active,created_at")
+    .select("id,title,description,country_code,is_active,created_at,ends_at,is_top")
     .eq("is_active", true)
     .order("created_at", { ascending:false })
     .limit(1000);
@@ -2242,15 +2254,22 @@ function setBigMapSelected(code){
 
 /* ================== INIT ================== */
 function manualRestoreSessionFromStorage(){
+  // Reads the session tokens that supabase-js stores in localStorage.
+  // Important: do NOT treat missing tokens as "logged out" — it can simply mean first visit.
   try{
-    const projectRef = (SUPABASE_URL || "").split("https://")[1]?.split(".")[0] || "";
+    const projectRef = (SUPABASE_URL || "").replace("https://","").split(".")[0] || "";
     const key = projectRef ? `sb-${projectRef}-auth-token` : null;
-    const raw = key ? localStorage.getItem(key) : null;
+    if (!key) return null;
+
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
-    const access_token = parsed?.access_token || parsed?.currentSession?.access_token;
-    const refresh_token = parsed?.refresh_token || parsed?.currentSession?.refresh_token;
+
+    // supabase-js v2 typically stores session under `currentSession`
+    const s = parsed?.currentSession || parsed?.session || parsed || null;
+    const access_token = s?.access_token || null;
+    const refresh_token = s?.refresh_token || null;
 
     if (access_token && refresh_token){
       return { access_token, refresh_token };
@@ -2259,6 +2278,7 @@ function manualRestoreSessionFromStorage(){
   }catch(e){
     return null;
   }
+}
 }
 
 function withTimeout(promise, ms, label){
@@ -2276,28 +2296,48 @@ function withTimeout(promise, ms, label){
   setContinentPill();
   setCountryPill();
 
-  // Restore session on refresh (do not block app if it fails)
+  // Restore session on refresh (robust; never auto-logout on timeout)
 try{
   try{ window.__setBoot && window.__setBoot('Init: restoring session…'); }catch(e){}
 
-  // First, try manual restore from localStorage (helps when getSession hangs)
+  let restored = false;
+
+  // 1) Try normal getSession (allow slower networks / cold start)
   try{
-    const tokens = manualRestoreSessionFromStorage();
-    if (tokens){
-      await withTimeout(supabaseClient.auth.setSession(tokens), 3000, "setSession");
+    const { data } = await withTimeout(supabaseClient.auth.getSession(), 12000, "getSession");
+    await restoreAuthFromSession(data?.session || null);
+    restored = true;
+  }catch(e){
+    // If getSession timed out or failed, try manual token restore (best effort)
+    console.warn("getSession failed:", e);
+
+    try{
+      const tokens = manualRestoreSessionFromStorage();
+      if (tokens){
+        await withTimeout(supabaseClient.auth.setSession(tokens), 12000, "setSession");
+
+        // Retry getSession once after setSession
+        const { data } = await withTimeout(supabaseClient.auth.getSession(), 12000, "getSession(retry)");
+        await restoreAuthFromSession(data?.session || null);
+        restored = true;
+      }
+    }catch(e2){
+      console.warn("setSession retry failed:", e2);
     }
-  }catch(e){}
+  }
 
-  const { data } = await withTimeout(supabaseClient.auth.getSession(), 4000, "getSession");
-  await restoreAuthFromSession(data?.session || null);
+  if (!restored){
+    // Do NOT sign the user out here — just continue as guest.
+    await restoreAuthFromSession(null);
+  }
+
+  try{ window.__setBoot && window.__setBoot(restored ? 'Init: session OK' : 'Init: session not available'); }catch(e){}
 }catch(e){
-  console.warn("session restore failed:", e);
+  console.warn("session restore failed (outer):", e);
   try{ await restoreAuthFromSession(null); }catch(_){}
-}finally{
-  try{ window.__setBoot && window.__setBoot('Init: session restored'); }catch(e){}
+  try{ window.__setBoot && window.__setBoot('Init: session error'); }catch(e){}
 }
-
-  // If arriving from email confirmation, Supabase may include ?code=... (PKCE)
+// If arriving from email confirmation, Supabase may include ?code=... (PKCE)
   // Try exchanging the code for a session.
   try{
     const url = new URL(window.location.href);
