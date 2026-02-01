@@ -297,7 +297,6 @@ if (window.__PCV_INIT_DONE__) {
         if (error) throw error;
         closeModal();
         // If countries were missing (policy mismatch), try to reload geo data
-        if (!geoLoaded) { try { await ensureGeoLoaded(); } catch(e){} }
         boot("Auth: signed in");
         return;
       }
@@ -417,19 +416,7 @@ if (window.__PCV_INIT_DONE__) {
     boot("Auth: signed out");
   }
 
-  /* ===== Geo state ===== */
-  let geoLoaded = false;
-  async function ensureGeoLoaded() {
-    try {
-      await ensureGeoLoaded();
-    } catch (e) {
-      console.error(e);
-      alert("Nepodařilo se načíst země. Zkontroluj Supabase RLS policies pro tabulky continents a countries (SELECT pro role anon i authenticated).\n\nDetail: " + (e?.message || e));
-      throw e;
-    }
-  }
-
-/* ===== Data rendering ===== */
+  /* ===== Data rendering ===== */
   function escapeHtml(s) {
     return String(s ?? "")
       .replaceAll("&", "&amp;")
@@ -602,7 +589,6 @@ if (window.__PCV_INIT_DONE__) {
       if (countrySel.value) await loadEventsForCountry(countrySel.value);
     }
 
-    geoLoaded = true;
     boot("Init: geo ready");
   }
 
@@ -668,8 +654,7 @@ if (window.__PCV_INIT_DONE__) {
         setAuthUI();
 
         // Ensure geo selectors (countries) are available for the current role (anon/authenticated)
-        if (!geoLoaded) {
-          try { await ensureGeoLoaded(); } catch(e) {}
+          try { await loadContinentsAndCountries(); } catch(e) {}
         }
 
         if (event === "PASSWORD_RECOVERY") {
@@ -682,7 +667,7 @@ if (window.__PCV_INIT_DONE__) {
         if (cc) await loadEventsForCountry(cc);
       });
 
-      await ensureGeoLoaded();
+      await loadContinentsAndCountries();
       await loadTop3();
 
       // If user lands with recovery hash, open the update modal
