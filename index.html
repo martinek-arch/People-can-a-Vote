@@ -5,36 +5,65 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>People Can Vote</title>
 <style>
+  :root { --muted:#555; --border:#e6e6e6; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }
-  #boot { position: fixed; bottom: 10px; left: 10px; font-size: 12px; color: #555; background: rgba(255,255,255,0.9); padding: 6px 8px; border-radius: 8px; }
+  h1 { margin: 0 0 12px; }
+  #boot { position: fixed; bottom: 10px; left: 10px; font-size: 12px; color: var(--muted);
+          background: rgba(255,255,255,0.92); padding: 6px 8px; border-radius: 10px; border: 1px solid var(--border); }
+  .row { display:flex; gap: 12px; align-items:center; flex-wrap:wrap; }
+  .card { border: 1px solid var(--border); border-radius: 14px; padding: 12px; margin: 12px 0; }
+  .muted { color: var(--muted); }
   .hidden { display:none; }
-  button { padding:8px 12px; margin:4px; }
+  select, button { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: white; }
+  button { cursor: pointer; }
+  button.primary { font-weight: 800; }
+  button[disabled] { opacity: 0.55; cursor: not-allowed; }
+  .list { display:flex; flex-direction:column; gap: 10px; }
+  .eventTitle { font-weight:900; margin-bottom:4px; }
+  .pill { display:inline-block; padding:2px 8px; border:1px solid var(--border); border-radius:999px; font-size:12px; color:#333; margin-left:6px; }
+  .top3grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
 </style>
 </head>
 <body>
-<div id="app">
-  <h1>People Can Vote</h1>
+<h1>People Can Vote</h1>
 
-  <div id="auth-status">Načítání uživatele…</div>
-
-  <div id="auth-actions">
+<div class="card">
+  <div class="row">
+    <div id="authStatus" class="muted">Načítání uživatele…</div>
     <button id="loginBtn">Přihlásit</button>
     <button id="logoutBtn" class="hidden">Odhlásit</button>
   </div>
+  <div id="voteGateMsg" class="muted" style="margin-top:8px;"></div>
+</div>
 
-  <hr>
+<div class="card">
+  <div class="row">
+    <label for="continentSel"><b>Kontinent</b></label>
+    <select id="continentSel"></select>
 
-  <div id="stats">
-    <p><b>Statistiky</b> – viditelné pro každého.</p>
+    <label for="countrySel"><b>Země</b></label>
+    <select id="countrySel"></select>
+
+    <button id="refreshEventsBtn">Obnovit události</button>
   </div>
-
-  <div id="vote-area" class="hidden">
-    <button id="voteBtn">Hlasovat</button>
+  <div class="muted" style="margin-top:8px;">
+    Statistiky jsou veřejné. Hlasovat může jen přihlášený a ověřený uživatel.
   </div>
+</div>
 
-  <div id="vote-disabled" class="hidden">
-    <p><b>Hlasování je dostupné pouze pro přihlášené a ověřené uživatele.</b></p>
+<div class="card">
+  <div class="row" style="justify-content:space-between;">
+    <b>TOP 3 události (nejvíc hlasujících)</b>
+    <button id="refreshTop3Btn">Obnovit</button>
   </div>
+  <div id="top3" class="top3grid" style="margin-top:10px;"></div>
+</div>
+
+<div class="card">
+  <div class="row" style="justify-content:space-between;">
+    <b>Události v zemi</b>
+  </div>
+  <div id="events" class="list" style="margin-top:10px;"></div>
 </div>
 
 <div id="boot">Booting…</div>
@@ -64,54 +93,243 @@ if (window.__PCV_INIT_DONE__) {
     });
   }
 
+  const SUPABASE_URL = "https://jqoomnhpyuikbntnrukw.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h";
+
+  let supabaseClient = null;
+  let session = null;
+  let isVerified = false;
+
+  function disableVoteButtons(disabled) {
+    document.querySelectorAll("button[data-vote-btn='1']").forEach(b => { b.disabled = disabled; });
+  }
+
+  function setAuthUI() {
+    const authStatus = document.getElementById("authStatus");
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const gateMsg = document.getElementById("voteGateMsg");
+
+    if (!session) {
+      authStatus.textContent = "Nepřihlášený uživatel";
+      loginBtn.classList.remove("hidden");
+      logoutBtn.classList.add("hidden");
+      gateMsg.textContent = "Hlasování je dostupné pouze pro přihlášené a ověřené uživatele.";
+      isVerified = false;
+      disableVoteButtons(true);
+      return;
+    }
+
+    isVerified = !!session.user?.email_confirmed_at;
+    authStatus.textContent = isVerified
+      ? "Přihlášený a ověřený uživatel"
+      : "Přihlášený, ale NEověřený uživatel";
+
+    loginBtn.classList.add("hidden");
+    logoutBtn.classList.remove("hidden");
+
+    gateMsg.textContent = isVerified
+      ? ""
+      : "Prosím ověř email (potvrzovací odkaz) – bez ověření nejde hlasovat.";
+
+    disableVoteButtons(!isVerified);
+  }
+
+  function canVote() { return !!session && !!isVerified; }
+
+  async function signInOtp() {
+    const email = prompt("Zadej email pro přihlášení (pošle se odkaz/OTP):");
+    if (!email) return;
+    boot("Auth: sending login email…");
+    const { error } = await supabaseClient.auth.signInWithOtp({ email });
+    if (error) { alert("Přihlášení selhalo: " + error.message); boot("Auth: error"); return; }
+    alert("Odesláno. Zkontroluj email a dokonči přihlášení.");
+    boot("Auth: email sent");
+  }
+
+  async function signOut() {
+    boot("Auth: signing out…");
+    await supabaseClient.auth.signOut();
+    boot("Auth: signed out");
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+  }
+
+  function renderTop3(items) {
+    const top3 = document.getElementById("top3");
+    top3.innerHTML = "";
+    if (!items?.length) { top3.innerHTML = "<div class='muted'>Zatím žádná data pro TOP 3.</div>"; return; }
+    for (const it of items) {
+      const div = document.createElement("div");
+      div.className = "card";
+      div.innerHTML = `
+        <div class="eventTitle">${escapeHtml(it.title || "Untitled")}</div>
+        <div class="muted">${escapeHtml(it.country_code || "")}</div>
+        <div style="margin-top:6px;"><span class="pill">hlasujících: ${it.votes ?? 0}</span></div>
+      `;
+      top3.appendChild(div);
+    }
+  }
+
+  async function loadTop3() {
+    boot("Data: loading TOP3…");
+    const { data, error } = await supabaseClient
+      .from("event_vote_counts")
+      .select("event_id,votes,events(title,country_code,is_active)")
+      .order("votes", { ascending: false })
+      .limit(3);
+
+    if (error) throw new Error("TOP3 load failed: " + error.message);
+
+    const normalized = (data || [])
+      .map(r => ({
+        event_id: r.event_id,
+        votes: r.votes,
+        title: r.events?.title,
+        country_code: r.events?.country_code,
+        is_active: r.events?.is_active
+      }))
+      .filter(x => x.is_active !== false);
+
+    renderTop3(normalized);
+    boot("Data: TOP3 ready");
+  }
+
+  function renderEvents(items) {
+    const events = document.getElementById("events");
+    events.innerHTML = "";
+    if (!items?.length) { events.innerHTML = "<div class='muted'>V této zemi zatím nejsou žádné aktivní události.</div>"; return; }
+
+    for (const e of items) {
+      const div = document.createElement("div");
+      div.className = "card";
+
+      const btn = document.createElement("button");
+      btn.textContent = "Hlasovat";
+      btn.className = "primary";
+      btn.dataset.voteBtn = "1";
+      btn.disabled = !canVote();
+
+      btn.onclick = async () => {
+        if (!canVote()) { alert("Hlasování je dostupné jen pro přihlášené a ověřené uživatele."); return; }
+        boot("Vote: submitting…");
+        const payload = { event_id: e.id, user_id: session.user.id, choice: "support" };
+        const { error } = await supabaseClient.from("votes").insert(payload);
+        if (error) { alert("Hlasování se nepodařilo: " + error.message); boot("Vote: error"); return; }
+        alert("Díky! Hlas byl uložen.");
+        await loadTop3();
+        boot("Vote: OK");
+      };
+
+      const ended = e.ends_at ? (new Date(e.ends_at).getTime() < Date.now()) : false;
+      const statusPill = ended ? "<span class='pill'>ukončeno</span>" : "<span class='pill'>aktivní</span>";
+
+      div.innerHTML = `
+        <div class="eventTitle">${escapeHtml(e.title || "Untitled")} ${statusPill}</div>
+        <div class="muted">${escapeHtml(e.description || "")}</div>
+        <div class="muted" style="margin-top:6px;">Země: ${escapeHtml(e.country_code || "")}</div>
+      `;
+      div.appendChild(btn);
+      events.appendChild(div);
+    }
+  }
+
+  async function loadEventsForCountry(countryCode) {
+    if (!countryCode) return;
+    boot("Data: loading events…");
+    const { data, error } = await supabaseClient
+      .from("events")
+      .select("id,title,description,country_code,is_active,is_top,ends_at,created_at")
+      .eq("country_code", countryCode)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error("Events load failed: " + error.message);
+
+    renderEvents(data || []);
+    boot("Data: events ready");
+  }
+
+  async function loadContinentsAndCountries() {
+    boot("Init: loading continents/countries…");
+    const continentSel = document.getElementById("continentSel");
+    const countrySel = document.getElementById("countrySel");
+
+    const { data: continents, error: cErr } = await supabaseClient
+      .from("continents").select("id,name,code").order("id", { ascending: true });
+    if (cErr) throw new Error("Continents load failed: " + cErr.message);
+
+    continentSel.innerHTML = "";
+    for (const c of continents) {
+      const opt = document.createElement("option");
+      opt.value = String(c.id);
+      opt.textContent = c.name;
+      continentSel.appendChild(opt);
+    }
+
+    async function fillCountries(continentId) {
+      countrySel.innerHTML = "";
+      const { data: countries, error: coErr } = await supabaseClient
+        .from("countries").select("code,name,continent_id")
+        .eq("continent_id", Number(continentId)).order("name", { ascending: true });
+      if (coErr) throw new Error("Countries load failed: " + coErr.message);
+
+      for (const co of countries) {
+        const opt = document.createElement("option");
+        opt.value = co.code;
+        opt.textContent = co.name + " (" + co.code + ")";
+        countrySel.appendChild(opt);
+      }
+    }
+
+    continentSel.onchange = async () => {
+      await fillCountries(continentSel.value);
+      if (countrySel.value) await loadEventsForCountry(countrySel.value);
+    };
+    countrySel.onchange = async () => {
+      if (countrySel.value) await loadEventsForCountry(countrySel.value);
+    };
+
+    if (continentSel.value) {
+      await fillCountries(continentSel.value);
+      if (countrySel.value) await loadEventsForCountry(countrySel.value);
+    }
+
+    boot("Init: geo ready");
+  }
+
   (async function init() {
     try {
       boot("Init: JS running");
-
       const supabaseLib = await loadSupabase();
-
-      const SUPABASE_URL = "https://jqoomnhpyuikbntnrukw.supabase.co";
-      const SUPABASE_ANON_KEY = "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h";
-
-      const supabaseClient = supabaseLib.createClient(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY
-      );
-
+      supabaseClient = supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       boot("Init: Supabase ready");
 
-      const { data: { session } } = await supabaseClient.auth.getSession();
+      document.getElementById("loginBtn").onclick = signInOtp;
+      document.getElementById("logoutBtn").onclick = signOut;
+      document.getElementById("refreshTop3Btn").onclick = loadTop3;
+      document.getElementById("refreshEventsBtn").onclick = async () => {
+        const cc = document.getElementById("countrySel").value;
+        await loadEventsForCountry(cc);
+      };
 
-      const authStatus = document.getElementById("auth-status");
-      const loginBtn = document.getElementById("loginBtn");
-      const logoutBtn = document.getElementById("logoutBtn");
-      const voteArea = document.getElementById("vote-area");
-      const voteDisabled = document.getElementById("vote-disabled");
+      const { data: sessData } = await supabaseClient.auth.getSession();
+      session = sessData?.session || null;
+      setAuthUI();
 
-      if (!session) {
-        authStatus.textContent = "Nepřihlášený uživatel";
-        loginBtn.onclick = () => supabaseClient.auth.signInWithOtp({
-          email: prompt("Zadej email")
-        });
-        voteDisabled.classList.remove("hidden");
-      } else {
-        const user = session.user;
-        const verified = !!user.email_confirmed_at;
+      supabaseClient.auth.onAuthStateChange(async (_event, newSession) => {
+        session = newSession;
+        setAuthUI();
+        const cc = document.getElementById("countrySel").value;
+        if (cc) await loadEventsForCountry(cc);
+      });
 
-        authStatus.textContent = verified
-          ? "Přihlášený a ověřený uživatel"
-          : "Přihlášený, ale NEověřený uživatel";
-
-        loginBtn.classList.add("hidden");
-        logoutBtn.classList.remove("hidden");
-        logoutBtn.onclick = () => supabaseClient.auth.signOut();
-
-        if (verified) {
-          voteArea.classList.remove("hidden");
-        } else {
-          voteDisabled.classList.remove("hidden");
-        }
-      }
+      await loadContinentsAndCountries();
+      await loadTop3();
 
       boot("Boot: ready");
     } catch (err) {
