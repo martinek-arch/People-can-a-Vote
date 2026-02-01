@@ -2592,9 +2592,6 @@ supabaseClient.auth.onAuthStateChange(async (_event, session) => {
     }
   }catch(e){}
 });
-
-
-}
 startApp().catch((e)=>{ try{ window.__setBoot && window.__setBoot('Startup error: ' + (e?.message||e)); }catch(_){}; console.error(e); });
 
 </script>
