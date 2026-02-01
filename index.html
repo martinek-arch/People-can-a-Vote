@@ -1,59 +1,2577 @@
 <!DOCTYPE html>
-<html lang="cs">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>People Can Vote</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>People can a Vote</title>
+
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet"/>
+
 <style>
-  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }
-  #boot { position: fixed; bottom: 10px; left: 10px; font-size: 12px; color: #555; background: rgba(255,255,255,0.9); padding: 6px 8px; border-radius: 8px; }
-  .badge { display:inline-block; padding:2px 8px; border:1px solid #ddd; border-radius:999px; font-size:12px; margin-left:8px; }
+  body { margin:0; font-family: Arial, sans-serif; background:#f4f6f8; }
+  .wrap { max-width:1100px; margin:0 auto; }
+  header { background:#fff; box-shadow:0 2px 4px rgba(0,0,0,.08); position:sticky; top:0; z-index:30; }
+  .nav { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; }
+  .nav-left, .nav-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .brand { display:flex; flex-direction:column; }
+  .brand h1 { margin:0; font-size:18px; }
+  .brand .muted { margin:2px 0 0; font-size:12px; color:#666; }
+
+  button { padding:8px 12px; border:0; border-radius:10px; cursor:pointer; }
+  button.ghost { background:#eee; }
+  button.primary { background:#111; color:#fff; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+
+  input { padding:9px 10px; border-radius:10px; border:1px solid #ddd; min-width:260px; }
+  .pill { background:#f1f1f1; padding:6px 10px; border-radius:999px; font-size:12px; color:#333; }
+  .card { background:#fff; padding:16px; border-radius:12px; margin:16px; }
+  .muted { color:#666; }
+
+  .errorText{ color:#b00020 !important; }
+  .okText{ color:#0b6b2e !important; }
+
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+  /* Continent bar */
+  #continentsBarWrap { padding:6px 16px; }
+  #continentsBar {
+    display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+    background:#fff; border:1px solid #eee; border-radius:12px; padding:8px 10px;
+  }
+  #continentsBar button { padding:6px 10px; font-size:13px; }
+
+  /* Search suggest */
+  .searchWrap { position:relative; }
+  #searchSuggest{
+    position:absolute; top:42px; left:0; right:0;
+    background:#fff; border:1px solid #ddd; border-radius:12px;
+    display:none; max-height:320px; overflow:auto;
+    box-shadow:0 10px 25px rgba(0,0,0,.12);
+    z-index:50;
+  }
+  .sItem { padding:10px 12px; cursor:pointer; border-top:1px solid #f1f1f1; display:flex; justify-content:space-between; gap:10px; }
+  .sItem:first-child{ border-top:none; }
+  .sItem:hover{ background:#f6f6f6; }
+  .sLeft { display:flex; flex-direction:column; gap:2px; }
+  .sTitle { font-weight:600; }
+  .sSub { font-size:12px; color:#666; }
+  .tag { font-size:11px; color:#555; background:#f1f1f1; padding:4px 8px; border-radius:999px; white-space:nowrap; align-self:flex-start; }
+
+
+  .countryChip{
+    padding:6px 10px;
+    border-radius:999px;
+    border:1px solid #e6e6e6;
+    background:#fafafa;
+    cursor:pointer;
+    font-size:13px;
+  }
+  .countryChip:hover{ border-color:#cfcfcf; background:#f3f3f3; }
+  .countryChip.active{ background:#e9e9e9; border-color:#bdbdbd; }
+
+
+  /* Screens */
+  .screen { display:none; }
+  .screen.active { display:block; }
+
+  #map { height:460px; border-radius:12px; overflow:hidden; }
+
+  .eventItem { background:#fff; border:1px solid #eee; border-radius:12px; padding:14px; margin:10px 16px; cursor:pointer; }
+  .eventItem:hover { border-color:#ddd; }
+
+  .topItem{ background:#fff;border:1px solid #eee;border-radius:12px;padding:12px;margin:10px 0;cursor:pointer; }
+  .topItem:hover{ border-color:#ddd; }
+  .topMeta{ font-size:12px;color:#666;margin-top:4px; }
+
+  .eventItem small { display:block; color:#666; margin-top:6px; }
+
+  .titleRow { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+  .barWrap{ margin:10px 0 14px; }
+  .barRow{ display:flex; align-items:center; gap:10px; margin:8px 0; }
+  .barLabel{ width:170px; font-size:14px; }
+  .barOuter{ flex:1; background:#eee; border-radius:999px; overflow:hidden; height:14px; }
+  .barInner{ height:100%; width:0%; background:#111; }
+  .barValue{ width:170px; text-align:right; font-size:13px; color:#333; }
+
+  .bars-large .barOuter{ height:18px; }
+  .bars-large .barLabel{ font-weight:600; }
+  .bars-medium .barOuter{ height:14px; }
+  .bars-small .barOuter{ height:10px; opacity:0.9; }
+  .bars-small .barLabel{ font-size:13px; }
+  .bars-small .barValue{ font-size:12px; }
+
+  /* Answer colors */
+  .barYes .barInner{ background:#2e7d32; }     /* green */
+  .barNo .barInner{ background:#c62828; }      /* red */
+  .barNeutral .barInner{ background:#6d6d6d; } /* gray */
+
+  /* Width groups for stats sections */
+  .stats-wide{ max-width:100%; }
+  .stats-medium{ max-width:85%; }
+  .stats-narrow{ max-width:70%; }
+  @media (max-width:700px){#miniMap{height:100px;}}
+
+
+
+  .backInline { padding:8px 12px; border-radius:10px; background:#eee; }
+
+  @media (max-width: 700px){
+    input{ min-width:180px; }
+  }
 </style>
 </head>
+
 <body>
-<div id="app">
-  <h1>People Can Vote <span class="badge">diag v5</span></h1>
-  <p>Aplikace se spustila (diagnostická verze pro ověření nahrávání).</p>
-  <p><b>Verze:</b> 2026-02-01T14:45Z</p>
+<div id="bootStatus" style="position:fixed;left:10px;bottom:10px;z-index:99999;background:#111;color:#fff;padding:6px 10px;border-radius:10px;font:12px/1.2 system-ui, sans-serif;opacity:.85">Booting…</div>
+
+<header>
+  <div class="wrap nav">
+    <div class="nav-left">
+      <div class="brand">
+        <h1>People can a Vote</h1>
+        <div class="muted">Global view of opinions from around the world</div>
+      </div>
+      <button class="ghost" id="homeBtn">Home</button>
+    </div>
+
+    <div class="nav-right">
+      <div class="searchWrap">
+        <input id="search" placeholder="Search country or event…" autocomplete="off" />
+        <div id="searchSuggest"></div>
+      </div>
+
+      <span class="pill" id="selectedCountryPill">Country: (all)</span>
+      <span class="pill" id="selectedContinentPill">Continent: All</span>
+    
+      <span class="pill" id="authPill">Not signed in</span>
+      <button class="ghost" id="loginToggleBtn">Log in</button>
+      <button class="ghost" id="registerNavBtn">Register</button>
+      <button class="ghost" id="logoutBtn" style="display:none;">Log out</button>
+
+      <select id="langSelect" style="padding:8px 10px;border-radius:10px;border:1px solid #ddd;">
+        <option value="en">EN</option>
+        <option value="cs">CS</option>
+        <option value="es">ES</option>
+        <option value="fr">FR</option>
+        <option value="de">DE</option>
+        <option value="ar">AR</option>
+        <option value="ru">RU</option>
+        <option value="zh">ZH</option>
+      </select>
 </div>
-<div id="boot">Init: starting…</div>
+  </div>
+</header>
 
+<!-- LOGIN PANEL (inline dropdown) -->
+<div class="wrap" id="loginPanelWrap" style="padding:0 16px; display:none;">
+  <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:12px 12px; margin-top:10px;">
+    <div class="row" style="justify-content:space-between;">
+      <strong>Log in</strong>
+      <button class="ghost" id="loginCloseBtn" style="padding:6px 10px;">Close</button>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <input id="loginEmail" type="email" placeholder="Email" style="min-width:240px;">
+      <input id="loginPassword" type="password" placeholder="Password" style="min-width:200px;">
+      <button class="primary" id="loginBtn">Log in</button>
+    </div>
+    <div id="loginError" style="color:#b00020; margin-top:10px;"></div>
+    <div class="muted" style="margin-top:10px; font-size:12px;">
+      New here? Click <strong>Register</strong> in the top bar.
+    </div>
+  </div>
+</div>
+
+
+</header>
+
+<div class="wrap" id="continentsBarWrap">
+  <div id="continentsBar">
+    <button class="ghost" data-cont="ALL">🌍 All</button>
+    <button class="ghost" data-cont="Europe">Europe</button>
+    <button class="ghost" data-cont="Asia">Asia</button>
+    <button class="ghost" data-cont="Africa">Africa</button>
+    <button class="ghost" data-cont="North America">North America</button>
+    <button class="ghost" data-cont="South America">South America</button>
+    <button class="ghost" data-cont="Oceania">Oceania</button>
+  </div>
+</div>
+
+<div class="wrap" id="continentCountriesWrap" style="padding:0 16px 10px 16px; display:none;">
+  <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:10px 12px;">
+    <div class="row" style="justify-content:space-between;">
+      <div>
+        <strong id="continentCountriesTitle">Countries</strong>
+        <div class="muted" id="continentCountriesSub" style="margin-top:2px;font-size:12px;">Pick a country to see events.</div>
+      </div>
+      <button class="ghost" id="hideCountriesBtn" style="padding:6px 10px;">Hide</button>
+    </div>
+    <div id="continentCountriesList" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;"></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- HOME -->
+  <section id="screenHome" class="screen active">
+    <section class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <h3 style="margin:0 0 6px 0;">Top 3 events</h3>
+          <div class="muted">Most voted events right now</div>
+        </div>
+        <button class="ghost" id="refreshTopBtn">Refresh</button>
+      </div>
+      <div id="top3Box" class="muted" style="margin-top:12px;">Loading…</div>
+    </section>
+
+    <section class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <h3 style="margin:0 0 6px 0;">Map</h3>
+          <div class="muted">Click a country to see its events. Or use search.</div>
+        </div>
+        <button class="ghost" id="clearCountryBtn">Clear country</button>
+      </div>
+      <div id="map" style="margin-top:12px;"></div>
+    </section>
+  </section>
+
+  <!-- COUNTRY -->
+  <section id="screenCountry" class="screen">
+    <section class="card">
+      <div class="titleRow">
+        <button class="backInline" id="backFromCountry">← Back</button>
+        <h2 id="countryTitle" style="margin:0;">Events</h2>
+      </div>
+      <div class="muted" id="countrySubtitle" style="margin-top:8px;"></div>
+    </section>
+    <div id="eventsList"></div>
+  </section>
+
+  <!-- EVENT -->
+  <section id="screenEvent" class="screen">
+    <section class="card">
+      <div class="titleRow">
+        <button class="backInline" id="backFromEvent">← Back</button>
+        <h2 id="eventTitle" style="margin:0; display:inline;">—</h2>
+        <span id="eventLangBadge" style="margin-left:10px;"></span>
+        <div style="margin-left:auto; width:180px;">
+          <div id="miniMap" style="width:100%;height:120px;border-radius:10px;overflow:hidden;border:1px solid #eee;"></div>
+        </div>
+      </div>
+      <div class="muted" id="eventMeta" style="margin-top:8px;"></div>
+      <div id="eventDesc" style="margin-top:12px; white-space:pre-wrap;"></div>
+    </section>
+
+    
+<section class="card">
+  <h3 style="margin:0 0 10px 0;">Vote</h3>
+  <div id="voteArea">
+    <div class="row" id="voteButtonsRow" style="margin-top:6px;">
+      <button class="primary" id="voteYesBtn">Yes</button>
+      <button class="primary" id="voteNoBtn">No</button>
+      <button class="primary" id="voteNeutralBtn">No opinion</button>
+    </div>
+    <div id="voteMsg" class="muted" style="margin-top:10px;"></div>
+  </div>
+</section>
+
+<section class="card">
+  <h3 style="margin:0 0 10px 0;">Statistics</h3>
+  <div id="statsBox" class="muted">Loading…</div>
+</section>
+</section>
+
+
+  
+  <!-- REGISTER -->
+  <section id="screenRegister" class="screen">
+    <section class="card">
+      <div class="titleRow">
+        <button class="backInline" id="backFromRegister">← Back</button>
+        <h2 style="margin:0;">Create account</h2>
+      </div>
+      <div class="muted" style="margin-top:8px;">
+        We’ll send you a verification email. After confirming, you’ll be redirected back here.
+      </div>
+
+      <div class="row" style="margin-top:14px;">
+        <input id="regEmail" type="email" placeholder="Email" style="min-width:280px;">
+        <input id="regPassword" type="password" placeholder="Password" style="min-width:220px;">
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <select id="regCountry" style="min-width:280px;">
+          <option value="">Select your country</option>
+        </select>
+        <select id="regLanguage" style="min-width:220px;">
+          <option value="en">English</option>
+          <option value="cs">Čeština</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="ar">العربية</option>
+          <option value="ru">Русский</option>
+          <option value="zh">中文</option>
+        </select>
+      </div>
+
+      <div class="row" style="margin-top:12px;">
+        <button class="primary" id="regSubmitBtn">Register</button>
+        <button class="ghost" id="regCancelBtn">Cancel</button>
+      </div>
+
+      <div id="regError" style="color:#b00020; margin-top:10px;"></div>
+      <div class="muted" style="margin-top:10px; font-size:12px;">
+        Tip: use a real email — verification is required before voting.
+      </div>
+    </section>
+  </section>
+
+  <!-- VERIFIED -->
+  <section id="screenVerified" class="screen">
+    <section class="card">
+      <h2 style="margin:0;">Your account was verified ✅</h2>
+      <div class="muted" style="margin-top:8px;">
+        You can now vote. We’ll take you back to the home page automatically.
+      </div>
+      <div class="row" style="margin-top:14px;">
+        <button class="primary" id="verifiedGoHomeBtn">Go to Home</button>
+      </div>
+    </section>
+  </section>
+
+
+</div>
 <script>
-/**
- * Guard proti dvojitému vložení (když se soubor omylem zduplikuje / concat).
- * Když se skript načte podruhé, jen to zaloguje a neprovádí init.
- */
-if (window.__PCV_DIAG_INIT_DONE__) {
-  console.warn("PCV: init already done – duplicate HTML/script detected.");
-  // Zkusíme aspoň nastavit boot text, ať je vidět, že došlo k duplicitě.
-  const b = document.getElementById("boot");
-  if (b) b.textContent = "Init: duplicate page/script detected (upload concatenated)";
-} else {
-  window.__PCV_DIAG_INIT_DONE__ = true;
+(function(){
+  const bootEl = document.getElementById('bootStatus');
+  const setBoot = (msg) => { try{ if(bootEl) bootEl.textContent = msg; }catch(e){} };
+  setBoot('Booting… (JS running)');
 
-  function boot(msg) {
-    const el = document.getElementById("boot");
-    if (el) el.textContent = msg;
-    console.log(msg);
+  window.addEventListener('error', (e) => {
+    try{ setBoot('JS error: ' + (e?.message || 'unknown')); }catch(_){}
+    console.error(e);
+  });
+
+  window.addEventListener('unhandledrejection', (e) => {
+    try{ setBoot('Promise error: ' + (e?.reason?.message || e?.reason || 'unknown')); }catch(_){}
+    console.error(e);
+  });
+
+  window.__setBoot = setBoot;
+})();
+
+/* ===== Robust library loader (prevents hanging on Booting) ===== */
+(function(){
+  const LOADED = new Set();
+
+  function loadScriptOnce(url, timeoutMs){
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[data-pcv-src="'+url+'"]');
+      if (existing) return resolve();
+      const s = document.createElement('script');
+      s.src = url;
+      s.async = true;
+      s.defer = true;
+      s.setAttribute('data-pcv-src', url);
+      let t = setTimeout(() => {
+        s.onerror = null; s.onload = null;
+        reject(new Error('script timeout: ' + url));
+      }, timeoutMs || 12000);
+      s.onload = () => { clearTimeout(t); resolve(); };
+      s.onerror = () => { clearTimeout(t); reject(new Error('script load failed: ' + url)); };
+      document.head.appendChild(s);
+    });
   }
 
-  // ==== STUB FUNKCE (aby se JS nikdy nezasekl) ====
-  function setContinentPill() {}
-  function renderContinentsBar() {}
-  function renderCountriesForContinent() {}
-
-  // ==== INIT ====
-  (async function init() {
-    try {
-      boot("Init: JS running (diag v5)");
-      await new Promise(r => setTimeout(r, 250));
-      boot("Init: ready (diag v5)");
-    } catch (e) {
-      boot("Startup error: " + (e && e.message ? e.message : String(e)));
-      console.error(e);
+  async function loadWithFallbacks(name, urls, timeoutMs){
+    if (LOADED.has(name)) return;
+    let lastErr = null;
+    for (const u of urls){
+      try{
+        window.__setBoot && window.__setBoot('Init: loading ' + name + '…');
+        await loadScriptOnce(u, timeoutMs);
+        LOADED.add(name);
+        return;
+      }catch(e){ lastErr = e; }
     }
-  })();
+    throw lastErr || new Error('failed to load ' + name);
+  }
+
+  window.__pcvEnsureSupabase = async function(){
+    if (window.supabase && window.supabase.createClient) return;
+    await loadWithFallbacks('Supabase', [
+      'https://unpkg.com/@supabase/supabase-js@2',
+      'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+    ], 15000);
+    if (!window.supabase || !window.supabase.createClient) {
+      throw new Error('Supabase loaded but global not found');
+    }
+  };
+
+  window.__pcvEnsureTurf = async function(){
+    if (window.turf) return;
+    await loadWithFallbacks('Turf', [
+      'https://unpkg.com/@turf/turf@6/turf.min.js',
+      'https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js'
+    ], 15000);
+  };
+
+  window.__pcvEnsureMapbox = async function(){
+    if (window.mapboxgl) return;
+    await loadWithFallbacks('Mapbox', [
+      'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'
+    ], 15000);
+  };
+})();
+
+
+/* ===== i18n bootstrap (must be defined before anything calls t()) ===== */
+var I18N = (typeof I18N !== "undefined" && I18N) ? I18N : { en: {
+    top: "TOP",
+    active_events: "Active events",
+    ended_events: "Ended events",
+    event_closed: "Voting closed",
+    ends_on: "Ends on {date}",
+    ended_on: "Ended on {date}",} };
+var currentLang = (typeof currentLang !== "undefined" && currentLang) ? currentLang : "en";
+function t(key, vars){
+  if (!vars) vars = {};
+  if (!currentLang) currentLang = "en";
+  var dict = (I18N && I18N[currentLang]) ? I18N[currentLang] : (I18N ? I18N.en : {});
+  var s = (dict && dict[key] != null) ? dict[key] : ((I18N && I18N.en && I18N.en[key] != null) ? I18N.en[key] : key);
+  for (var k in vars){
+    if (Object.prototype.hasOwnProperty.call(vars, k)){
+      s = s.split("{" + k + "}").join(String(vars[k]));
+    }
+  }
+  return s;
 }
+/* ===== end i18n bootstrap ===== */
+
+// Persist language choice across refresh
+function getStoredLang(){
+  try{ return localStorage.getItem('pcav_lang') || ''; }catch(e){ return ''; }
+}
+function setStoredLang(lang){
+  try{ localStorage.setItem('pcav_lang', lang); }catch(e){}
+}
+
+
+/* ================== CONFIG ================== */
+/* ================== CONFIG ================== */
+const SUPABASE_URL = "https://jqoomnhpyuikbntnrukw.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h";
+const MAPBOX_ACCESS_TOKEN = "pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ";
+
+/** Supabase client is initialized after the Supabase library is loaded. */
+let supabaseClient = null;
+/* ================== STATE ================== */
+let continentsById = {};   // {id: name}
+let countries = [];        // [{code,name,continent_id,continent_name}]
+let countriesByCode = {};  // { "US": {...} }
+let eventsCache = [];
+// Translations cache: { [eventId]: { [lang]: { title, description } } }
+let eventTranslations = {};
+// Track which (eventId, lang) pairs were already checked/loaded to avoid repeated queries
+let translationLoaded = new Set();
+
+      // active events for search [{id,title,description,country_code}]
+let selectedContinent = "ALL";
+let selectedCountryCode = "";
+let selectedCountryName = "";
+let currentEventId = null;
+let currentEventCountryCode = null;
+let currentEventEndsAt = null;
+
+/* ================== MINI MAP ================== */
+let miniMap = null;
+let miniMapLoaded = false;
+
+async function initMiniMap(){
+  try{
+    await window.__pcvEnsureMapbox();
+    if (window.mapboxgl && MAPBOX_ACCESS_TOKEN) window.mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
+  }catch(e){
+    console.warn("MiniMap unavailable:", e);
+    return;
+  }
+  if (miniMapLoaded) return;
+  miniMapLoaded = true;
+
+  miniMap = new mapboxgl.Map({
+    container: "miniMap",
+    style: "mapbox://styles/mapbox/light-v11",
+    center: [10, 20],
+    zoom: 1.3,
+    interactive: false
+  });
+
+  miniMap.on("load", () => {
+    // Use Mapbox's country boundaries vector tiles (no need for per-country GeoJSON in DB)
+    miniMap.addSource("miniCountryBoundaries", {
+      type:"vector",
+      url:"mapbox://mapbox.country-boundaries-v1"
+    });
+
+    // very light base layer for context
+    miniMap.addLayer({
+      id: "mini-country-base",
+      type: "fill",
+      source: "miniCountryBoundaries",
+      "source-layer": "country_boundaries",
+      paint: { "fill-color":"#000", "fill-opacity": 0.04 }
+    });
+
+    // selected country highlight
+    miniMap.addLayer({
+      id: "mini-country-selected",
+      type: "fill",
+      source: "miniCountryBoundaries",
+      "source-layer": "country_boundaries",
+      paint: { "fill-color":"#111", "fill-opacity": 0.20 },
+      filter: ["==", ["get","iso_3166_1"], "ZZ"]
+    });
+
+    // outline for selected
+    miniMap.addLayer({
+      id: "mini-country-outline",
+      type: "line",
+      source: "miniCountryBoundaries",
+      "source-layer": "country_boundaries",
+      paint: { "line-color":"#111", "line-width": 1.5, "line-opacity": 0.70 },
+      filter: ["==", ["get","iso_3166_1"], "ZZ"]
+    });
+  });
+}
+
+async function updateMiniMap(countryCode){
+  initMiniMap().catch(()=>{});
+  if (!miniMap) return;
+
+  if (!miniMap.isStyleLoaded()){
+    await new Promise(resolve => miniMap.once("load", resolve));
+  }
+
+  const iso = (countryCode || "ZZ").toUpperCase();
+
+  try{
+    miniMap.setFilter("mini-country-selected", ["==", ["get","iso_3166_1"], iso]);
+    miniMap.setFilter("mini-country-outline", ["==", ["get","iso_3166_1"], iso]);
+  }catch(e){}
+
+  // Zoom roughly to continent of the country for better framing (fast + stable)
+  const cont = continentOfCountry(iso);
+  const b = CONTINENT_BOUNDS[cont];
+  if (b){
+    try{ miniMap.fitBounds(b, { padding: 22, duration: 0 }); }catch(e){}
+  }else{
+    try{ miniMap.easeTo({ center:[10,20], zoom:1.3, duration: 0 }); }catch(e){}
+  }
+}
+
+
+/* ================== AUTH (Supabase) ================== */
+let currentSession = null;   // session
+let currentUser = null;      // supabase user
+let isAdmin = false;   // admin
+
+const authPill = document.getElementById("authPill");
+const loginToggleBtn = document.getElementById("loginToggleBtn");
+const registerNavBtn = document.getElementById("registerNavBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+
+const loginPanelWrap = document.getElementById("loginPanelWrap");
+const loginCloseBtn = document.getElementById("loginCloseBtn");
+const loginBtn = document.getElementById("loginBtn");
+const loginEmail = document.getElementById("loginEmail");
+const loginPassword = document.getElementById("loginPassword");
+const loginError = document.getElementById("loginError");
+
+const screenRegister = document.getElementById("screenRegister");
+const screenVerified = document.getElementById("screenVerified");
+const backFromRegister = document.getElementById("backFromRegister");
+const regCancelBtn = document.getElementById("regCancelBtn");
+const regSubmitBtn = document.getElementById("regSubmitBtn");
+const regEmail = document.getElementById("regEmail");
+const regPassword = document.getElementById("regPassword");
+const regCountry = document.getElementById("regCountry");
+const regLanguage = document.getElementById("regLanguage");
+const regError = document.getElementById("regError");
+const verifiedGoHomeBtn = document.getElementById("verifiedGoHomeBtn");
+
+function safeHideSuggest(){
+  try{ if (typeof hideSuggest === "function") hideSuggest(); }catch(e){}
+}
+
+function setAuthUI(){
+  if (!currentUser){
+    authPill.textContent = t("not_signed_in");
+    loginToggleBtn.style.display = "inline-block";
+    registerNavBtn.style.display = "inline-block";
+    logoutBtn.style.display = "none";
+  } else {
+    authPill.textContent = t("signed_in_as", { email: currentUser.email });
+    loginToggleBtn.style.display = "none";
+    registerNavBtn.style.display = "none";
+    logoutBtn.style.display = "inline-block";
+    loginPanelWrap.style.display = "none";
+    loginError.textContent = "";
+  }
+}
+
+function openRegister(){
+  loginPanelWrap.style.display = "none";
+  safeHideSuggest();
+  showScreen("REGISTER");
+}
+
+
+
+let map;
+
+/* ================== Helpers ================== */
+function escapeHtml(s){
+  return (s||"").toString()
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;");
+}
+
+// ================== Event translations ==================
+
+async function loadEventTranslations(eventIds, langs){
+  if (!eventIds || !eventIds.length) return;
+  if (!langs || !langs.length) return;
+
+  // Only request translations we haven't checked yet
+  const ids = Array.from(new Set(eventIds)).filter(id => id != null);
+  const langsUnique = Array.from(new Set(langs)).filter(Boolean);
+
+  const needIds = [];
+  for (const id of ids){
+    if (!eventTranslations[id]) eventTranslations[id] = {};
+    let needsAny = false;
+    for (const lang of langsUnique){
+      const key = `${id}:${lang}`;
+      if (!translationLoaded.has(key)){
+        needsAny = true;
+      }
+    }
+    if (needsAny) needIds.push(id);
+  }
+
+  if (!needIds.length) return;
+
+  const { data, error } = await supabaseClient
+    .from("event_translations")
+    .select("event_id, lang, title, description")
+    .in("event_id", needIds)
+    .in("lang", langsUnique);
+
+  if (error){
+    console.warn("loadEventTranslations error:", error);
+    return;
+  }
+
+  // Mark all requested pairs as checked (even if missing in DB)
+  for (const id of needIds){
+    for (const lang of langsUnique){
+      translationLoaded.add(`${id}:${lang}`);
+      // initialize as null marker if not present; helps avoid re-fetch loops
+      if (eventTranslations[id][lang] === undefined) eventTranslations[id][lang] = null;
+    }
+  }
+
+  for (const row of (data || [])){
+    const id = row.event_id;
+    if (!eventTranslations[id]) eventTranslations[id] = {};
+    eventTranslations[id][row.lang] = {
+      title: row.title || "",
+      description: row.description || ""
+    };
+  }
+}
+
+function getEventText(evt, field){
+  const id = evt?.id;
+  if (!id) return (evt?.[field] || "");
+
+  const pack = eventTranslations[id] || {};
+  const curObj = pack[currentLang];
+  const cur = (curObj && curObj[field]) ? curObj[field] : "";
+  if (cur) return cur;
+
+  const enObj = pack["en"];
+  const en = (enObj && enObj[field]) ? enObj[field] : "";
+  if (en) return en;
+
+  return (evt?.[field] || "");
+}
+
+function getEventTextSource(evt, field){
+  // returns: "cur" | "en" | "orig"
+  const id = evt?.id;
+  if (!id) return "orig";
+
+  const pack = eventTranslations[id] || {};
+  const curObj = pack[currentLang];
+  const cur = (curObj && curObj[field]) ? curObj[field] : "";
+  if (cur) return "cur";
+
+  const enObj = pack["en"];
+  const en = (enObj && enObj[field]) ? enObj[field] : "";
+  if (en) return "en";
+
+  return "orig";
+}
+
+function fallbackBadgeHTML(evt){
+  // If current language is EN, no need to show fallback badge.
+  if ((currentLang || "en") === "en") return "";
+
+  const srcTitle = getEventTextSource(evt, "title");
+  const srcDesc  = getEventTextSource(evt, "description");
+  const src = (srcTitle === "cur" || srcDesc === "cur") ? "cur" : (srcTitle === "en" || srcDesc === "en") ? "en" : "orig";
+
+  if (src === "cur") return "";
+  if (src === "en") return `<span class="pill" style="background:#fff7e6;border-color:#ffe0b2;">EN</span>`;
+  return `<span class="pill" style="background:#f5f5f5;border-color:#e0e0e0;">ORIG</span>`;
+}
+function norm(s){
+  return (s||"").toString().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+}
+
+
+/* ================== i18n ================== */
+I18N = {
+  en: {
+    brand_sub: "Global view of opinions from around the world",
+    home: "Home",
+    map_title: "Map",
+    map_sub: "Click a country to see its events. Or use search.",
+    clear_country: "Clear country",
+    top3_title: "Top 3 events",
+    top3_sub: "Most voted events right now",
+    refresh: "Refresh",
+    search_ph: "Search country or event…",
+    country_pill_all: "Country: (all)",
+    continent_pill_all: "Continent: All",
+    not_signed_in: "Not signed in",
+    signed_in_as: "Signed in as: {email}",
+    login: "Log in",
+    logout: "Log out",
+    register: "Register",
+    login_title: "Log in",
+    close: "Close",
+    email: "Email",
+    password: "Password",
+    register_title: "Create account",
+    register_sub: "We’ll send you a verification email. After confirming, you’ll be redirected back here.",
+    select_country: "Select your country",
+    cancel: "Cancel",
+    verified_title: "Your account was verified ✅",
+    verified_sub: "You can now vote. We’ll take you back to the home page automatically.",
+    go_home: "Go to Home",
+    back: "← Back",
+    events: "Events",
+    loading: "Loading…",
+    no_events: "No events for this country yet.",
+    vote_title: "Vote",
+    vote_yes: "Yes",
+    vote_no: "No",
+    vote_neutral: "No opinion",
+    vote_need_login: "Please log in to vote.",
+    vote_need_verify: "Please verify your email to vote.",
+    voted_already: "You already voted on this event.",
+    voted_saved: "Vote saved ✅",
+    stats_title: "Statistics",
+    stats_total_votes: "Total votes:",
+    citizens_of: "Citizens of {country} ({code})",
+    other_countries: "Other countries",
+    location: "Location",
+    countries_in: "Countries in {continent}",
+    selected_country: "Selected country",
+    found_countries: "Found: {n}. Click a country to see its events.",
+    pick_country_sub: "Pick a country to see events.",
+    back_to_countries: "Click back to choose another country in {continent}.",
+  },
+  cs: {
+    brand_sub: "Globální pohled na názory lidí z celého světa",
+    home: "Domů",
+    map_title: "Mapa",
+    map_sub: "Klikni na zemi a zobraz události. Nebo použij vyhledávání.",
+    clear_country: "Zrušit zemi",
+    top3_title: "TOP 3 události",
+    top3_sub: "Nejvíc hlasované události",
+    refresh: "Obnovit",
+    search_ph: "Hledej zemi nebo událost…",
+    country_pill_all: "Země: (vše)",
+    continent_pill_all: "Kontinent: Vše",
+    not_signed_in: "Nepřihlášen",
+    signed_in_as: "Přihlášen jako: {email}",
+    login: "Přihlásit",
+    logout: "Odhlásit",
+    register: "Registrace",
+    login_title: "Přihlášení",
+    close: "Zavřít",
+    email: "Email",
+    password: "Heslo",
+    register_title: "Vytvořit účet",
+    register_sub: "Pošleme ti ověřovací email. Po potvrzení se vrátíš zpět na web.",
+    select_country: "Vyber svou zemi",
+    cancel: "Zrušit",
+    verified_title: "Účet byl ověřen ✅",
+    verified_sub: "Teď můžeš hlasovat. Za chvíli tě vrátíme na hlavní stránku.",
+    go_home: "Domů",
+    back: "← Zpět",
+    events: "Události",
+    loading: "Načítám…",
+    no_events: "Pro tuto zemi zatím nejsou události.",
+    vote_title: "Hlasování",
+    vote_yes: "Ano",
+    vote_no: "Ne",
+    vote_neutral: "Nemám názor",
+    vote_need_login: "Pro hlasování se prosím přihlas.",
+    vote_need_verify: "Nejdřív ověř email, abys mohl hlasovat.",
+    voted_already: "Pro tuto událost jste již hlasoval.",
+    voted_saved: "Hlas byl uložen ✅",
+    stats_title: "Statistiky",
+    stats_total_votes: "Celkem hlasů:",
+    citizens_of: "Občané {country} ({code})",
+    other_countries: "Ostatní státy",
+    location: "Lokace",
+    countries_in: "Země v kontinentu {continent}",
+    selected_country: "Vybraná země",
+    found_countries: "Nalezeno: {n}. Klikni na zemi pro události.",
+    pick_country_sub: "Vyber zemi pro zobrazení událostí.",
+    back_to_countries: "Klikni na zpět pro výběr jiné země v {continent}.",
+  
+    top: "TOP",
+    active_events: "Aktivní události",
+    ended_events: "Skončené události",
+    event_closed: "Hlasování ukončeno",
+    ends_on: "Končí {date}",
+    ended_on: "Skončilo {date}",
+  },
+  es: {
+    brand_sub: "Visión global de opiniones de todo el mundo",
+    home: "Inicio",
+    map_title: "Mapa",
+    map_sub: "Haz clic en un país para ver sus eventos. O usa la búsqueda.",
+    clear_country: "Quitar país",
+    top3_title: "Top 3 eventos",
+    top3_sub: "Eventos con más votos",
+    refresh: "Actualizar",
+    search_ph: "Buscar país o evento…",
+    country_pill_all: "País: (todos)",
+    continent_pill_all: "Continente: Todos",
+    not_signed_in: "Sin sesión",
+    signed_in_as: "Conectado como: {email}",
+    login: "Iniciar sesión",
+    logout: "Cerrar sesión",
+    register: "Registrarse",
+    login_title: "Iniciar sesión",
+    close: "Cerrar",
+    email: "Email",
+    password: "Contraseña",
+    register_title: "Crear cuenta",
+    register_sub: "Te enviaremos un email de verificación. Tras confirmar, volverás aquí.",
+    select_country: "Selecciona tu país",
+    cancel: "Cancelar",
+    verified_title: "Cuenta verificada ✅",
+    verified_sub: "Ya puedes votar. Volveremos a Inicio automáticamente.",
+    go_home: "Ir a Inicio",
+    back: "← Atrás",
+    events: "Eventos",
+    loading: "Cargando…",
+    no_events: "Aún no hay eventos para este país.",
+    vote_title: "Votar",
+    vote_yes: "Sí",
+    vote_no: "No",
+    vote_neutral: "Sin opinión",
+    vote_need_login: "Inicia sesión para votar.",
+    vote_need_verify: "Verifica tu email para votar.",
+    voted_already: "Ya votaste en este evento.",
+    voted_saved: "Voto guardado ✅",
+    stats_title: "Estadísticas",
+    stats_total_votes: "Votos totales:",
+    citizens_of: "Ciudadanos de {country} ({code})",
+    other_countries: "Otros países",
+    location: "Ubicación",
+    countries_in: "Países en {continent}",
+    selected_country: "País seleccionado",
+    found_countries: "Encontrados: {n}. Haz clic en un país.",
+    pick_country_sub: "Elige un país para ver eventos.",
+    back_to_countries: "Pulsa atrás para elegir otro país en {continent}."
+  },
+  fr: {
+    brand_sub: "Vue globale des opinions du monde entier",
+    home: "Accueil",
+    map_title: "Carte",
+    map_sub: "Cliquez sur un pays pour voir ses événements, ou utilisez la recherche.",
+    clear_country: "Effacer le pays",
+    top3_title: "Top 3 événements",
+    top3_sub: "Événements les plus votés",
+    refresh: "Rafraîchir",
+    search_ph: "Rechercher un pays ou un événement…",
+    country_pill_all: "Pays : (tous)",
+    continent_pill_all: "Continent : Tous",
+    not_signed_in: "Non connecté",
+    signed_in_as: "Connecté : {email}",
+    login: "Connexion",
+    logout: "Déconnexion",
+    register: "Inscription",
+    login_title: "Connexion",
+    close: "Fermer",
+    email: "Email",
+    password: "Mot de passe",
+    register_title: "Créer un compte",
+    register_sub: "Nous enverrons un email de vérification. Après confirmation, vous reviendrez ici.",
+    select_country: "Choisissez votre pays",
+    cancel: "Annuler",
+    verified_title: "Compte vérifié ✅",
+    verified_sub: "Vous pouvez voter. Retour à l’accueil automatiquement.",
+    go_home: "Aller à l’accueil",
+    back: "← Retour",
+    events: "Événements",
+    loading: "Chargement…",
+    no_events: "Aucun événement pour ce pays.",
+    vote_title: "Voter",
+    vote_yes: "Oui",
+    vote_no: "Non",
+    vote_neutral: "Sans avis",
+    vote_need_login: "Connectez‑vous pour voter.",
+    vote_need_verify: "Vérifiez votre email pour voter.",
+    voted_already: "Vous avez déjà voté.",
+    voted_saved: "Vote enregistré ✅",
+    stats_title: "Statistiques",
+    stats_total_votes: "Total des votes :",
+    citizens_of: "Citoyens de {country} ({code})",
+    other_countries: "Autres pays",
+    location: "Lieu",
+    countries_in: "Pays en {continent}",
+    selected_country: "Pays sélectionné",
+    found_countries: "Trouvés : {n}. Cliquez sur un pays.",
+    pick_country_sub: "Choisissez un pays pour voir les événements.",
+    back_to_countries: "Retour pour choisir un autre pays en {continent}."
+  },
+  de: {
+    brand_sub: "Globale Sicht auf Meinungen aus aller Welt",
+    home: "Start",
+    map_title: "Karte",
+    map_sub: "Klicke auf ein Land, um Ereignisse zu sehen – oder nutze die Suche.",
+    clear_country: "Land löschen",
+    top3_title: "Top 3 Ereignisse",
+    top3_sub: "Meistgewählte Ereignisse",
+    refresh: "Aktualisieren",
+    search_ph: "Land oder Ereignis suchen…",
+    country_pill_all: "Land: (alle)",
+    continent_pill_all: "Kontinent: Alle",
+    not_signed_in: "Nicht angemeldet",
+    signed_in_as: "Angemeldet als: {email}",
+    login: "Anmelden",
+    logout: "Abmelden",
+    register: "Registrieren",
+    login_title: "Anmelden",
+    close: "Schließen",
+    email: "E‑Mail",
+    password: "Passwort",
+    register_title: "Konto erstellen",
+    register_sub: "Wir senden eine Bestätigungs‑E‑Mail. Danach wirst du zurückgeleitet.",
+    select_country: "Wähle dein Land",
+    cancel: "Abbrechen",
+    verified_title: "Konto bestätigt ✅",
+    verified_sub: "Du kannst jetzt abstimmen. Weiterleitung zur Startseite…",
+    go_home: "Zur Startseite",
+    back: "← Zurück",
+    events: "Ereignisse",
+    loading: "Lädt…",
+    no_events: "Noch keine Ereignisse für dieses Land.",
+    vote_title: "Abstimmen",
+    vote_yes: "Ja",
+    vote_no: "Nein",
+    vote_neutral: "Keine Meinung",
+    vote_need_login: "Bitte anmelden, um abzustimmen.",
+    vote_need_verify: "Bitte E‑Mail bestätigen, um abzustimmen.",
+    voted_already: "Du hast bereits abgestimmt.",
+    voted_saved: "Stimme gespeichert ✅",
+    stats_title: "Statistiken",
+    stats_total_votes: "Stimmen gesamt:",
+    citizens_of: "Bürger von {country} ({code})",
+    other_countries: "Andere Länder",
+    location: "Ort",
+    countries_in: "Länder in {continent}",
+    selected_country: "Ausgewähltes Land",
+    found_countries: "Gefunden: {n}. Klicke auf ein Land.",
+    pick_country_sub: "Wähle ein Land, um Ereignisse zu sehen.",
+    back_to_countries: "Zurück, um ein anderes Land in {continent} zu wählen."
+  },
+  ar: {
+    brand_sub: "نظرة عالمية على آراء الناس حول العالم",
+    home: "الرئيسية",
+    map_title: "الخريطة",
+    map_sub: "اضغط على دولة لرؤية الأحداث أو استخدم البحث.",
+    clear_country: "إزالة الدولة",
+    top3_title: "أفضل 3 أحداث",
+    top3_sub: "الأكثر تصويتًا الآن",
+    refresh: "تحديث",
+    search_ph: "ابحث عن دولة أو حدث…",
+    country_pill_all: "الدولة: (الكل)",
+    continent_pill_all: "القارة: الكل",
+    not_signed_in: "غير مسجّل",
+    signed_in_as: "مسجّل كـ: {email}",
+    login: "تسجيل الدخول",
+    logout: "تسجيل الخروج",
+    register: "إنشاء حساب",
+    login_title: "تسجيل الدخول",
+    close: "إغلاق",
+    email: "البريد",
+    password: "كلمة المرور",
+    register_title: "إنشاء حساب",
+    register_sub: "سنرسل رسالة تحقق. بعد التأكيد ستعود إلى هنا.",
+    select_country: "اختر دولتك",
+    cancel: "إلغاء",
+    verified_title: "تم التحقق من الحساب ✅",
+    verified_sub: "يمكنك التصويت الآن. سنعيدك للصفحة الرئيسية.",
+    go_home: "اذهب للرئيسية",
+    back: "← رجوع",
+    events: "الأحداث",
+    loading: "جارٍ التحميل…",
+    no_events: "لا توجد أحداث لهذه الدولة بعد.",
+    vote_title: "التصويت",
+    vote_yes: "نعم",
+    vote_no: "لا",
+    vote_neutral: "لا رأي",
+    vote_need_login: "سجّل الدخول للتصويت.",
+    vote_need_verify: "تحقق من بريدك للتصويت.",
+    voted_already: "لقد صوّتت بالفعل.",
+    voted_saved: "تم حفظ الصوت ✅",
+    stats_title: "الإحصائيات",
+    stats_total_votes: "إجمالي الأصوات:",
+    citizens_of: "مواطنو {country} ({code})",
+    other_countries: "دول أخرى",
+    location: "الموقع",
+    countries_in: "دول في {continent}",
+    selected_country: "الدولة المختارة",
+    found_countries: "تم العثور على {n}. اختر دولة.",
+    pick_country_sub: "اختر دولة لرؤية الأحداث.",
+    back_to_countries: "ارجع لاختيار دولة أخرى في {continent}."
+  },
+  ru: {
+    brand_sub: "Глобальный взгляд на мнения людей со всего мира",
+    home: "Главная",
+    map_title: "Карта",
+    map_sub: "Нажмите на страну, чтобы увидеть события, или используйте поиск.",
+    clear_country: "Сбросить страну",
+    top3_title: "Топ‑3 событий",
+    top3_sub: "Самые голосуемые сейчас",
+    refresh: "Обновить",
+    search_ph: "Искать страну или событие…",
+    country_pill_all: "Страна: (все)",
+    continent_pill_all: "Континент: Все",
+    not_signed_in: "Не вошли",
+    signed_in_as: "Вошли как: {email}",
+    login: "Войти",
+    logout: "Выйти",
+    register: "Регистрация",
+    login_title: "Вход",
+    close: "Закрыть",
+    email: "Email",
+    password: "Пароль",
+    register_title: "Создать аккаунт",
+    register_sub: "Мы отправим письмо для подтверждения. После подтверждения вы вернётесь сюда.",
+    select_country: "Выберите страну",
+    cancel: "Отмена",
+    verified_title: "Аккаунт подтверждён ✅",
+    verified_sub: "Теперь вы можете голосовать. Сейчас вернём на главную.",
+    go_home: "На главную",
+    back: "← Назад",
+    events: "События",
+    loading: "Загрузка…",
+    no_events: "Пока нет событий для этой страны.",
+    vote_title: "Голосование",
+    vote_yes: "Да",
+    vote_no: "Нет",
+    vote_neutral: "Нет мнения",
+    vote_need_login: "Войдите, чтобы голосовать.",
+    vote_need_verify: "Подтвердите email, чтобы голосовать.",
+    voted_already: "Вы уже голосовали.",
+    voted_saved: "Голос сохранён ✅",
+    stats_title: "Статистика",
+    stats_total_votes: "Всего голосов:",
+    citizens_of: "Граждане {country} ({code})",
+    other_countries: "Другие страны",
+    location: "Локация",
+    countries_in: "Страны в {continent}",
+    selected_country: "Выбрана страна",
+    found_countries: "Найдено: {n}. Нажмите на страну.",
+    pick_country_sub: "Выберите страну для событий.",
+    back_to_countries: "Назад, чтобы выбрать другую страну в {continent}."
+  },
+  zh: {
+    brand_sub: "来自世界各地的全球意见视图",
+    home: "主页",
+    map_title: "地图",
+    map_sub: "点击国家查看事件，或使用搜索。",
+    clear_country: "清除国家",
+    top3_title: "Top 3 事件",
+    top3_sub: "当前投票最多的事件",
+    refresh: "刷新",
+    search_ph: "搜索国家或事件…",
+    country_pill_all: "国家： (全部)",
+    continent_pill_all: "洲：全部",
+    not_signed_in: "未登录",
+    signed_in_as: "已登录：{email}",
+    login: "登录",
+    logout: "退出",
+    register: "注册",
+    login_title: "登录",
+    close: "关闭",
+    email: "邮箱",
+    password: "密码",
+    register_title: "创建账号",
+    register_sub: "我们会发送验证邮件。确认后会跳回此页面。",
+    select_country: "选择你的国家",
+    cancel: "取消",
+    verified_title: "账号已验证 ✅",
+    verified_sub: "现在可以投票。将自动返回主页。",
+    go_home: "返回主页",
+    back: "← 返回",
+    events: "事件",
+    loading: "加载中…",
+    no_events: "该国家暂无事件。",
+    vote_title: "投票",
+    vote_yes: "是",
+    vote_no: "否",
+    vote_neutral: "无意见",
+    vote_need_login: "请登录后投票。",
+    vote_need_verify: "请验证邮箱后投票。",
+    voted_already: "你已对此事件投票。",
+    voted_saved: "投票已保存 ✅",
+    stats_title: "统计",
+    stats_total_votes: "总票数：",
+    citizens_of: "{country}（{code}）公民",
+    other_countries: "其他国家",
+    location: "位置",
+    countries_in: "{continent} 的国家",
+    selected_country: "已选国家",
+    found_countries: "找到：{n}。点击国家查看。",
+    pick_country_sub: "选择国家查看事件。",
+    back_to_countries: "返回以选择 {continent} 的其他国家。"
+  }
+};
+
+
+
+
+function countriesForSearch(){
+  if (selectedContinent === "ALL") return countries;
+  return countries.filter(c => (c.continent_name || "") === selectedContinent);
+}
+function continentOfCountry(code){
+  return countriesByCode[code]?.continent_name || "";
+}
+function eventsForSearch(){
+  if (selectedContinent === "ALL") return eventsCache;
+  return eventsCache.filter(e => continentOfCountry(e.country_code) === selectedContinent);
+}
+
+/* ================== UI refs ================== */
+const screenHome = document.getElementById("screenHome");
+const screenCountry = document.getElementById("screenCountry");
+const screenEvent = document.getElementById("screenEvent");
+
+const selectedCountryPill = document.getElementById("selectedCountryPill");
+const selectedContinentPill = document.getElementById("selectedContinentPill");
+
+const continentsBar = document.getElementById("continentsBar");
+
+const searchInput = document.getElementById("search");
+const suggestBox = document.getElementById("searchSuggest");
+
+const countryTitle = document.getElementById("countryTitle");
+const countrySubtitle = document.getElementById("countrySubtitle");
+const eventsList = document.getElementById("eventsList");
+
+const eventTitle = document.getElementById("eventTitle");
+const eventMeta = document.getElementById("eventMeta");
+const eventDesc = document.getElementById("eventDesc");
+
+
+function applyI18n(){
+  // header
+  document.querySelector(".brand .muted").textContent = t("brand_sub");
+  document.getElementById("homeBtn").textContent = t("home");
+  document.getElementById("search").placeholder = t("search_ph");
+
+  // home
+  const mapTitle = document.querySelector("#screenHome h3");
+  if (mapTitle) mapTitle.textContent = t("map_title");
+  const mapSub = document.querySelector("#screenHome .muted");
+  if (mapSub) mapSub.textContent = t("map_sub");
+  const clearBtn = document.getElementById("clearCountryBtn");
+  if (clearBtn) clearBtn.textContent = t("clear_country");
+
+  // top3
+  const topTitle = document.querySelector("#top3Box")?.closest(".card")?.querySelector("h3");
+  if (topTitle) topTitle.textContent = t("top3_title");
+  const topSub = document.querySelector("#top3Box")?.closest(".card")?.querySelector(".muted");
+  if (topSub) topSub.textContent = t("top3_sub");
+  const refreshTop = document.getElementById("refreshTopBtn");
+  if (refreshTop) refreshTop.textContent = t("refresh");
+
+  // auth
+  document.getElementById("loginToggleBtn").textContent = t("login");
+  document.getElementById("registerNavBtn").textContent = t("register");
+  document.getElementById("logoutBtn").textContent = t("logout");
+
+  // login panel
+  const lpTitle = document.querySelector("#loginPanelWrap strong");
+  if (lpTitle) lpTitle.textContent = t("login_title");
+  document.getElementById("loginCloseBtn").textContent = t("close");
+  document.getElementById("loginEmail").placeholder = t("email");
+  document.getElementById("loginPassword").placeholder = t("password");
+  document.getElementById("loginBtn").textContent = t("login");
+
+  // register screen
+  const regH2 = document.querySelector("#screenRegister h2");
+  if (regH2) regH2.textContent = t("register_title");
+  const regSub = document.querySelector("#screenRegister .muted");
+  if (regSub) regSub.textContent = t("register_sub");
+  document.getElementById("regEmail").placeholder = t("email");
+  document.getElementById("regPassword").placeholder = t("password");
+  const regCountry = document.getElementById("regCountry");
+  if (regCountry && regCountry.options.length){
+    regCountry.options[0].textContent = t("select_country");
+  }
+  document.getElementById("regCancelBtn").textContent = t("cancel");
+  document.getElementById("regSubmitBtn").textContent = t("register");
+  document.getElementById("backFromRegister").textContent = t("back");
+
+  // verified
+  const vH2 = document.querySelector("#screenVerified h2");
+  if (vH2) vH2.textContent = t("verified_title");
+  const vSub = document.querySelector("#screenVerified .muted");
+  if (vSub) vSub.textContent = t("verified_sub");
+  document.getElementById("verifiedGoHomeBtn").textContent = t("go_home");
+
+  // country / event nav
+  document.getElementById("backFromCountry").textContent = t("back");
+  document.getElementById("backFromEvent").textContent = t("back");
+
+  // vote / stats
+  const voteH3 = document.querySelector("#screenEvent #voteArea")?.closest(".card")?.querySelector("h3");
+  if (voteH3) voteH3.textContent = t("vote_title");
+  document.getElementById("voteYesBtn").textContent = t("vote_yes");
+  document.getElementById("voteNoBtn").textContent = t("vote_no");
+  document.getElementById("voteNeutralBtn").textContent = t("vote_neutral");
+  const statsH3 = document.querySelector("#statsBox")?.closest(".card")?.querySelector("h3");
+  if (statsH3) statsH3.textContent = t("stats_title");
+
+  // minimap label
+  const locLabel = document.querySelector("#miniMap")?.parentElement?.querySelector(".muted");
+  if (locLabel) locLabel.textContent = t("location");
+
+  // pills (default text; actual value set by functions)
+  setContinentPill();
+  setCountryPill();
+
+  // auth pill refresh
+  setAuthUI();
+}
+
+
+/* ================== Voting UI refs ================== */
+const voteYesBtn = document.getElementById("voteYesBtn");
+const voteNoBtn = document.getElementById("voteNoBtn");
+const voteNeutralBtn = document.getElementById("voteNeutralBtn");
+const voteButtonsRow = document.getElementById("voteButtonsRow");
+const voteMsg = document.getElementById("voteMsg");
+const statsBox = document.getElementById("statsBox");
+
+const VOTE = { YES: "YES", NO: "NO", NEUTRAL: "NEUTRAL" };
+
+// Local fallback: if we know the user voted in this session, lock UI immediately
+const votedLocal = new Set();
+
+function pct(part, total){ return total ? Math.round((part/total)*100) : 0; }
+function barHTML(label, count, total){
+  const p = pct(count, total);
+  let cls = "barNeutral";
+  if (label === "Yes") cls = "barYes";
+  if (label === "No") cls = "barNo";
+
+  return `
+    <div class="barRow ${cls}">
+      <div class="barLabel">${escapeHtml(label)}</div>
+      <div class="barOuter"><div class="barInner" style="width:${p}%;"></div></div>
+      <div class="barValue">${count} (${p}%)</div>
+    </div>
+  `;
+}
+
+
+function isEmailVerified(){
+  return !!(currentUser && (currentUser.email_confirmed_at || currentUser.confirmed_at));
+}
+
+function setVoteUIState(state){
+  if (state === "NEED_LOGIN"){
+    voteButtonsRow.style.display = "none";
+    voteMsg.textContent = t("vote_need_login");
+    return;
+  }
+  if (state === "NEED_VERIFY"){
+    voteButtonsRow.style.display = "none";
+    voteMsg.textContent = t("vote_need_verify");
+    return;
+  }
+  if (state === "ALREADY_VOTED"){
+    voteButtonsRow.style.display = "none";
+    return;
+  }
+  voteButtonsRow.style.display = "flex";
+}
+
+async function refreshStats(eventId, eventCountryCode){
+  statsBox.textContent = "Loading…";
+
+  const { data, error } = await supabaseClient
+    .from("votes")
+    .select("vote,country_code")
+    .eq("event_id", eventId);
+
+  if (error){
+    console.error("refreshStats error:", error);
+    statsBox.textContent = "Cannot load statistics.";
+    return;
+  }
+
+  const rows = data || [];
+  const total = rows.length;
+
+  const yes = rows.filter(r => r.vote === VOTE.YES).length;
+  const no = rows.filter(r => r.vote === VOTE.NO).length;
+  const neutral = rows.filter(r => r.vote === VOTE.NEUTRAL).length;
+
+  const citizens = eventCountryCode ? rows.filter(r => r.country_code === eventCountryCode) : [];
+  const others = eventCountryCode ? rows.filter(r => r.country_code !== eventCountryCode) : rows;
+
+  const cTotal = citizens.length;
+  const oTotal = others.length;
+
+  const cYes = citizens.filter(r => r.vote === VOTE.YES).length;
+  const cNo = citizens.filter(r => r.vote === VOTE.NO).length;
+  const cNeutral = citizens.filter(r => r.vote === VOTE.NEUTRAL).length;
+
+  const oYes = others.filter(r => r.vote === VOTE.YES).length;
+  const oNo = others.filter(r => r.vote === VOTE.NO).length;
+  const oNeutral = others.filter(r => r.vote === VOTE.NEUTRAL).length;
+
+  const countryLabel = eventCountryCode ? (countriesByCode[eventCountryCode]?.name || eventCountryCode) : "";
+
+  statsBox.innerHTML = `
+    <div class="stats-wide">
+      <div><strong>${t("stats_total_votes")}</strong> ${total}</div>
+      <div class="barWrap bars-large">
+        ${barHTML("Yes", yes, total)}
+        ${barHTML("No", no, total)}
+        ${barHTML("No opinion", neutral, total)}
+      </div>
+    </div>
+
+    <div class="stats-medium" style="margin-top:14px;">
+      <div><strong>${t("citizens_of", {country: escapeHtml(countryLabel), code: escapeHtml(eventCountryCode||"")})}</strong>: ${cTotal}</div>
+      <div class="barWrap bars-medium">
+        ${barHTML("Yes", cYes, cTotal)}
+        ${barHTML("No", cNo, cTotal)}
+        ${barHTML("No opinion", cNeutral, cTotal)}
+      </div>
+    </div>
+
+    <div class="stats-narrow" style="margin-top:14px;">
+      <div><strong>${t("other_countries")}</strong>: ${oTotal}</div>
+      <div class="barWrap bars-small">
+        ${barHTML("Yes", oYes, oTotal)}
+        ${barHTML("No", oNo, oTotal)}
+        ${barHTML("No opinion", oNeutral, oTotal)}
+      </div>
+    </div>
+  `;
+}
+
+async function checkAlreadyVoted(eventId){
+  if (!currentUser) return false;
+
+  // Fast path: we already voted during this session
+  if (votedLocal.has(eventId)) return true;
+
+  const { data, error } = await supabaseClient
+    .from("votes")
+    .select("vote")
+    .eq("user_id", currentUser.id)
+    .eq("event_id", eventId)
+    .maybeSingle();
+
+  if (error){
+    // If RLS blocks SELECT, we can’t reliably detect across refresh,
+    // but at least don’t keep the UI unlocked after a successful vote in this session.
+    console.warn("checkAlreadyVoted error:", error);
+    return votedLocal.has(eventId);
+  }
+  return !!data;
+}
+
+async function refreshVoteArea(eventId, eventCountryCode){
+  voteMsg.textContent = "";
+
+  // Closed event: allow viewing stats, but no voting
+  try{
+    if (currentEventEndsAt){
+      const d = new Date(currentEventEndsAt);
+      if (!isNaN(d) && d.getTime() <= Date.now()){
+        setVoteUIState("ALREADY_VOTED");
+        voteMsg.classList.add("okText");
+        voteMsg.textContent = t("event_closed");
+        return;
+      }
+    }
+  }catch(e){}
+
+
+  if (!currentUser){
+    setVoteUIState("NEED_LOGIN");
+    return;
+  }
+  if (!isEmailVerified()){
+    setVoteUIState("NEED_VERIFY");
+    return;
+  }
+
+  const already = await checkAlreadyVoted(eventId);
+  if (already){
+    setVoteUIState("ALREADY_VOTED");
+    voteMsg.classList.add("okText");
+    voteMsg.textContent = t("voted_already");
+    return;
+  }
+
+  setVoteUIState("CAN_VOTE");
+}
+
+async function submitVote(value){
+  if (!currentUser){ setVoteUIState("NEED_LOGIN"); return; }
+
+  try{
+    if (currentEventEndsAt){
+      const d = new Date(currentEventEndsAt);
+      if (!isNaN(d) && d.getTime() <= Date.now()){
+        voteMsg.classList.add("errorText");
+        voteMsg.textContent = t("event_closed");
+        setVoteUIState("ALREADY_VOTED");
+        return;
+      }
+    }
+  }catch(e){}
+
+  if (!isEmailVerified()){ setVoteUIState("NEED_VERIFY"); return; }
+  if (!currentEventId){ return; }
+
+  voteMsg.classList.remove("errorText","okText");
+  voteMsg.textContent = "Saving…";
+  voteButtonsRow.style.display = "none";
+
+  const prof = await getMyProfile();
+  const myCountry = prof?.country_code || currentUser.user_metadata?.country_code || null;
+
+  if (!myCountry){
+    voteMsg.classList.add("errorText");
+    voteMsg.textContent = "Missing your country in profile. Please re-register or contact admin.";
+    return;
+  }
+
+  const { error } = await supabaseClient.from("votes").insert({
+    user_id: currentUser.id,
+    event_id: currentEventId,
+    vote: value,
+    country_code: myCountry
+  });
+
+  if (error){
+    if (error.code === "23505" || error.status === 409){
+      voteMsg.classList.add("okText");
+      voteMsg.classList.add("okText");
+    voteMsg.textContent = t("voted_already");
+      await refreshVoteArea(currentEventId, currentEventCountryCode || "");
+      return;
+    }
+    console.error("Vote insert error:", error);
+    voteMsg.classList.add("errorText");
+    voteMsg.textContent = error.message;
+    voteButtonsRow.style.display = "flex";
+    return;
+  }
+
+  votedLocal.add(currentEventId);
+  voteMsg.classList.add("okText");
+  voteMsg.textContent = t("voted_saved");
+  setVoteUIState("ALREADY_VOTED");
+  await refreshStats(currentEventId, currentEventCountryCode || "");
+  try{ await loadTop3(); }catch(e){}
+}
+
+voteYesBtn.onclick = () => submitVote(VOTE.YES);
+voteNoBtn.onclick = () => submitVote(VOTE.NO);
+voteNeutralBtn.onclick = () => submitVote(VOTE.NEUTRAL);
+
+
+
+
+/* ================== Continent countries UI ================== */
+const continentCountriesWrap = document.getElementById("continentCountriesWrap");
+const continentCountriesTitle = document.getElementById("continentCountriesTitle");
+const continentCountriesSub = document.getElementById("continentCountriesSub");
+const continentCountriesList = document.getElementById("continentCountriesList");
+const hideCountriesBtn = document.getElementById("hideCountriesBtn");
+
+hideCountriesBtn.onclick = () => {
+  continentCountriesWrap.style.display = "none";
+};
+
+/* Rough map bounds per continent (lng/lat). We can refine later. */
+const CONTINENT_BOUNDS = {
+  "Europe": [[-25, 34], [45, 72]],
+  "Asia": [[25, -10], [180, 80]],
+  "Africa": [[-25, -40], [60, 38]],
+  "North America": [[-170, 7], [-50, 83]],
+  "South America": [[-92, -56], [-30, 13]],
+  "Oceania": [[110, -50], [180, 5]],
+};
+
+function renderContinentCountries(){
+  // Only show this panel when a specific continent is selected
+  if (selectedContinent === "ALL"){
+    continentCountriesWrap.style.display = "none";
+    continentCountriesList.innerHTML = "";
+    return;
+  }
+
+  continentCountriesWrap.style.display = "block";
+
+  // If a country is selected, collapse to a single chip + back button (more room for events)
+  if (selectedCountryCode){
+    const c = countriesByCode[selectedCountryCode];
+    const label = c ? `${c.name} (${c.code})` : selectedCountryCode;
+
+    continentCountriesTitle.textContent = t("selected_country");
+    continentCountriesSub.textContent = t("back_to_countries", { continent: selectedContinent });
+
+    // two-column layout: left selected country chip, right back button
+    continentCountriesList.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;">
+        <button class="countryChip active" data-cc="${escapeHtml(selectedCountryCode)}" style="cursor:default;">${escapeHtml(label)}</button>
+        <button class="ghost" id="continentBackBtn" style="padding:6px 10px;">← Back</button>
+      </div>
+    `;
+
+    const backBtn = document.getElementById("continentBackBtn");
+    if (backBtn){
+      backBtn.onclick = async () => {
+        // clear current selection but keep continent
+        selectedCountryCode = "";
+        selectedCountryName = "";
+        setCountryPill();
+        setBigMapSelected("");
+        // go back to country list + home (so user can pick again)
+        try{ window.__setBoot && window.__setBoot('Boot: ready'); }catch(e){}
+  showScreen("HOME");
+        renderContinentCountries();
+      };
+    }
+    return;
+  }
+
+  // Otherwise render all countries for this continent
+  const list = countriesForSearch().slice().sort((a,b)=>a.name.localeCompare(b.name));
+  continentCountriesTitle.textContent = t("countries_in", { continent: selectedContinent });
+  continentCountriesSub.textContent = t("found_countries", { n: list.length });
+
+  continentCountriesList.innerHTML = list.map(c => {
+    return `<button class="countryChip" data-cc="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${escapeHtml(c.code)})</button>`;
+  }).join("");
+
+  for (const btn of continentCountriesList.querySelectorAll("button[data-cc]")){
+    btn.addEventListener("click", async () => {
+      const cc = btn.getAttribute("data-cc");
+      await selectCountry(cc);
+      // collapse to selected view
+      renderContinentCountries();
+    });
+  }
+}
+
+let pendingContinentView = "ALL";
+function applyContinentView(){
+  // Called when continent changes; zoom map if available.
+  const c = selectedContinent;
+  pendingContinentView = c;
+
+  if (!map) return;
+
+  if (c === "ALL"){
+    map.easeTo({ center:[10,20], zoom:1.2, duration:450 });
+    return;
+  }
+
+  const b = CONTINENT_BOUNDS[c];
+  if (b){
+    map.fitBounds(b, { padding: 30, duration: 450 });
+  }
+}
+
+
+/* ================== Navigation ================== */
+function showScreen(name){
+  screenHome.classList.toggle("active", name === "HOME");
+  screenCountry.classList.toggle("active", name === "COUNTRY");
+  screenEvent.classList.toggle("active", name === "EVENT");
+  if (name === "HOME" && map) setTimeout(() => map.resize(), 0);
+  screenRegister.classList.toggle("active", name === "REGISTER");
+  screenVerified.classList.toggle("active", name === "VERIFIED");
+}
+document.getElementById("homeBtn").onclick = () => {
+  currentEventId = null;
+  hideSuggest();
+  showScreen("HOME");
+};
+document.getElementById("backFromCountry").onclick = () => {
+  hideSuggest();
+  showScreen("HOME");
+};
+document.getElementById("backFromEvent").onclick = () => {
+  hideSuggest();
+  showScreen("COUNTRY");
+};
+
+registerNavBtn.onclick = () => openRegister();
+loginToggleBtn.onclick = () => {
+  loginError.textContent = "";
+  loginPanelWrap.style.display = (loginPanelWrap.style.display === "none" || loginPanelWrap.style.display === "") ? "block" : "none";
+  safeHideSuggest();
+};
+loginCloseBtn.onclick = () => { loginPanelWrap.style.display = "none"; };
+logoutBtn.onclick = async () => { await supabaseClient.auth.signOut(); };
+
+backFromRegister.onclick = () => { showScreen("HOME"); };
+regCancelBtn.onclick = () => { showScreen("HOME"); };
+
+verifiedGoHomeBtn.onclick = () => { showScreen("HOME"); };
+
+loginBtn.onclick = async () => {
+  loginError.textContent = "";
+  const em = (loginEmail.value || "").trim();
+  const pw = loginPassword.value || "";
+  if (!em || !pw){ loginError.textContent = "Enter email and password."; return; }
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email: em, password: pw });
+  if (error){ loginError.textContent = error.message; return; }
+
+  currentSession = data.session || null;
+  currentUser = data.user || currentSession?.user || null;
+  setAuthUI();
+  loginPanelWrap.style.display = "none";
+};
+
+regSubmitBtn.onclick = async () => {
+  regError.textContent = "";
+  const em = (regEmail.value || "").trim();
+  const pw = regPassword.value || "";
+  const cc = regCountry.value || "";
+  const lang = regLanguage.value || "en";
+
+  if (!em || !pw){ regError.textContent = "Enter email and password."; return; }
+  if (!cc){ regError.textContent = "Select your country."; return; }
+
+  const redirectTo = window.location.origin + window.location.pathname + "#verified";
+
+  const { error } = await supabaseClient.auth.signUp({
+    email: em,
+    password: pw,
+    options: {
+      emailRedirectTo: redirectTo,
+      data: { country_code: cc, language: lang }
+    }
+  });
+
+  if (error){ regError.textContent = error.message; return; }
+
+  alert("Verification email sent. Please check your inbox and confirm your account.");
+  showScreen("HOME");
+};
+
+const top3Box = document.getElementById("top3Box");
+const refreshTopBtn = document.getElementById("refreshTopBtn");
+if (refreshTopBtn){
+  refreshTopBtn.onclick = () => loadTop3();
+}
+document.getElementById("clearCountryBtn").onclick = () => {
+  selectedCountryCode = "";
+  selectedCountryName = "";
+  setCountryPill();
+  setBigMapSelected("");
+  renderContinentCountries();
+};
+
+/* ================== Pills ================== */
+function setCountryPill(){
+  selectedCountryPill.textContent = selectedCountryCode
+    ? `Country: ${selectedCountryName} (${selectedCountryCode})`
+    : t("country_pill_all");
+}
+function setContinentPill(){
+  selectedContinentPill.textContent = `${t("continent_pill_all").split(":")[0]}: ${selectedContinent === "ALL" ? t("continent_pill_all").split(":")[1].trim() : selectedContinent}`;
+}
+
+/* ================== Continents bar ================== */
+(function bindContinentBar(){
+  continentsBar.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-cont]");
+    if (!btn) return;
+
+    selectedContinent = btn.getAttribute("data-cont") || "ALL";
+    setContinentPill();
+
+    // visual active
+    for (const b of continentsBar.querySelectorAll("button[data-cont]")){
+      const active = (b === btn);
+      b.style.border = active ? "1px solid #bbb" : "0";
+      b.style.background = active ? "#ddd" : "#eee";
+    }
+
+    // reset country selection when continent changes
+    selectedCountryCode = "";
+    selectedCountryName = "";
+    setCountryPill();
+    setBigMapSelected("");
+
+    hideSuggest();
+    showScreen("HOME");
+
+    // show list of countries under the continent bar and zoom map
+    renderContinentCountries();
+    applyContinentView();
+  });
+})();
+
+/* ================== Search suggest ================== */
+function hideSuggest(){
+  suggestBox.style.display = "none";
+  suggestBox.innerHTML = "";
+}
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".searchWrap")) hideSuggest();
+});
+
+searchInput.addEventListener("input", () => buildSuggest(searchInput.value));
+searchInput.addEventListener("focus", () => buildSuggest(searchInput.value));
+
+function buildSuggest(raw){
+  const term = norm(raw);
+  if (term.length < 2){ hideSuggest(); return; }
+
+  const cMatches = countriesForSearch()
+    .filter(c => norm(c.name).includes(term) || norm(c.code).startsWith(term))
+    .slice(0, 6)
+    .map(c => ({
+      type: "country",
+      key: c.code,
+      title: `${c.name} (${c.code})`,
+      sub: c.continent_name || ""
+    }));
+
+  const eMatches = eventsForSearch()
+    .filter(e => norm(e.title).includes(term) || norm(e.description).includes(term))
+    .slice(0, 6)
+    .map(e => ({
+      type: "event",
+      key: String(e.id),
+      title: e.title || "(no title)",
+      sub: e.country_code ? `${e.country_code} • ${countriesByCode[e.country_code]?.name || ""}` : ""
+    }));
+
+  const merged = [...cMatches, ...eMatches].slice(0, 10);
+  if (!merged.length){ hideSuggest(); return; }
+
+  suggestBox.innerHTML = merged.map(item => `
+    <div class="sItem" data-type="${item.type}" data-key="${escapeHtml(item.key)}">
+      <div class="sLeft">
+        <div class="sTitle">${escapeHtml(item.title)}</div>
+        <div class="sSub">${escapeHtml(item.sub)}</div>
+      </div>
+      <div class="tag">${item.type === "country" ? "Country" : "Event"}</div>
+    </div>
+  `).join("");
+
+  suggestBox.style.display = "block";
+
+  for (const el of suggestBox.querySelectorAll(".sItem")){
+    el.addEventListener("click", async () => {
+      const type = el.getAttribute("data-type");
+      const key = el.getAttribute("data-key");
+      hideSuggest();
+      searchInput.value = "";
+
+      if (type === "country") {
+        await selectCountry(key);
+        renderContinentCountries();
+      } else {
+        await openEvent(Number(key));
+      }
+    });
+  }
+}
+
+/* ================== Country selection + events list ================== */
+async function selectCountry(code){
+  selectedCountryCode = code || "";
+  selectedCountryName = countriesByCode[selectedCountryCode]?.name || selectedCountryCode;
+  setCountryPill();
+  setBigMapSelected(selectedCountryCode);
+
+  countryTitle.textContent = `Events`;
+  countrySubtitle.textContent = selectedCountryCode
+    ? `${selectedCountryName} (${selectedCountryCode})`
+    : "Select a country.";
+
+  showScreen("COUNTRY");
+  await loadEventsForCountry(selectedCountryCode);
+}
+
+async function loadEventsForCountry(code){
+  // Reset translation cache for country list (keeps app fast and bounded)
+  eventTranslations = {};
+  translationLoaded.clear();
+  eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">${t("loading")}</div>`;
+
+  if (!code){
+    eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">No country selected.</div>`;
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("events")
+    .select("id,title,description,country_code,created_at,is_active")
+    .eq("is_active", true)
+    .eq("country_code", code)
+    .order("created_at", { ascending:false });
+
+  if (error){
+    console.error("loadEventsForCountry error:", error);
+    eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">Cannot load events.</div>`;
+    return;
+  }
+
+  const list = data || [];
+
+  // Load translations for current language + EN fallback
+  try{
+    const ids = list.map(e => e.id);
+    const langs = Array.from(new Set([currentLang, "en"].filter(Boolean)));
+    await loadEventTranslations(ids, langs);
+  }catch(e){}
+  
+  if (!list.length){
+    eventsList.innerHTML = `<div class="muted" style="margin:0 16px;">${t("no_events")}</div>`;
+    return;
+  }
+
+  const now = Date.now();
+  const isEnded = (e) => {
+    try{
+      if (e.is_active === false) return true;
+      if (!e.ends_at) return false;
+      const d = new Date(e.ends_at);
+      return (!isNaN(d) && d.getTime() <= now);
+    }catch(err){ return false; }
+  };
+
+  const top = list.filter(e => (e.is_top === true) && !isEnded(e))
+                  .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const active = list.filter(e => !(e.is_top === true) && !isEnded(e))
+                     .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const ended = list.filter(e => isEnded(e))
+                    .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+  function dateLabel(iso){
+    try{
+      const d = new Date(iso);
+      if (isNaN(d)) return "";
+      return d.toLocaleDateString(undefined, { year:"numeric", month:"short", day:"2-digit" });
+    }catch(e){ return ""; }
+  }
+
+  function renderItem(e){
+    const endedFlag = isEnded(e);
+    const endText = e.ends_at ? (endedFlag ? t("ended_on",{date: dateLabel(e.ends_at)}) : t("ends_on",{date: dateLabel(e.ends_at)})) : "";
+    return `
+      <div class="eventItem" data-id="${e.id}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <strong>${escapeHtml(getEventText(e, "title") || "")}</strong>
+          ${fallbackBadgeHTML(e)}
+            ${endedFlag ? `<span class="pill" style="background:#f2f2f2;border-color:#e6e6e6;">${escapeHtml(t("event_closed"))}</span>` : ""}
+        </div>
+        <div class="muted" style="margin-top:6px;">${escapeHtml(endText)}</div>
+        ${getEventText(e, "description") ? `<div class="muted" style="margin-top:6px;">${escapeHtml(getEventText(e, "description"))}</div>` : ""}
+      </div>
+    `;
+  }
+
+  let html = "";
+  if (top.length){
+    html += `<div class="muted" style="margin:0 16px 10px; font-weight:600;">${escapeHtml(t("top"))}</div>`;
+    html += top.map(renderItem).join("");
+  }
+
+  if (active.length){
+    html += `<div class="muted" style="margin:18px 16px 10px; font-weight:600;">${escapeHtml(t("active_events"))}</div>`;
+    html += active.map(renderItem).join("");
+  }
+
+  if (ended.length){
+    html += `<div style="margin:18px 16px 10px; border-top:1px solid #eee;"></div>`;
+    html += `<div class="muted" style="margin:10px 16px 10px; font-weight:600;">${escapeHtml(t("ended_events"))}</div>`;
+    html += ended.map(renderItem).join("");
+  }
+
+  eventsList.innerHTML = html;
+
+  for (const el of eventsList.querySelectorAll(".eventItem")){
+    el.addEventListener("click", async () => {
+      const eid = Number(el.getAttribute("data-id"));
+      await openEvent(eid);
+    });
+  }
+
+  setBigMapSelected(selectedCountryCode);
+
+}
+
+/* ================== Event detail ================== */
+async function openEvent(id){
+  if (!id) return;
+  currentEventId = id;
+
+  // Try cache first
+  let evt = eventsCache.find(x => x.id === id);
+  if (!evt){
+    const { data, error } = await supabaseClient
+      .from("events")
+      .select("id,title,description,country_code,created_at,is_active")
+      .eq("id", id)
+      .maybeSingle();
+    if (error || !data) return;
+    evt = data;
+  }
+
+  // Ensure translations are available (currentLang + EN fallback)
+  try{ await loadEventTranslations([evt.id], Array.from(new Set([currentLang, "en"].filter(Boolean)))); }catch(e){}
+
+  // ensure country pill sync
+  if (evt.country_code){
+    selectedCountryCode = evt.country_code;
+    selectedCountryName = countriesByCode[selectedCountryCode]?.name || selectedCountryCode;
+    setCountryPill();
+    setBigMapSelected(selectedCountryCode);
+  }
+
+    eventTitle.textContent = getEventText(evt, "title") || "—";
+  const cName = evt.country_code ? (countriesByCode[evt.country_code]?.name || "") : "";
+  eventMeta.textContent = evt.country_code ? `Country: ${cName} (${evt.country_code})` : "";
+  try{
+    const d = currentEventEndsAt ? new Date(currentEventEndsAt) : null;
+    if (d && !isNaN(d)){
+      const ds = d.toLocaleDateString(undefined, { year:"numeric", month:"short", day:"2-digit" });
+      const ended = (d.getTime() <= Date.now());
+      eventMeta.textContent += " • " + (ended ? t("ended_on", {date: ds}) : t("ends_on", {date: ds}));
+    }
+  }catch(e){}
+
+    eventDesc.textContent = getEventText(evt, "description") || "";
+  const badge = document.getElementById("eventLangBadge");
+  if (badge) badge.innerHTML = fallbackBadgeHTML(evt);
+
+
+  currentEventCountryCode = evt.country_code || null;
+  currentEventEndsAt = evt.ends_at || null;
+
+  showScreen("EVENT");
+  initMiniMap().catch(()=>{});
+  updateMiniMap(currentEventCountryCode || "");
+  await refreshStats(currentEventId, currentEventCountryCode || "");
+  await refreshVoteArea(currentEventId, currentEventCountryCode || "");
+  renderContinentCountries();
+}
+
+/* ================== Data loading ================== */
+async function loadContinentsRemote(){
+  const { data, error } = await supabaseClient
+    .from("continents")
+    .select("id,name")
+    .order("name", { ascending:true });
+
+  if (error){ console.error("loadContinents error:", error); return null; }
+  return data || [];
+}
+
+function applyContinents(list){
+  continents = list || [];
+  continentsById = {};
+  for (const c of continents) continentsById[c.id] = c.name;
+  renderContinentsBar();
+}
+
+async function loadContinents(){
+  // 1) instant cache
+  try{
+    const cached = localStorage.getItem("pcav_continents_v1");
+    if (cached){
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length){
+        applyContinents(parsed);
+      }
+    }
+  }catch(e){}
+
+  // 2) background refresh
+  try{
+    const fresh = await withTimeout(loadContinentsRemote(), 60000, "loadContinentsRemote");
+    if (fresh && fresh.length){
+      applyContinents(fresh);
+      try{ localStorage.setItem("pcav_continents_v1", JSON.stringify(fresh)); }catch(e){}
+    }
+  }catch(e){
+    console.warn(e);
+  }
+}
+
+async function loadCountriesRemote(){
+  const { data, error } = await supabaseClient
+    .from("countries")
+    .select("code,name,continent_id")
+    .order("name", { ascending:true });
+
+  if (error){ console.error("loadCountries error:", error); return null; }
+
+  const list = (data || []).map(c => ({
+    ...c,
+    continent_name: continentsById[c.continent_id] || ""
+  }));
+
+  return list;
+}
+
+function applyCountries(list){
+  countries = list || [];
+  countriesByCode = {};
+  for (const c of countries) countriesByCode[c.code] = c;
+
+  // Populate registration country dropdown
+  if (regCountry){
+    regCountry.innerHTML = '<option value="">Select your country</option>' +
+      countries.map(c => `<option value="${c.code}">${escapeHtml(c.name)} (${c.code})</option>`).join("");
+  }
+
+  // If currently browsing continents/country list, re-render countries list
+  try{ renderCountriesForContinent(selectedContinent); }catch(e){}
+}
+
+async function loadCountries(){
+  // 1) instant: local cache
+  try{
+    const cached = localStorage.getItem("pcav_countries_v1");
+    if (cached){
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length){
+        applyCountries(parsed);
+      }
+    }
+  }catch(e){}
+
+  // 2) background refresh (do not block init)
+  try{
+    const fresh = await withTimeout(loadCountriesRemote(), 60000, "loadCountriesRemote");
+    if (fresh && fresh.length){
+      applyCountries(fresh);
+      try{ localStorage.setItem("pcav_countries_v1", JSON.stringify(fresh)); }catch(e){}
+    }
+  }catch(e){
+    console.warn(e);
+  }
+}
+
+async function loadEventsCache(){
+  const { data, error } = await supabaseClient
+    .from("events")
+    .select("id,title,description,country_code,is_active,created_at")
+    .eq("is_active", true)
+    .order("created_at", { ascending:false })
+    .limit(1000);
+
+  if (error){ console.error("loadEventsCache error:", error); eventsCache = []; return; }
+  eventsCache = data || [];
+}
+
+/* ================== TOP 3 ==================
+   Best practice is to use a DB view/RPC for vote counts.
+   This code tries a view "event_vote_counts" first (event_id, votes).
+   If it doesn't exist, it falls back to counting the latest 5000 votes client-side.
+*/
+async function loadTop3(){
+  if (!top3Box) return;
+  top3Box.textContent = "Loading…";
+
+  // Attempt 1: view with precomputed counts
+  try{
+    const r = await supabaseClient
+      .from("event_vote_counts")
+      .select("event_id,votes")
+      .order("votes", { ascending:false })
+      .limit(3);
+
+    if (!r.error && r.data && r.data.length){
+      renderTop3FromCounts(r.data.map(x => ({ event_id: x.event_id, votes: x.votes })));
+      return;
+    }
+  }catch(e){}
+
+  // Attempt 2: fallback - count latest votes client-side
+  const { data, error } = await supabaseClient
+    .from("votes")
+    .select("event_id")
+    .order("created_at", { ascending:false })
+    .limit(5000);
+
+  if (error){
+    console.error("loadTop3 votes fallback error:", error);
+    top3Box.textContent = "Cannot load Top 3 (check votes SELECT policy).";
+    return;
+  }
+
+  const counts = {};
+  for (const row of (data || [])){
+    const id = row.event_id;
+    counts[id] = (counts[id] || 0) + 1;
+  }
+
+  const top = Object.entries(counts)
+    .map(([event_id, votes]) => ({ event_id: Number(event_id), votes }))
+    .sort((a,b) => b.votes - a.votes)
+    .slice(0,3);
+
+  if (!top.length){
+    top3Box.textContent = "No votes yet.";
+    return;
+  }
+
+  renderTop3FromCounts(top);
+}
+
+function renderTop3FromCounts(items){
+  if (!top3Box) return;
+
+  // Join with eventsCache (already loaded)
+  const enriched = items.map(it => {
+    const evt = eventsCache.find(e => e.id === it.event_id);
+    return {
+      ...it,
+      title: evt?.title || `Event #${it.event_id}`,
+      country_code: evt?.country_code || "",
+      description: evt?.description || ""
+    };
+  });
+
+  top3Box.innerHTML = enriched.map((e, idx) => {
+    const cName = e.country_code ? (countriesByCode[e.country_code]?.name || "") : "";
+    return `
+      <div class="topItem" data-eid="${e.event_id}">
+        <strong>${escapeHtml((idx+1) + ". " + e.title)}</strong>
+        <div class="topMeta">
+          Votes: <strong>${e.votes}</strong>
+          ${e.country_code ? ` • ${escapeHtml(cName)} (${escapeHtml(e.country_code)})` : ""}
+        </div>
+        ${e.description ? `<div class="topMeta">${escapeHtml(e.description)}</div>` : ""}
+      </div>
+    `;
+  }).join("");
+
+  for (const el of top3Box.querySelectorAll(".topItem")){
+    el.addEventListener("click", async () => {
+      const eid = Number(el.getAttribute("data-eid"));
+      await openEvent(eid);
+    });
+  }
+}
+
+
+/* ================== Map ================== */
+async function initMap(){
+  try{
+    await window.__pcvEnsureMapbox();
+    if (window.mapboxgl && MAPBOX_ACCESS_TOKEN) window.mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
+  }catch(e){
+    console.warn("Mapbox unavailable:", e);
+    const el = document.getElementById("map");
+    if (el) el.innerHTML = '<div style="padding:12px;color:#666">Map unavailable (Mapbox failed to load).</div>';
+    return;
+  }
+  map = new mapboxgl.Map({
+    container: "map",
+    style: "mapbox://styles/mapbox/light-v11",
+    center: [10, 20],
+    zoom: 1.2
+  });
+
+  map.on("load", () => {
+    // apply continent view after style loads
+    setTimeout(() => applyContinentView(), 0);
+
+    map.addSource("countryBoundaries", { type:"vector", url:"mapbox://mapbox.country-boundaries-v1" });
+
+    map.addLayer({
+      id: "country-fill",
+      type: "fill",
+      source: "countryBoundaries",
+      "source-layer": "country_boundaries",
+      paint: { "fill-color":"#000", "fill-opacity":0.05 }
+    });
+
+    map.addLayer({
+      id: "country-selected",
+      type: "fill",
+      source: "countryBoundaries",
+      "source-layer": "country_boundaries",
+      paint: { "fill-color":"#000", "fill-opacity":0.18 },
+      filter: ["==", ["get","iso_3166_1"], ""]
+    });
+
+    let hoveredISO = "";
+    map.addLayer({
+      id: "country-hover",
+      type: "fill",
+      source: "countryBoundaries",
+      "source-layer": "country_boundaries",
+      paint: { "fill-color":"#000", "fill-opacity":0.12 },
+      filter: ["==", ["get","iso_3166_1"], ""]
+    });
+
+    map.on("mousemove", "country-fill", (e) => {
+      const iso = e.features?.[0]?.properties?.iso_3166_1 || "";
+      if (iso !== hoveredISO){
+        hoveredISO = iso;
+        map.setFilter("country-hover", ["==", ["get","iso_3166_1"], hoveredISO]);
+      }
+      map.getCanvas().style.cursor = "pointer";
+    });
+
+    map.on("mouseleave", "country-fill", () => {
+      hoveredISO = "";
+      map.setFilter("country-hover", ["==", ["get","iso_3166_1"], ""]);
+      map.getCanvas().style.cursor = "";
+    });
+
+    map.on("click", "country-fill", async (e) => {
+      const iso = e.features?.[0]?.properties?.iso_3166_1 || "";
+      if (!iso) return;
+
+      // If continent filter is active, ignore clicks outside it
+      if (selectedContinent !== "ALL"){
+        const cont = continentOfCountry(iso);
+        if (cont !== selectedContinent){
+          // brief feedback
+          console.log("Country outside selected continent:", iso, cont, "selected:", selectedContinent);
+          return;
+        }
+      }
+
+      await selectCountry(iso);
+    });
+  });
+}
+
+function setBigMapSelected(code){
+  if (!map || !map.getLayer("country-selected")) return;
+  map.setFilter("country-selected", ["==", ["get","iso_3166_1"], code || ""]);
+}
+
+/* ================== INIT ================== */
+function manualRestoreSessionFromStorage(){
+  try{
+    const projectRef = (SUPABASE_URL || "").split("https://")[1]?.split(".")[0] || "";
+    const key = projectRef ? `sb-${projectRef}-auth-token` : null;
+    const raw = key ? localStorage.getItem(key) : null;
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    const access_token = parsed?.access_token || parsed?.currentSession?.access_token;
+    const refresh_token = parsed?.refresh_token || parsed?.currentSession?.refresh_token;
+
+    if (access_token && refresh_token){
+      return { access_token, refresh_token };
+    }
+    return null;
+  }catch(e){
+    return null;
+  }
+}
+
+function withTimeout(promise, ms, label){
+  let t;
+  const timeout = new Promise((_, reject) => {
+    t = setTimeout(() => reject(new Error((label || "timeout") + " after " + ms + "ms")), ms);
+  });
+  return Promise.race([promise.finally(()=>clearTimeout(t)), timeout]);
+}
+
+(async function init(){
+  try{ window.__setBoot && window.__setBoot('Init: start'); }catch(e){}
+  // Ensure Supabase is available and initialize the client
+  try{ window.__setBoot && window.__setBoot('Init: loading Supabase…'); }catch(e){}
+  await window.__pcvEnsureSupabase();
+  if (!supabaseClient) {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage
+  }
+});
+  }
+
+
+  // default pills (guarded)
+  try{ if (typeof setContinentPill==='function') setContinentPill(); }catch(e){}
+  try{ if (typeof setCountryPill==='function') setCountryPill(); }catch(e){}
+
+  // Restore session on refresh (do not block app if it fails)
+try{
+  try{ window.__setBoot && window.__setBoot('Init: restoring session…'); }catch(e){}
+
+  // First, try manual restore from localStorage (helps when getSession hangs)
+  try{
+    const tokens = manualRestoreSessionFromStorage();
+    if (tokens){
+      await withTimeout(supabaseClient.auth.setSession(tokens), 12000, "setSession");
+    }
+  }catch(e){}
+
+  const { data } = await withTimeout(supabaseClient.auth.getSession(), 12000, "getSession");
+  await restoreAuthFromSession(data?.session || null);
+}catch(e){
+  console.warn("session restore failed:", e);
+  try{ await restoreAuthFromSession(null); }catch(_){}
+}finally{
+  try{ window.__setBoot && window.__setBoot('Init: session restored'); }catch(e){}
+}
+
+  // If arriving from email confirmation, Supabase may include ?code=... (PKCE)
+  // Try exchanging the code for a session.
+  try{
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("code");
+    if (code){
+      const { data, error } = await supabaseClient.auth.exchangeCodeForSession(code);
+      if (!error){
+        currentSession = data.session || null;
+        currentUser = data.user || currentSession?.user || null;
+        // Clean URL (remove code params)
+        url.searchParams.delete("code");
+        url.searchParams.delete("type");
+        window.history.replaceState({}, document.title, url.toString());
+      }
+    }
+  }catch(e){}
+
+  // Read current session (already restored above)
+  setAuthUI();
+
+  // Language: stored -> profile -> metadata -> default
+  try{
+    let lang = "en";
+    const stored = getStoredLang();
+    if (stored && I18N && I18N[stored]) lang = stored;
+
+    if (currentUser){
+      const prof = await getMyProfile();
+      const fromProfile = (prof?.language || currentUser.user_metadata?.language || "");
+      if (!stored && fromProfile && I18N && I18N[fromProfile]) lang = fromProfile;
+    }
+
+    currentLang = (I18N && I18N[lang]) ? lang : "en";
+    const ls = document.getElementById("langSelect");
+    if (ls) ls.value = currentLang;
+    applyI18n();
+  }catch(e){
+    currentLang = "en";
+    const ls = document.getElementById("langSelect");
+    if (ls) ls.value = "en";
+    applyI18n();
+  }
+
+  // Language selector: apply + save + refresh
+  try{
+    const langSel = document.getElementById("langSelect");
+    if (langSel){
+      langSel.onchange = async () => {
+  const lang = (langSel.value || "en").toLowerCase();
+  currentLang = (I18N && I18N[lang]) ? lang : "en";
+  setStoredLang(currentLang);
+
+  // Save preference if logged in (best-effort)
+  if (currentUser){
+    try{
+      const r = await supabaseClient.from("profiles")
+        .update({ language: currentLang })
+        .eq("id", currentUser.id);
+      if (r.error) console.warn("save language error:", r.error);
+    }catch(e){}
+  }
+
+  // Re-render UI without reloading page (prevents logout / map reset)
+  try{ applyI18n(); }catch(e){}
+  try{
+    // Re-render current view content (cheap refresh)
+    if (screenHome && screenHome.classList.contains("active")){
+      // refresh top3 label texts if present
+      await loadTop3?.();
+    } else if (screenCountry && screenCountry.classList.contains("active") && selectedCountryCode){
+      await loadEventsForCountry(selectedCountryCode);
+    } else if (screenEvent && screenEvent.classList.contains("active") && currentEventId){
+      await openEvent(currentEventId);
+    }
+  }catch(e){}
+};
+    }
+  }catch(e){}
+
+
+  // Upsert profile after verification/login using user_metadata
+  if (currentUser){
+    const meta = currentUser.user_metadata || {};
+    const cc = meta.country_code;
+    const lang = meta.language;
+    if (cc || lang){
+      // Try upsert into profiles (some schemas use id, others user_id)
+      let pErr = null;
+      try{
+        const r1 = await supabaseClient
+          .from("profiles")
+          .upsert([{ id: currentUser.id, country_code: cc || null, language: lang || null }], { onConflict: "id" });
+        pErr = r1.error || null;
+      }catch(e){
+        pErr = { message: String(e) };
+      }
+      if (pErr) console.warn("profiles upsert error:", pErr);
+    }
+  }
+
+  // If hash indicates verified, show confirmation screen briefly.
+  if (window.location.hash === "#verified"){
+    showScreen("VERIFIED");
+    setTimeout(() => showScreen("HOME"), 2200);
+  }
+
+try{ window.__setBoot && window.__setBoot('Init: loading continents…'); }catch(e){}
+try{ await withTimeout(loadContinents(), 12000, 'loadContinents'); }catch(e){ console.warn(e); }
+
+try{ window.__setBoot && window.__setBoot('Init: loading countries…'); }catch(e){}
+try{ loadCountries(); }catch(e){ console.warn(e); }
+
+try{ window.__setBoot && window.__setBoot('Init: loading events cache…'); }catch(e){}
+try{ loadEventsCache(); }catch(e){ console.warn(e); }
+
+try{ window.__setBoot && window.__setBoot('Init: loading Top 3…'); }catch(e){}
+try{ loadTop3(); }catch(e){ console.warn(e); }
+
+try{ window.__setBoot && window.__setBoot('Init: initializing map…'); }catch(e){}
+try{
+  if (typeof mapboxgl !== "undefined" && mapboxgl){
+    await initMap();
+}else{
+    console.warn("Mapbox not available");
+  }
+}catch(e){ console.warn(e); }
+
+try{ renderContinentCountries(); }catch(e){ console.warn(e); }
+try{ applyContinentView(); }catch(e){ console.warn(e); }
+
+try{ window.__setBoot && window.__setBoot('Boot: ready'); }catch(e){}
+})();
+
+// Auth state listener
+async function getMyProfile(){
+  if (!currentUser) return null;
+  try{
+    const { data, error } = await supabaseClient
+      .from("profiles")
+      .select("country_code, language, is_admin")
+      .eq("id", currentUser.id)
+      .maybeSingle();
+
+    if (error){
+      console.warn("getMyProfile error:", error);
+      return null;
+    }
+    return data || null;
+  }catch(e){
+    console.warn("getMyProfile unexpected:", e);
+    return null;
+  }
+}
+
+async function restoreAuthFromSession(session){
+  currentSession = session || null;
+  currentUser = session?.user || null;
+  isAdmin = false;
+
+  if (currentUser){
+    const prof = await getMyProfile();
+    isAdmin = !!prof?.is_admin;
+
+    // nastav jazyk z profilu jen pokud uživatel ručně nevybral jazyk
+    try{
+      const stored = (typeof getStoredLang === "function") ? getStoredLang() : "";
+      const fromProfile = prof?.language || currentUser.user_metadata?.language || "";
+      if (!stored && fromProfile && typeof I18N !== "undefined" && I18N[fromProfile]){
+        currentLang = fromProfile;
+        const ls = document.getElementById("langSelect");
+        if (ls) ls.value = currentLang;
+      }
+    }catch(e){}
+  }
+
+  // překresli UI
+  try{ setAuthUI(); }catch(e){}
+}
+                                  
+supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+  await restoreAuthFromSession(session);
+
+  // pokud je otevřená událost, přepočítej UI hlasování
+  try{
+    if (screenEvent && screenEvent.classList.contains("active") && currentEventId){
+      await refreshVoteArea(currentEventId, currentEventCountryCode || "");
+      await refreshStats(currentEventId, currentEventCountryCode || "");
+    }
+  }catch(e){}
+});
+
 </script>
 </body>
 </html>
