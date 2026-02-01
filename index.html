@@ -296,6 +296,8 @@ if (window.__PCV_INIT_DONE__) {
         const { error } = await supabaseClient.auth.signInWithPassword({ email, password: p1 });
         if (error) throw error;
         closeModal();
+        // If countries were missing (policy mismatch), try to reload geo data
+        if (!geoLoaded) { try { await ensureGeoLoaded(); } catch(e){} }
         boot("Auth: signed in");
         return;
       }
@@ -315,9 +317,10 @@ if (window.__PCV_INIT_DONE__) {
       // update
       const { error } = await supabaseClient.auth.updateUser({ password: p1 });
       if (error) throw error;
-      authMsg.textContent = "Heslo změněno. Můžeš okno zavřít.";
+      authMsg.textContent = "Heslo změněno.";
       boot("Auth: password updated");
-      // keep modal open to show success
+      // auto-close after success
+      setTimeout(() => { try { closeModal(); } catch(e){} }, 700);
     } catch (err) {
       console.error(err);
       authMsg.textContent = (err && err.message) ? err.message : "Neznámá chyba";
@@ -414,7 +417,19 @@ if (window.__PCV_INIT_DONE__) {
     boot("Auth: signed out");
   }
 
-  /* ===== Data rendering ===== */
+  /* ===== Geo state ===== */
+  let geoLoaded = false;
+  async function ensureGeoLoaded() {
+    try {
+      await ensureGeoLoaded();
+    } catch (e) {
+      console.error(e);
+      alert("Nepodařilo se načíst země. Zkontroluj Supabase RLS policies pro tabulky continents a countries (SELECT pro role anon i authenticated).\n\nDetail: " + (e?.message || e));
+      throw e;
+    }
+  }
+
+/* ===== Data rendering ===== */
   function escapeHtml(s) {
     return String(s ?? "")
       .replaceAll("&", "&amp;")
@@ -587,6 +602,7 @@ if (window.__PCV_INIT_DONE__) {
       if (countrySel.value) await loadEventsForCountry(countrySel.value);
     }
 
+    geoLoaded = true;
     boot("Init: geo ready");
   }
 
@@ -651,6 +667,11 @@ if (window.__PCV_INIT_DONE__) {
         session = newSession;
         setAuthUI();
 
+        // Ensure geo selectors (countries) are available for the current role (anon/authenticated)
+        if (!geoLoaded) {
+          try { await ensureGeoLoaded(); } catch(e) {}
+        }
+
         if (event === "PASSWORD_RECOVERY") {
           // open change password modal automatically
           openModal("update");
@@ -661,7 +682,7 @@ if (window.__PCV_INIT_DONE__) {
         if (cc) await loadEventsForCountry(cc);
       });
 
-      await loadContinentsAndCountries();
+      await ensureGeoLoaded();
       await loadTop3();
 
       // If user lands with recovery hash, open the update modal
