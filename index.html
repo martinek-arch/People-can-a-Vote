@@ -16,6 +16,7 @@
   .muted { color: var(--muted); }
   .hidden { display:none !important; }
   select, button, input { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: white; }
+  input { min-width: 260px; }
   button { cursor: pointer; }
   button.primary { font-weight: 800; }
   button.ghost { background: transparent; }
@@ -36,6 +37,20 @@
   .brand { font-weight: 900; letter-spacing: 0.2px; }
   .navRight { display:flex; align-items:center; gap: 8px; flex-wrap: wrap; justify-content:flex-end; }
   .small { font-size: 12px; }
+
+  /* modal */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display:none; align-items:center; justify-content:center; z-index: 50; }
+  .overlay.open { display:flex; }
+  .modal { width: min(520px, calc(100vw - 32px)); background:#fff; border-radius: 16px; border:1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.18); }
+  .modalHeader { display:flex; justify-content:space-between; align-items:center; padding: 12px 14px; border-bottom:1px solid var(--border); }
+  .modalTitle { font-weight: 900; }
+  .modalBody { padding: 14px; }
+  .field { display:flex; flex-direction:column; gap:6px; margin-bottom: 12px; }
+  .actions { display:flex; gap:10px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+  .tabs { display:flex; gap:8px; }
+  .tab { border:1px solid var(--border); border-radius: 999px; padding: 6px 10px; cursor:pointer; background:#fff; }
+  .tab.active { font-weight: 800; }
+  .msg { margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -61,12 +76,6 @@
   <div class="card" id="authCard">
     <div id="authStatus" class="muted">Načítání uživatele…</div>
     <div id="voteGateMsg" class="muted" style="margin-top:8px;"></div>
-
-    <div class="muted small" style="margin-top:10px;">
-      <b>Přihlášení</b> i <b>Registrace</b> fungují přes emailový odkaz (magic link).
-      Po kliknutí na odkaz v emailu se vrátíš sem. Pokud ti odkaz hází chybu, zkontroluj Supabase → Authentication → URL Configuration:
-      Site URL = <span class="pill">https://martinek-arch.github.io</span> a Redirect URLs obsahují <span class="pill">https://martinek-arch.github.io/People-can-a-Vote/</span>.
-    </div>
   </div>
 
   <div class="card" id="homeCard">
@@ -100,10 +109,42 @@
   </div>
 </main>
 
+<!-- AUTH MODAL -->
+<div id="overlay" class="overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modalHeader">
+      <div class="row" style="gap:10px;">
+        <div id="modalTitle" class="modalTitle">Účet</div>
+        <div class="tabs">
+          <button id="tabLogin" class="tab active" type="button">Přihlášení</button>
+          <button id="tabRegister" class="tab" type="button">Registrace</button>
+        </div>
+      </div>
+      <button id="closeModalBtn" class="ghost" type="button" aria-label="Zavřít">✕</button>
+    </div>
+    <div class="modalBody">
+      <div class="field">
+        <label for="authEmail"><b>Email</b></label>
+        <input id="authEmail" type="email" autocomplete="email" placeholder="email@domena.cz">
+      </div>
+      <div class="field">
+        <label for="authPassword"><b>Heslo</b></label>
+        <input id="authPassword" type="password" autocomplete="current-password" placeholder="••••••••">
+        <div class="muted small">Doporučeno aspoň 8 znaků.</div>
+      </div>
+
+      <div class="actions">
+        <button id="submitAuthBtn" class="primary" type="button">Přihlásit</button>
+      </div>
+
+      <div id="authMsg" class="msg muted"></div>
+    </div>
+  </div>
+</div>
+
 <div id="boot">Booting…</div>
 
 <script>
-/* ====== init guard ====== */
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");
 } else {
@@ -131,13 +172,108 @@ if (window.__PCV_INIT_DONE__) {
   const SUPABASE_URL = "https://jqoomnhpyuikbntnrukw.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h";
 
-  // GitHub Pages base URL (MUSÍ sedět s Redirect URLs v Supabase)
+  // GitHub Pages base URL (musí sedět s Redirect URLs v Supabase)
   const APP_BASE_URL = "https://martinek-arch.github.io/People-can-a-Vote/";
 
   let supabaseClient = null;
   let session = null;
   let isVerified = false;
 
+  /* ===== Modal state ===== */
+  let authMode = "login"; // "login" | "register"
+
+  const overlay = document.getElementById("overlay");
+  const tabLogin = document.getElementById("tabLogin");
+  const tabRegister = document.getElementById("tabRegister");
+  const submitAuthBtn = document.getElementById("submitAuthBtn");
+  const authMsg = document.getElementById("authMsg");
+  const authEmail = document.getElementById("authEmail");
+  const authPassword = document.getElementById("authPassword");
+
+  function openModal(mode) {
+    authMode = mode;
+    authMsg.textContent = "";
+    authPassword.value = "";
+    setModeUI();
+    overlay.classList.add("open");
+    overlay.setAttribute("aria-hidden", "false");
+    setTimeout(() => authEmail.focus(), 0);
+  }
+  function closeModal() {
+    overlay.classList.remove("open");
+    overlay.setAttribute("aria-hidden", "true");
+    authMsg.textContent = "";
+  }
+  function setModeUI() {
+    if (authMode === "login") {
+      tabLogin.classList.add("active");
+      tabRegister.classList.remove("active");
+      submitAuthBtn.textContent = "Přihlásit";
+      authPassword.setAttribute("autocomplete", "current-password");
+    } else {
+      tabLogin.classList.remove("active");
+      tabRegister.classList.add("active");
+      submitAuthBtn.textContent = "Registrovat";
+      authPassword.setAttribute("autocomplete", "new-password");
+    }
+  }
+
+  document.getElementById("closeModalBtn").onclick = closeModal;
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape" && overlay.classList.contains("open")) closeModal(); });
+  tabLogin.onclick = () => { authMode = "login"; authMsg.textContent = ""; setModeUI(); };
+  tabRegister.onclick = () => { authMode = "register"; authMsg.textContent = ""; setModeUI(); };
+
+  async function runAuth() {
+    const email = (authEmail.value || "").trim();
+    const password = authPassword.value || "";
+
+    if (!email) { authMsg.textContent = "Zadej email."; return; }
+    if (password.length < 8) { authMsg.textContent = "Heslo musí mít alespoň 8 znaků."; return; }
+
+    submitAuthBtn.disabled = true;
+    authMsg.textContent = authMode === "login" ? "Přihlašuji…" : "Registruji…";
+    boot("Auth: working…");
+
+    try {
+      if (authMode === "login") {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        // session se nastaví přes onAuthStateChange, ale zavřeme modal hned
+        authMsg.textContent = "Přihlášeno.";
+        closeModal();
+        boot("Auth: signed in");
+        return;
+      }
+
+      // REGISTER
+      const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password,
+        options: {
+          // po potvrzení emailu se uživatel vrátí sem
+          emailRedirectTo: APP_BASE_URL + "#auth"
+        }
+      });
+      if (error) throw error;
+
+      // Pokud je v projektu zapnuté "Confirm email", user bude neověřený dokud nepotvrdí email.
+      authMsg.textContent = "Registrace vytvořena. Zkontroluj email a potvrď adresu. Pak se přihlas heslem.";
+      boot("Auth: signUp ok");
+    } catch (err) {
+      console.error(err);
+      authMsg.textContent = (err && err.message) ? err.message : "Neznámá chyba";
+      boot("Auth: error");
+    } finally {
+      submitAuthBtn.disabled = false;
+    }
+  }
+
+  submitAuthBtn.onclick = runAuth;
+  authPassword.addEventListener("keydown", (e) => { if (e.key === "Enter") runAuth(); });
+  authEmail.addEventListener("keydown", (e) => { if (e.key === "Enter") authPassword.focus(); });
+
+  /* ===== App auth UI ===== */
   function disableVoteButtons(disabled) {
     document.querySelectorAll("button[data-vote-btn='1']").forEach(b => { b.disabled = disabled; });
   }
@@ -167,6 +303,7 @@ if (window.__PCV_INIT_DONE__) {
 
     isVerified = !!session.user?.email_confirmed_at;
     const email = session.user?.email || "uživatel";
+
     navUser.textContent = email + (isVerified ? " (ověřený)" : " (neověřený)");
     authStatus.textContent = isVerified
       ? "Přihlášený a ověřený uživatel"
@@ -174,7 +311,7 @@ if (window.__PCV_INIT_DONE__) {
 
     voteGateMsg.textContent = isVerified
       ? ""
-      : "Prosím ověř email (potvrzovací odkaz) – bez ověření nejde hlasovat.";
+      : "Prosím potvrď email (odkaz v emailu) – bez ověření nejde hlasovat.";
 
     loginBtn.classList.add("hidden");
     registerBtn.classList.add("hidden");
@@ -185,34 +322,13 @@ if (window.__PCV_INIT_DONE__) {
 
   function canVote() { return !!session && !!isVerified; }
 
-  async function sendMagicLink(mode) {
-    const label = mode === "register" ? "registraci" : "přihlášení";
-    const email = prompt(`Zadej email pro ${label}:`);
-    if (!email) return;
-
-    boot("Auth: sending email…");
-
-    const { error } = await supabaseClient.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: APP_BASE_URL + "#auth" }
-    });
-
-    if (error) {
-      alert("Nepodařilo se odeslat email: " + error.message);
-      boot("Auth: error");
-      return;
-    }
-
-    alert(`Hotovo. Poslal jsem email pro ${label}. Otevři odkaz v emailu – vrátí tě zpět na web.`);
-    boot("Auth: email sent");
-  }
-
   async function signOut() {
     boot("Auth: signing out…");
     await supabaseClient.auth.signOut();
     boot("Auth: signed out");
   }
 
+  /* ===== Data rendering ===== */
   function escapeHtml(s) {
     return String(s ?? "")
       .replaceAll("&", "&amp;")
@@ -243,7 +359,6 @@ if (window.__PCV_INIT_DONE__) {
 
   async function loadTop3() {
     boot("Data: loading TOP3…");
-
     const { data, error } = await supabaseClient
       .from("event_vote_counts")
       .select("event_id,votes,events(title,country_code,is_active)")
@@ -379,7 +494,6 @@ if (window.__PCV_INIT_DONE__) {
       if (countrySel.value) await loadEventsForCountry(countrySel.value);
     };
 
-    // initial fill
     const firstContinent = continentSel.value || (continents[0] ? String(continents[0].id) : "");
     if (firstContinent) {
       continentSel.value = firstContinent;
@@ -417,8 +531,8 @@ if (window.__PCV_INIT_DONE__) {
 
       // Navbar actions
       document.getElementById("homeBtn").onclick = goHome;
-      document.getElementById("loginNavBtn").onclick = () => sendMagicLink("login");
-      document.getElementById("registerNavBtn").onclick = () => sendMagicLink("register");
+      document.getElementById("loginNavBtn").onclick = () => openModal("login");
+      document.getElementById("registerNavBtn").onclick = () => openModal("register");
       document.getElementById("logoutNavBtn").onclick = signOut;
 
       // Refresh actions
@@ -428,7 +542,7 @@ if (window.__PCV_INIT_DONE__) {
         await loadEventsForCountry(cc);
       };
 
-      // Session (handles magic-link redirect too)
+      // Session
       const { data: sessData } = await supabaseClient.auth.getSession();
       session = sessData?.session || null;
       setAuthUI();
@@ -443,6 +557,7 @@ if (window.__PCV_INIT_DONE__) {
       await loadContinentsAndCountries();
       await loadTop3();
 
+      // If redirected from confirm email link, we just land here; session may or may not exist yet
       boot("Boot: ready");
     } catch (err) {
       boot("Startup error: " + err.message);
