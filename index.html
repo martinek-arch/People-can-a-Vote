@@ -2,83 +2,58 @@
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>People Can Vote</title>
 <style>
-body { font-family: sans-serif; }
-#boot { position: fixed; bottom: 10px; left: 10px; font-size: 12px; color: #555; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }
+  #boot { position: fixed; bottom: 10px; left: 10px; font-size: 12px; color: #555; background: rgba(255,255,255,0.9); padding: 6px 8px; border-radius: 8px; }
+  .badge { display:inline-block; padding:2px 8px; border:1px solid #ddd; border-radius:999px; font-size:12px; margin-left:8px; }
 </style>
 </head>
 <body>
 <div id="app">
-  <h1>People Can Vote</h1>
-  <p>Aplikace se spustila.</p>
+  <h1>People Can Vote <span class="badge">diag v5</span></h1>
+  <p>Aplikace se spustila (diagnostická verze pro ověření nahrávání).</p>
+  <p><b>Verze:</b> 2026-02-01T14:45Z</p>
 </div>
 <div id="boot">Init: starting…</div>
 
 <script>
-function boot(msg) {
-  document.getElementById("boot").textContent = msg;
-  console.log(msg);
-}
+/**
+ * Guard proti dvojitému vložení (když se soubor omylem zduplikuje / concat).
+ * Když se skript načte podruhé, jen to zaloguje a neprovádí init.
+ */
+if (window.__PCV_DIAG_INIT_DONE__) {
+  console.warn("PCV: init already done – duplicate HTML/script detected.");
+  // Zkusíme aspoň nastavit boot text, ať je vidět, že došlo k duplicitě.
+  const b = document.getElementById("boot");
+  if (b) b.textContent = "Init: duplicate page/script detected (upload concatenated)";
+} else {
+  window.__PCV_DIAG_INIT_DONE__ = true;
 
-// ==== STUB FUNKCE (aby se JS nikdy nezasekl) ====
-function setContinentPill() {}
-function renderContinentsBar() {}
-function renderCountriesForContinent() {}
-
-// ==== INIT ====
-(async function init() {
-  try {
-    boot("Init: JS running");
-    await new Promise(r => setTimeout(r, 300));
-    boot("Init: ready");
-  } catch (e) {
-    boot("Startup error: " + e.message);
-    console.error(e);
+  function boot(msg) {
+    const el = document.getElementById("boot");
+    if (el) el.textContent = msg;
+    console.log(msg);
   }
-})();
-</script>
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="cs">
-<head>
-<meta charset="UTF-8">
-<title>People Can Vote</title>
-<style>
-body { font-family: sans-serif; }
-#boot { position: fixed; bottom: 10px; left: 10px; font-size: 12px; color: #555; }
-</style>
-</head>
-<body>
-<div id="app">
-  <h1>People Can Vote</h1>
-  <p>Aplikace se spustila.</p>
-</div>
-<div id="boot">Init: starting…</div>
 
-<script>
-function boot(msg) {
-  document.getElementById("boot").textContent = msg;
-  console.log(msg);
+  // ==== STUB FUNKCE (aby se JS nikdy nezasekl) ====
+  function setContinentPill() {}
+  function renderContinentsBar() {}
+  function renderCountriesForContinent() {}
+
+  // ==== INIT ====
+  (async function init() {
+    try {
+      boot("Init: JS running (diag v5)");
+      await new Promise(r => setTimeout(r, 250));
+      boot("Init: ready (diag v5)");
+    } catch (e) {
+      boot("Startup error: " + (e && e.message ? e.message : String(e)));
+      console.error(e);
+    }
+  })();
 }
-
-// ==== STUB FUNKCE (aby se JS nikdy nezasekl) ====
-function setContinentPill() {}
-function renderContinentsBar() {}
-function renderCountriesForContinent() {}
-
-// ==== INIT ====
-(async function init() {
-  try {
-    boot("Init: JS running");
-    await new Promise(r => setTimeout(r, 300));
-    boot("Init: ready");
-  } catch (e) {
-    boot("Startup error: " + e.message);
-    console.error(e);
-  }
-})();
 </script>
 </body>
 </html>
