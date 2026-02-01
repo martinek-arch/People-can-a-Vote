@@ -120,7 +120,6 @@
     input{ min-width:180px; }
   }
 </style>
-<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 </head>
 
 <body>
@@ -345,11 +344,8 @@
 
 
 </div>
-
-<script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-
 <script>
+
 (function(){
   const bootEl = document.getElementById('bootStatus');
   const setBoot = (msg) => { try{ if(bootEl) bootEl.textContent = msg; }catch(e){} };
@@ -366,7 +362,75 @@
   });
 
   window.__setBoot = setBoot;
-})();
+})()
+;
+
+// Dynamic dependency loader (prevents "stuck on Booting" when CDN is slow/blocked)
+function loadScript(url, timeoutMs){
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.async = true;
+    s.referrerPolicy = 'no-referrer';
+    const t = setTimeout(() => {
+      try{ s.remove(); }catch(_){}
+      reject(new Error('script timeout: ' + url));
+    }, timeoutMs || 15000);
+
+    s.onload = () => { clearTimeout(t); resolve(true); };
+    s.onerror = () => { clearTimeout(t); reject(new Error('script load failed: ' + url)); };
+
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureSupabase(){
+  if (window.supabase && typeof window.supabase.createClient === 'function') return true;
+
+  // Try a couple of CDNs (jsdelivr first, then unpkg)
+  const candidates = [
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+    'https://unpkg.com/@supabase/supabase-js@2'
+  ];
+  let lastErr = null;
+  for (const url of candidates){
+    try{
+      try{ window.__setBoot && window.__setBoot('Init: loading Supabase…'); }catch(e){}
+      await loadScript(url, 20000);
+      if (window.supabase && typeof window.supabase.createClient === 'function') return true;
+    }catch(e){ lastErr = e; }
+  }
+  throw (lastErr || new Error('Supabase failed to load'));
+}
+
+async function ensureOptionalLibs(){
+  // Turf (optional)
+  try{
+    if (!window.turf){
+      try{ window.__setBoot && window.__setBoot('Init: loading Turf…'); }catch(e){}
+      await loadScript('https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js', 20000);
+    }
+  }catch(e){
+    console.warn(e);
+  }
+
+  // Mapbox GL JS (optional)
+  try{
+    if (!window.mapboxgl){
+      try{ window.__setBoot && window.__setBoot('Init: loading Mapbox…'); }catch(e){}
+      await loadScript('https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js', 20000);
+    }
+  }catch(e){
+    console.warn(e);
+  }
+}
+
+async function startApp(){
+
+  try{ window.__setBoot && window.__setBoot('Init: starting…'); }catch(e){}
+  await ensureSupabase();
+  await ensureOptionalLibs();
+;
 
 
 /* ===== i18n bootstrap (must be defined before anything calls t()) ===== */
@@ -2528,6 +2592,10 @@ supabaseClient.auth.onAuthStateChange(async (_event, session) => {
     }
   }catch(e){}
 });
+
+
+}
+startApp().catch((e)=>{ try{ window.__setBoot && window.__setBoot('Startup error: ' + (e?.message||e)); }catch(_){}; console.error(e); });
 
 </script>
 </body>
