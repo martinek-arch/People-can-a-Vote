@@ -296,7 +296,6 @@ if (window.__PCV_INIT_DONE__) {
         const { error } = await supabaseClient.auth.signInWithPassword({ email, password: p1 });
         if (error) throw error;
         closeModal();
-        // If countries were missing (policy mismatch), try to reload geo data
         boot("Auth: signed in");
         return;
       }
@@ -318,7 +317,6 @@ if (window.__PCV_INIT_DONE__) {
       if (error) throw error;
       authMsg.textContent = "Heslo změněno.";
       boot("Auth: password updated");
-      // auto-close after success
       setTimeout(() => { try { closeModal(); } catch(e){} }, 700);
     } catch (err) {
       console.error(err);
@@ -652,10 +650,6 @@ if (window.__PCV_INIT_DONE__) {
       supabaseClient.auth.onAuthStateChange(async (event, newSession) => {
         session = newSession;
         setAuthUI();
-
-        // Ensure geo selectors (countries) are available for the current role (anon/authenticated)
-          try { await loadContinentsAndCountries(); } catch(e) {}
-        }
 
         if (event === "PASSWORD_RECOVERY") {
           // open change password modal automatically
