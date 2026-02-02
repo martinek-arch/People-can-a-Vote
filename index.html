@@ -467,7 +467,7 @@ if (window.__PCV_INIT_DONE__) {
     boot("Data: TOP3 ready");
   }
 
-  function renderEvents(items) {
+  function renderEvents(items, votesMap) {
     const events = document.getElementById("events");
     events.innerHTML = "";
     if (!items?.length) {
@@ -477,13 +477,16 @@ if (window.__PCV_INIT_DONE__) {
 
     for (const e of items) {
       const div = document.createElement("div");
+
+      const votedChoice = votesMap && votesMap.has(e.id) ? votesMap.get(e.id) : null;
+      const hasVoted = votedChoice !== null && votedChoice !== undefined;
       div.className = "card";
 
       const btn = document.createElement("button");
-      btn.textContent = "Hlasovat";
+      btn.textContent = hasVoted ? "Už jsi hlasoval" : "Hlasovat";
       btn.className = "primary";
       btn.dataset.voteBtn = "1";
-      btn.disabled = !canVote();
+      btn.disabled = !canVote() || hasVoted;
 
       btn.onclick = async () => {
         if (!canVote()) {
@@ -493,21 +496,31 @@ if (window.__PCV_INIT_DONE__) {
         boot("Vote: submitting…");
         const payload = { event_id: e.id, user_id: session.user.id, choice: "support" };
         const { error } = await supabaseClient.from("votes").insert(payload);
+
         if (error) {
-          alert("Hlasování se nepodařilo: " + error.message);
+          const code = error.code || error?.details?.code;
+          if (code === "23505" || (error.message || "").toLowerCase().includes("duplicate")) {
+            alert("Už jsi pro tuto událost hlasoval.");
+          } else {
+            alert("Hlasování se nepodařilo: " + error.message);
+          }
           boot("Vote: error");
           return;
         }
+
         alert("Díky! Hlas byl uložen.");
         await loadTop3();
+        const cc = document.getElementById("countrySel").value;
+        if (cc) await loadEventsForCountry(cc);
         boot("Vote: OK");
       };
 
       const ended = e.ends_at ? (new Date(e.ends_at).getTime() < Date.now()) : false;
       const statusPill = ended ? "<span class='pill'>ukončeno</span>" : "<span class='pill'>aktivní</span>";
+      const votedPill = hasVoted ? ("<span class='pill'>hlasoval</span>") : "";
 
       div.innerHTML = `
-        <div class="eventTitle">${escapeHtml(e.title || "Untitled")} ${statusPill}</div>
+        <div class="eventTitle">${escapeHtml(e.title || "Untitled")} ${statusPill} ${votedPill}</div>
         <div class="muted">${escapeHtml(e.description || "")}</div>
         <div class="muted" style="margin-top:6px;">Země: ${escapeHtml(e.country_code || "")}</div>
       `;
@@ -528,7 +541,26 @@ if (window.__PCV_INIT_DONE__) {
 
     if (error) throw new Error("Events load failed: " + error.message);
 
-    renderEvents(data || []);
+    const events = data || [];
+    let votesMap = new Map();
+    if (session?.user?.id && events.length) {
+      try {
+        const ids = events.map(x => x.id);
+        const { data: myVotes, error: vErr } = await supabaseClient
+          .from("votes")
+          .select("event_id")
+          .eq("user_id", session.user.id)
+          .in("event_id", ids);
+
+        if (!vErr && myVotes) {
+          votesMap = new Map(myVotes.map(v => [v.event_id, "yes"]));
+        }
+      } catch (e) {
+        console.warn("Votes lookup failed", e);
+      }
+    }
+
+    renderEvents(events, votesMap);
     boot("Data: events ready");
   }
 
