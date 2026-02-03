@@ -622,46 +622,6 @@ if (window.__PCV_INIT_DONE__) {
   }
 
 
-    for (const e of items) {
-      const div = document.createElement("div");
-      div.className = "card";
-
-      const btn = document.createElement("button");
-      btn.textContent = "Hlasovat";
-      btn.className = "primary";
-      btn.dataset.voteBtn = "1";
-      btn.disabled = !canVote();
-
-      btn.onclick = async () => {
-        if (!canVote()) {
-          alert("Hlasování je dostupné jen pro přihlášené a ověřené uživatele.");
-          return;
-        }
-        boot("Vote: submitting…");
-        const payload = { event_id: e.id, user_id: session.user.id, choice: "support" };
-        const { error } = await supabaseClient.from("votes").insert(payload);
-        if (error) {
-          alert("Hlasování se nepodařilo: " + error.message);
-          boot("Vote: error");
-          return;
-        }
-        alert("Díky! Hlas byl uložen.");
-        await loadTop3();
-        boot("Vote: OK");
-      };
-
-      const ended = e.ends_at ? (new Date(e.ends_at).getTime() < Date.now()) : false;
-      const statusPill = ended ? "<span class='pill'>ukončeno</span>" : "<span class='pill'>aktivní</span>";
-
-      div.innerHTML = `
-        <div class="eventTitle">${escapeHtml(e.title || "Untitled")} ${statusPill}</div>
-        <div class="muted">${escapeHtml(e.description || "")}</div>
-        <div class="muted" style="margin-top:6px;">Země: ${escapeHtml(e.country_code || "")}</div>
-      `;
-      div.appendChild(btn);
-      events.appendChild(div);
-    }
-  }
 
   async function loadEventsForCountry(countryCode) {
     if (!countryCode) return;
@@ -858,7 +818,7 @@ renderEvents(data || []);
       console.error(err);
     }
   })();
-
+}
 </script>
 </body>
 </html>
