@@ -435,20 +435,16 @@ if (window.__PCV_INIT_DONE__) {
     if (!d || d <= 0) return 0;
     return Math.round((n / d) * 100);
   }
-
   function setBar(el, valuePct) {
     const v = Math.max(0, Math.min(100, Number(valuePct) || 0));
-    el.style.width = v + "%";
+    if (el) el.style.width = v + "%";
   }
-
   function renderResultBlock(title, r, sizeClass) {
     const yes = r?.yes || 0, no = r?.no || 0, dk = r?.dk || 0, total = r?.total || 0;
-
     const wrap = document.createElement("div");
     wrap.className = "resultBlock " + (sizeClass || "large");
     wrap.innerHTML = `
       <div class="resultTitle">${escapeHtml(title)}</div>
-
       <div class="rowBar">
         <div><b>Ano</b></div>
         <div class="bar"><div class="barFill" data-k="yes"></div></div>
@@ -464,10 +460,8 @@ if (window.__PCV_INIT_DONE__) {
         <div class="bar"><div class="barFill" data-k="dk"></div></div>
         <div class="pct">${pct(dk,total)}%</div>
       </div>
-
       <div class="countLine">Hlasů celkem: <b>${total}</b> (Ano: ${yes}, Ne: ${no}, Nevím: ${dk})</div>
     `;
-
     setBar(wrap.querySelector('[data-k="yes"]'), pct(yes,total));
     setBar(wrap.querySelector('[data-k="no"]'),  pct(no,total));
     setBar(wrap.querySelector('[data-k="dk"]'),  pct(dk,total));
@@ -537,15 +531,14 @@ if (window.__PCV_INIT_DONE__) {
     for (const e of items) {
       const div = document.createElement("div");
 
-      const votedChoice = votesMap && votesMap.has(e.id) ? votesMap.get(e.id) : null;
-      const hasVoted = votedChoice !== null && votedChoice !== undefined;
+      const hasVoted = votesMap && votesMap.has(e.id);
       div.className = "card";
 
       const btn = document.createElement("button");
-      btn.textContent = hasVoted ? "Už jsi hlasoval" : "Hlasovat";
+      btn.textContent = "Hlasovat";
       btn.className = "primary";
       btn.dataset.voteBtn = "1";
-      btn.disabled = !canVote() || hasVoted;
+      btn.disabled = !canVote();
 
       btn.onclick = async () => {
         if (!canVote()) {
@@ -555,29 +548,19 @@ if (window.__PCV_INIT_DONE__) {
         boot("Vote: submitting…");
         const payload = { event_id: e.id, user_id: session.user.id, choice };
         const { error } = await supabaseClient.from("votes").insert(payload);
-
         if (error) {
-          const code = error.code || error?.details?.code;
-          if (code === "23505" || (error.message || "").toLowerCase().includes("duplicate")) {
-            alert("Už jste pro tuto událost hlasoval.");
-          } else {
-            alert("Hlasování se nepodařilo: " + error.message);
-          }
+          alert("Hlasování se nepodařilo: " + error.message);
           boot("Vote: error");
           return;
         }
-
         alert("Díky! Hlas byl uložen.");
         await loadTop3();
-        const cc = document.getElementById("countrySel").value;
-        if (cc) await loadEventsForCountry(cc);
         boot("Vote: OK");
       };
 
       const ended = e.ends_at ? (new Date(e.ends_at).getTime() < Date.now()) : false;
       const statusPill = ended ? "<span class='pill'>ukončeno</span>" : "<span class='pill'>aktivní</span>";
-      const votedPill = hasVoted ? ("<span class='pill'>už jste hlasoval</span>") : "";
-
+      const votedPill = hasVoted ? "<span class='pill'>už jste hlasoval</span>" : "";
       div.innerHTML = `
         <div class="eventTitle">${escapeHtml(e.title || "Untitled")} ${statusPill} ${votedPill}</div>
         <div class="muted">${escapeHtml(e.description || "")}</div>
@@ -600,43 +583,7 @@ if (window.__PCV_INIT_DONE__) {
 
     if (error) throw new Error("Events load failed: " + error.message);
 
-    const events = data || [];
-    const ids = events.map(x => x.id);
-    let votesMap = new Map();
-    // Public results (visible to everyone)
-    let resultsMap = new Map();
-    if (session?.user?.id && events.length) {
-      try {
-        const ids = events.map(x => x.id);
-        const { data: myVotes, error: vErr } = await supabaseClient
-          .from("votes")
-          .select("event_id")
-          .eq("user_id", session.user.id)
-          .in("event_id", ids);
-
-        if (!vErr && myVotes) {
-          votesMap = new Map(myVotes.map(v => [v.event_id, "yes"]));
-        }
-      } catch (e) {
-        console.warn("Votes lookup failed", e);
-      }
-    }
-
-    
-    if (ids.length) {
-      try {
-        const { data: rows, error: rErr } = await supabaseClient.rpc("get_event_results", { event_ids: ids });
-        if (!rErr && rows) {
-          resultsMap = new Map(rows.map(r => [r.event_id, r]));
-        } else if (rErr) {
-          console.warn("Results RPC error", rErr);
-        }
-      } catch (e) {
-        console.warn("Results lookup failed", e);
-      }
-    }
-
-    renderEvents(events, votesMap, resultsMap);
+    renderEvents(data || []);
     boot("Data: events ready");
   }
 
