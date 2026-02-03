@@ -53,6 +53,21 @@
   .tab { border:1px solid var(--border); border-radius: 999px; padding: 6px 10px; cursor:pointer; background:#fff; }
   .tab.active { font-weight: 800; }
   .msg { margin-top: 10px; }
+
+  .answers { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .answers button { font-weight:800; }
+  .resultsWrap { margin-top: 12px; display:flex; flex-direction:column; gap:10px; }
+  .resultBlock { border:1px solid var(--border); border-radius: 14px; padding:10px; background:#fff; }
+  .resultBlock.large { padding:12px; }
+  .resultBlock.medium { padding:10px; opacity:0.98; transform: scale(0.985); transform-origin: left top; }
+  .resultBlock.small { padding:9px; opacity:0.96; transform: scale(0.97); transform-origin: left top; }
+  .resultTitle { font-weight:900; margin-bottom:8px; }
+  .rowBar { display:grid; grid-template-columns: 58px 1fr 62px; gap:10px; align-items:center; margin:6px 0; }
+  .bar { height:10px; border:1px solid var(--border); border-radius:999px; overflow:hidden; background:#fafafa; }
+  .barFill { height:100%; width:0%; background:#111; }
+  .pct { text-align:right; font-variant-numeric: tabular-nums; }
+  .countLine { margin-top:6px; font-size:12px; color: var(--muted); }
+
 </style>
 </head>
 <body>
@@ -415,6 +430,50 @@ if (window.__PCV_INIT_DONE__) {
   }
 
   /* ===== Data rendering ===== */
+  
+  function pct(n, d) {
+    if (!d || d <= 0) return 0;
+    return Math.round((n / d) * 100);
+  }
+
+  function setBar(el, valuePct) {
+    const v = Math.max(0, Math.min(100, Number(valuePct) || 0));
+    el.style.width = v + "%";
+  }
+
+  function renderResultBlock(title, r, sizeClass) {
+    const yes = r?.yes || 0, no = r?.no || 0, dk = r?.dk || 0, total = r?.total || 0;
+
+    const wrap = document.createElement("div");
+    wrap.className = "resultBlock " + (sizeClass || "large");
+    wrap.innerHTML = `
+      <div class="resultTitle">${escapeHtml(title)}</div>
+
+      <div class="rowBar">
+        <div><b>Ano</b></div>
+        <div class="bar"><div class="barFill" data-k="yes"></div></div>
+        <div class="pct">${pct(yes,total)}%</div>
+      </div>
+      <div class="rowBar">
+        <div><b>Ne</b></div>
+        <div class="bar"><div class="barFill" data-k="no"></div></div>
+        <div class="pct">${pct(no,total)}%</div>
+      </div>
+      <div class="rowBar">
+        <div><b>Nevím</b></div>
+        <div class="bar"><div class="barFill" data-k="dk"></div></div>
+        <div class="pct">${pct(dk,total)}%</div>
+      </div>
+
+      <div class="countLine">Hlasů celkem: <b>${total}</b> (Ano: ${yes}, Ne: ${no}, Nevím: ${dk})</div>
+    `;
+
+    setBar(wrap.querySelector('[data-k="yes"]'), pct(yes,total));
+    setBar(wrap.querySelector('[data-k="no"]'),  pct(no,total));
+    setBar(wrap.querySelector('[data-k="dk"]'),  pct(dk,total));
+    return wrap;
+  }
+
   function escapeHtml(s) {
     return String(s ?? "")
       .replaceAll("&", "&amp;")
@@ -467,7 +526,7 @@ if (window.__PCV_INIT_DONE__) {
     boot("Data: TOP3 ready");
   }
 
-  function renderEvents(items, votesMap) {
+  function renderEvents(items, votesMap, resultsMap) {
     const events = document.getElementById("events");
     events.innerHTML = "";
     if (!items?.length) {
@@ -494,13 +553,13 @@ if (window.__PCV_INIT_DONE__) {
           return;
         }
         boot("Vote: submitting…");
-        const payload = { event_id: e.id, user_id: session.user.id, choice: "support" };
+        const payload = { event_id: e.id, user_id: session.user.id, choice };
         const { error } = await supabaseClient.from("votes").insert(payload);
 
         if (error) {
           const code = error.code || error?.details?.code;
           if (code === "23505" || (error.message || "").toLowerCase().includes("duplicate")) {
-            alert("Už jsi pro tuto událost hlasoval.");
+            alert("Už jste pro tuto událost hlasoval.");
           } else {
             alert("Hlasování se nepodařilo: " + error.message);
           }
@@ -517,7 +576,7 @@ if (window.__PCV_INIT_DONE__) {
 
       const ended = e.ends_at ? (new Date(e.ends_at).getTime() < Date.now()) : false;
       const statusPill = ended ? "<span class='pill'>ukončeno</span>" : "<span class='pill'>aktivní</span>";
-      const votedPill = hasVoted ? ("<span class='pill'>hlasoval</span>") : "";
+      const votedPill = hasVoted ? ("<span class='pill'>už jste hlasoval</span>") : "";
 
       div.innerHTML = `
         <div class="eventTitle">${escapeHtml(e.title || "Untitled")} ${statusPill} ${votedPill}</div>
@@ -542,7 +601,10 @@ if (window.__PCV_INIT_DONE__) {
     if (error) throw new Error("Events load failed: " + error.message);
 
     const events = data || [];
+    const ids = events.map(x => x.id);
     let votesMap = new Map();
+    // Public results (visible to everyone)
+    let resultsMap = new Map();
     if (session?.user?.id && events.length) {
       try {
         const ids = events.map(x => x.id);
@@ -560,7 +622,21 @@ if (window.__PCV_INIT_DONE__) {
       }
     }
 
-    renderEvents(events, votesMap);
+    
+    if (ids.length) {
+      try {
+        const { data: rows, error: rErr } = await supabaseClient.rpc("get_event_results", { event_ids: ids });
+        if (!rErr && rows) {
+          resultsMap = new Map(rows.map(r => [r.event_id, r]));
+        } else if (rErr) {
+          console.warn("Results RPC error", rErr);
+        }
+      } catch (e) {
+        console.warn("Results lookup failed", e);
+      }
+    }
+
+    renderEvents(events, votesMap, resultsMap);
     boot("Data: events ready");
   }
 
