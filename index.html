@@ -54,6 +54,7 @@
   .tab.active { font-weight: 800; }
   .msg { margin-top: 10px; }
 
+  /* Voting answers + result blocks */
   .answers { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
   .answers button { font-weight:800; }
   .resultsWrap { margin-top: 12px; display:flex; flex-direction:column; gap:10px; }
@@ -430,7 +431,16 @@ if (window.__PCV_INIT_DONE__) {
   }
 
   /* ===== Data rendering ===== */
-  
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+
   function pct(n, d) {
     if (!d || d <= 0) return 0;
     return Math.round((n / d) * 100);
@@ -445,6 +455,7 @@ if (window.__PCV_INIT_DONE__) {
     wrap.className = "resultBlock " + (sizeClass || "large");
     wrap.innerHTML = `
       <div class="resultTitle">${escapeHtml(title)}</div>
+
       <div class="rowBar">
         <div><b>Ano</b></div>
         <div class="bar"><div class="barFill" data-k="yes"></div></div>
@@ -460,6 +471,7 @@ if (window.__PCV_INIT_DONE__) {
         <div class="bar"><div class="barFill" data-k="dk"></div></div>
         <div class="pct">${pct(dk,total)}%</div>
       </div>
+
       <div class="countLine">Hlasů celkem: <b>${total}</b> (Ano: ${yes}, Ne: ${no}, Nevím: ${dk})</div>
     `;
     setBar(wrap.querySelector('[data-k="yes"]'), pct(yes,total));
@@ -468,14 +480,6 @@ if (window.__PCV_INIT_DONE__) {
     return wrap;
   }
 
-  function escapeHtml(s) {
-    return String(s ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
 
   function renderTop3(items) {
     const top3 = document.getElementById("top3");
@@ -529,9 +533,97 @@ if (window.__PCV_INIT_DONE__) {
     }
 
     for (const e of items) {
-      const div = document.createElement("div");
-
       const hasVoted = votesMap && votesMap.has(e.id);
+
+      const div = document.createElement("div");
+      div.className = "card";
+
+      const ended = e.ends_at ? (new Date(e.ends_at).getTime() < Date.now()) : false;
+      const statusPill = ended ? "<span class='pill'>ukončeno</span>" : "<span class='pill'>aktivní</span>";
+      const votedPill = hasVoted ? "<span class='pill'>už jste hlasoval</span>" : "";
+
+      div.innerHTML = `
+        <div class="eventTitle">${escapeHtml(e.title || "Untitled")} ${statusPill} ${votedPill}</div>
+        <div class="muted">${escapeHtml(e.description || "")}</div>
+        <div class="muted" style="margin-top:6px;">Země: ${escapeHtml(e.country_code || "")}</div>
+      `;
+
+      // Answers
+      const answers = document.createElement("div");
+      answers.className = "answers";
+
+      function mkAnswer(label, choice) {
+        const b = document.createElement("button");
+        b.textContent = label;
+        b.className = "primary";
+        b.disabled = ended || !canVote() || hasVoted;
+
+        b.onclick = async () => {
+          if (!canVote()) {
+            alert("Hlasování je dostupné jen pro přihlášené a ověřené uživatele.");
+            return;
+          }
+          if (ended) {
+            alert("Tato událost už je ukončená.");
+            return;
+          }
+          if (hasVoted) {
+            alert("Už jste pro tuto událost hlasoval.");
+            return;
+          }
+
+          boot("Vote: submitting…");
+          const payload = { event_id: e.id, user_id: session.user.id, choice };
+          const { error } = await supabaseClient.from("votes").insert(payload);
+
+          if (error) {
+            // Duplicate vote (unique constraint) -> show friendly message
+            if (error.code === "23505") {
+              alert("Už jste pro tuto událost hlasoval.");
+            } else {
+              alert("Hlasování se nepodařilo: " + error.message);
+            }
+            boot("Vote: error");
+            return;
+          }
+
+          alert("Díky! Hlas byl uložen.");
+          boot("Vote: OK");
+
+          // Refresh events + TOP3 so results update immediately
+          await loadEventsForCountry(e.country_code);
+          await loadTop3();
+        };
+
+        return b;
+      }
+
+      answers.appendChild(mkAnswer("Ano", "yes"));
+      answers.appendChild(mkAnswer("Ne", "no"));
+      answers.appendChild(mkAnswer("Nevím", "dont_know"));
+      div.appendChild(answers);
+
+      // Results (public)
+      const resWrap = document.createElement("div");
+      resWrap.className = "resultsWrap";
+
+      const r = resultsMap && resultsMap.has(e.id) ? resultsMap.get(e.id) : null;
+      if (r) {
+        resWrap.appendChild(renderResultBlock("Celkem (všichni)", { yes: r.yes_total, no: r.no_total, dk: r.dk_total, total: r.votes_total }, "large"));
+        resWrap.appendChild(renderResultBlock("Občané cílové země", { yes: r.yes_dom, no: r.no_dom, dk: r.dk_dom, total: r.votes_dom_total }, "medium"));
+        resWrap.appendChild(renderResultBlock("Ostatní země", { yes: r.yes_for, no: r.no_for, dk: r.dk_for, total: r.votes_for_total }, "small"));
+      } else {
+        resWrap.innerHTML = "<div class='muted'>Výsledky se načítají…</div>";
+      }
+
+      div.appendChild(resWrap);
+      events.appendChild(div);
+    }
+  }
+
+
+    for (const e of items) {
+      const div = document.createElement("div");
       div.className = "card";
 
       const btn = document.createElement("button");
@@ -546,7 +638,7 @@ if (window.__PCV_INIT_DONE__) {
           return;
         }
         boot("Vote: submitting…");
-        const payload = { event_id: e.id, user_id: session.user.id, choice };
+        const payload = { event_id: e.id, user_id: session.user.id, choice: "support" };
         const { error } = await supabaseClient.from("votes").insert(payload);
         if (error) {
           alert("Hlasování se nepodařilo: " + error.message);
@@ -560,9 +652,9 @@ if (window.__PCV_INIT_DONE__) {
 
       const ended = e.ends_at ? (new Date(e.ends_at).getTime() < Date.now()) : false;
       const statusPill = ended ? "<span class='pill'>ukončeno</span>" : "<span class='pill'>aktivní</span>";
-      const votedPill = hasVoted ? "<span class='pill'>už jste hlasoval</span>" : "";
+
       div.innerHTML = `
-        <div class="eventTitle">${escapeHtml(e.title || "Untitled")} ${statusPill} ${votedPill}</div>
+        <div class="eventTitle">${escapeHtml(e.title || "Untitled")} ${statusPill}</div>
         <div class="muted">${escapeHtml(e.description || "")}</div>
         <div class="muted" style="margin-top:6px;">Země: ${escapeHtml(e.country_code || "")}</div>
       `;
@@ -581,9 +673,47 @@ if (window.__PCV_INIT_DONE__) {
       .eq("is_active", true)
       .order("created_at", { ascending: false });
 
-    if (error) throw new Error("Events load failed: " + error.message);
+    
+if (error) throw new Error("Events load failed: " + error.message);
 
-    renderEvents(data || []);
+    const events = data || [];
+    const ids = events.map(x => x.id);
+
+    // My votes (for disabling buttons) - only when logged in
+    let votesMap = new Map();
+    if (session?.user?.id && ids.length) {
+      try {
+        const { data: myVotes, error: vErr } = await supabaseClient
+          .from("votes")
+          .select("event_id")
+          .eq("user_id", session.user.id)
+          .in("event_id", ids);
+
+        if (!vErr && myVotes) {
+          votesMap = new Map(myVotes.map(v => [v.event_id, true]));
+        }
+      } catch (e) {
+        console.warn("Votes lookup failed", e);
+      }
+    }
+
+    // Public results (visible to everyone) via RPC
+    let resultsMap = new Map();
+    if (ids.length) {
+      try {
+        const { data: rows, error: rErr } = await supabaseClient.rpc("get_event_results", { event_ids: ids });
+        if (!rErr && rows) {
+          resultsMap = new Map(rows.map(r => [r.event_id, r]));
+        } else if (rErr) {
+          console.warn("Results RPC error", rErr);
+        }
+      } catch (e) {
+        console.warn("Results lookup failed", e);
+      }
+    }
+
+    renderEvents(events, votesMap, resultsMap);
+renderEvents(data || []);
     boot("Data: events ready");
   }
 
