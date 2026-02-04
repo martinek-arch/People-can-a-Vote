@@ -68,6 +68,13 @@
   .barFill { height:100%; width:0%; background:#111; }
   .pct { text-align:right; font-variant-numeric: tabular-nums; }
   .countLine { margin-top:6px; font-size:12px; color: var(--muted); }
+  .mapPanel { display:flex; flex-direction:column; gap:10px; }
+  .mapList { display:flex; flex-direction:column; gap:8px; }
+  .mapRow { display:grid; grid-template-columns: minmax(140px, 1fr) 1fr 70px; gap:10px; align-items:center; }
+  .mapBar { height:8px; border:1px solid var(--border); border-radius:999px; overflow:hidden; background:#fafafa; }
+  .mapBarFill { height:100%; width:0%; background:#111; }
+  .mapButton { text-align:left; background:transparent; border:none; padding:0; cursor:pointer; font-weight:600; }
+  .mapHint { font-size:12px; color: var(--muted); }
 
 </style>
 </head>
@@ -112,6 +119,18 @@
     </div>
   </div>
 
+  <div class="card" id="mapCard">
+    <div class="row" style="justify-content:space-between;">
+      <b>Interaktivní přehled podle zemí</b>
+      <button id="refreshMapBtn">Obnovit mapu</button>
+    </div>
+    <div class="mapPanel" style="margin-top:10px;">
+      <div id="mapSummary" class="muted">Načítání mapy hlasování…</div>
+      <div id="mapList" class="mapList"></div>
+      <div class="mapHint">Kliknutím na zemi otevřeš události týkající se daného státu.</div>
+    </div>
+  </div>
+
   <div class="card">
     <div class="row" style="justify-content:space-between;">
       <b>TOP 3 události (nejvíc hlasujících)</b>
@@ -122,9 +141,16 @@
 
   <div class="card">
     <div class="row" style="justify-content:space-between;">
-      <b>Události v zemi</b>
+      <b>Aktivní události v zemi</b>
     </div>
-    <div id="events" class="list" style="margin-top:10px;"></div>
+    <div id="eventsActive" class="list" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <b>Archiv / ukončené hlasování</b>
+    </div>
+    <div id="eventsArchive" class="list" style="margin-top:10px;"></div>
   </div>
 </main>
 
@@ -445,6 +471,12 @@ if (window.__PCV_INIT_DONE__) {
     if (!d || d <= 0) return 0;
     return Math.round((n / d) * 100);
   }
+  function formatDate(value) {
+    if (!value) return "neuvedeno";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "neuvedeno";
+    return d.toLocaleDateString("cs-CZ");
+  }
   function setBar(el, valuePct) {
     const v = Math.max(0, Math.min(100, Number(valuePct) || 0));
     if (el) el.style.width = v + "%";
@@ -480,6 +512,61 @@ if (window.__PCV_INIT_DONE__) {
     return wrap;
   }
 
+  function setMapBar(el, valuePct) {
+    const v = Math.max(0, Math.min(100, Number(valuePct) || 0));
+    if (el) el.style.width = v + "%";
+  }
+
+  function renderMap(rows) {
+    const mapList = document.getElementById("mapList");
+    const mapSummary = document.getElementById("mapSummary");
+    mapList.innerHTML = "";
+
+    if (!rows?.length) {
+      mapSummary.textContent = "Zatím žádná data pro mapu hlasování.";
+      return;
+    }
+
+    const totalVotes = rows.reduce((sum, r) => sum + (r.votes || 0), 0);
+    mapSummary.textContent = `Zemí s hlasováním: ${rows.length}. Celkový počet hlasů: ${totalVotes}.`;
+
+    const maxVotes = Math.max(...rows.map(r => r.votes || 0), 1);
+    for (const row of rows) {
+      const entry = document.createElement("div");
+      entry.className = "mapRow";
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "mapButton";
+      button.textContent = row.label;
+      button.onclick = () => {
+        const countrySel = document.getElementById("countrySel");
+        if (countrySel) {
+          countrySel.value = row.code;
+          countrySel.dispatchEvent(new Event("change"));
+          window.scrollTo({ top: document.getElementById("homeCard").offsetTop - 20, behavior: "smooth" });
+        }
+      };
+
+      const bar = document.createElement("div");
+      bar.className = "mapBar";
+      const fill = document.createElement("div");
+      fill.className = "mapBarFill";
+      bar.appendChild(fill);
+
+      const pctValue = Math.round((row.votes / maxVotes) * 100);
+      setMapBar(fill, pctValue);
+
+      const count = document.createElement("div");
+      count.className = "pct";
+      count.textContent = `${row.votes}`;
+
+      entry.appendChild(button);
+      entry.appendChild(bar);
+      entry.appendChild(count);
+      mapList.appendChild(entry);
+    }
+  }
 
   function renderTop3(items) {
     const top3 = document.getElementById("top3");
@@ -524,11 +611,10 @@ if (window.__PCV_INIT_DONE__) {
     boot("Data: TOP3 ready");
   }
 
-  function renderEvents(items, votesMap, resultsMap) {
-    const events = document.getElementById("events");
-    events.innerHTML = "";
+  function renderEventList(container, items, votesMap, resultsMap, emptyMessage) {
+    container.innerHTML = "";
     if (!items?.length) {
-      events.innerHTML = "<div class='muted'>V této zemi zatím nejsou žádné aktivní události.</div>";
+      container.innerHTML = `<div class='muted'>${emptyMessage}</div>`;
       return;
     }
 
@@ -538,7 +624,9 @@ if (window.__PCV_INIT_DONE__) {
       const div = document.createElement("div");
       div.className = "card";
 
-      const ended = e.ends_at ? (new Date(e.ends_at).getTime() < Date.now()) : false;
+      const ended = e.is_active === false
+        ? true
+        : (e.ends_at ? (new Date(e.ends_at).getTime() < Date.now()) : false);
       const statusPill = ended ? "<span class='pill'>ukončeno</span>" : "<span class='pill'>aktivní</span>";
       const votedPill = hasVoted ? "<span class='pill'>už jste hlasoval</span>" : "";
 
@@ -546,6 +634,7 @@ if (window.__PCV_INIT_DONE__) {
         <div class="eventTitle">${escapeHtml(e.title || "Untitled")} ${statusPill} ${votedPill}</div>
         <div class="muted">${escapeHtml(e.description || "")}</div>
         <div class="muted" style="margin-top:6px;">Země: ${escapeHtml(e.country_code || "")}</div>
+        <div class="muted">Hlasování do: ${escapeHtml(formatDate(e.ends_at))}</div>
       `;
 
       // Answers
@@ -617,10 +706,41 @@ if (window.__PCV_INIT_DONE__) {
       }
 
       div.appendChild(resWrap);
-      events.appendChild(div);
+      container.appendChild(div);
     }
   }
 
+  function renderEvents(items, votesMap, resultsMap) {
+    const activeWrap = document.getElementById("eventsActive");
+    const archiveWrap = document.getElementById("eventsArchive");
+    const now = Date.now();
+
+    const active = [];
+    const archived = [];
+    for (const e of items || []) {
+      const ended = e.ends_at ? (new Date(e.ends_at).getTime() < now) : false;
+      if (ended || e.is_active === false) {
+        archived.push(e);
+      } else {
+        active.push(e);
+      }
+    }
+
+    renderEventList(
+      activeWrap,
+      active,
+      votesMap,
+      resultsMap,
+      "V této zemi zatím nejsou žádné aktivní události."
+    );
+    renderEventList(
+      archiveWrap,
+      archived,
+      votesMap,
+      resultsMap,
+      "Zatím tu nejsou žádné ukončené události."
+    );
+  }
 
 
   async function loadEventsForCountry(countryCode) {
@@ -630,7 +750,6 @@ if (window.__PCV_INIT_DONE__) {
       .from("events")
       .select("id,title,description,country_code,is_active,is_top,ends_at,created_at")
       .eq("country_code", countryCode)
-      .eq("is_active", true)
       .order("created_at", { ascending: false });
 
     
@@ -673,8 +792,61 @@ if (error) throw new Error("Events load failed: " + error.message);
     }
 
     renderEvents(events, votesMap, resultsMap);
-renderEvents(data || []);
     boot("Data: events ready");
+  }
+
+  async function loadMapOverview() {
+    boot("Data: loading map…");
+    const { data, error } = await supabaseClient
+      .from("event_vote_counts")
+      .select("votes,events(country_code)")
+      .order("votes", { ascending: false });
+
+    if (error) {
+      console.warn("Map load failed", error);
+      renderMap([]);
+      return;
+    }
+
+    const byCountry = new Map();
+    for (const row of data || []) {
+      const code = row.events?.country_code;
+      if (!code) continue;
+      const prev = byCountry.get(code) || 0;
+      byCountry.set(code, prev + (row.votes || 0));
+    }
+
+    const countries = Array.from(byCountry.entries()).map(([code, votes]) => ({
+      code,
+      votes
+    }));
+
+    if (!countries.length) {
+      renderMap([]);
+      return;
+    }
+
+    const { data: countryRows, error: cErr } = await supabaseClient
+      .from("countries")
+      .select("code,name")
+      .in("code", countries.map(c => c.code));
+
+    if (cErr) {
+      console.warn("Countries lookup failed", cErr);
+    }
+
+    const nameMap = new Map((countryRows || []).map(c => [c.code, c.name]));
+    const rows = countries
+      .map(c => ({
+        code: c.code,
+        votes: c.votes,
+        label: `${nameMap.get(c.code) || c.code} (${c.code})`
+      }))
+      .sort((a, b) => b.votes - a.votes)
+      .slice(0, 20);
+
+    renderMap(rows);
+    boot("Data: map ready");
   }
 
   async function loadContinentsAndCountries() {
@@ -782,6 +954,7 @@ renderEvents(data || []);
 
       // Refresh actions
       document.getElementById("refreshTop3Btn").onclick = loadTop3;
+      document.getElementById("refreshMapBtn").onclick = loadMapOverview;
       document.getElementById("refreshEventsBtn").onclick = async () => {
         const cc = document.getElementById("countrySel").value;
         await loadEventsForCountry(cc);
@@ -808,6 +981,7 @@ renderEvents(data || []);
 
       await loadContinentsAndCountries();
       await loadTop3();
+      await loadMapOverview();
 
       // If user lands with recovery hash, open the update modal
       maybeOpenRecoveryModal();
