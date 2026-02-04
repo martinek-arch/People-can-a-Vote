@@ -566,6 +566,13 @@ if (window.__PCV_INIT_DONE__) {
     const minutes = Math.floor((diff % 36e5) / 6e4);
     return `${hours} h ${minutes} min`;
   }
+  function getEventEnd(eventItem) {
+    if (eventItem?.ends_at) return new Date(eventItem.ends_at).getTime();
+    if (eventItem?.created_at) {
+      return new Date(eventItem.created_at).getTime() + 30 * 24 * 60 * 60 * 1000;
+    }
+    return NaN;
+  }
   function setBar(el, valuePct) {
     const v = Math.max(0, Math.min(100, Number(valuePct) || 0));
     if (el) el.style.width = v + "%";
@@ -699,20 +706,23 @@ if (window.__PCV_INIT_DONE__) {
         };
       }
 
+      const endAt = getEventEnd(eventItem);
       const ended = eventItem.is_active === false
         ? true
-        : (eventItem.ends_at ? (new Date(eventItem.ends_at).getTime() < Date.now()) : false);
+        : (Number.isNaN(endAt) ? false : endAt < Date.now());
       const statusPill = ended ? "<span class='pill'>ukončeno</span>" : "<span class='pill'>aktivní</span>";
       const votedPill = hasVoted ? "<span class='pill'>už jste hlasoval</span>" : "";
 
       const remainingLabel = ended
         ? "Hlasování ukončeno"
-        : `Do konce hlasování zbývá: ${escapeHtml(formatRemainingTime(eventItem.ends_at))}`;
+        : `Do konce hlasování zbývá: ${escapeHtml(formatRemainingTime(endAt))}`;
       div.innerHTML = `
         <div class="eventTitle">${escapeHtml(eventItem.title || "Untitled")} ${statusPill} ${votedPill}</div>
         <div class="muted">${escapeHtml(eventItem.description || "")}</div>
-        <div class="muted" style="margin-top:6px;">Země: ${escapeHtml(eventItem.country_code || "")}</div>
-        <div class="muted">${remainingLabel}</div>
+        <div class="eventMetaRow">
+          <div class="eventCountry muted">Země: ${escapeHtml(eventItem.country_code || "")}</div>
+          <div class="eventRemaining muted">${remainingLabel}</div>
+        </div>
       `;
 
       // Answers
@@ -771,7 +781,7 @@ if (window.__PCV_INIT_DONE__) {
       if (!clickable) {
         if (hasVoted) {
           const votedMsg = document.createElement("div");
-          votedMsg.className = "muted";
+          votedMsg.className = "votedBadge";
           votedMsg.textContent = "Odhlasováno";
           div.appendChild(votedMsg);
         } else {
@@ -807,7 +817,10 @@ if (window.__PCV_INIT_DONE__) {
     const active = [];
     const archived = [];
     for (const e of items || []) {
-      const ended = e.ends_at ? (new Date(e.ends_at).getTime() < now) : false;
+      const endAt = getEventEnd(e);
+      const ended = e.is_active === false
+        ? true
+        : (Number.isNaN(endAt) ? false : endAt < now);
       if (ended || e.is_active === false) {
         archived.push(e);
       } else {
@@ -929,8 +942,10 @@ if (window.__PCV_INIT_DONE__) {
 
     document.getElementById("eventTitle").textContent = eventData.title || "Událost";
     document.getElementById("eventMeta").textContent = eventData.description || "";
+    document.getElementById("eventMeta").classList.add("eventQuestion");
     const statusEl = document.getElementById("eventStatus");
-    const isClosed = eventData.is_active === false || (eventData.ends_at && new Date(eventData.ends_at).getTime() < Date.now());
+    const eventEndAt = getEventEnd(eventData);
+    const isClosed = eventData.is_active === false || (Number.isNaN(eventEndAt) ? false : eventEndAt < Date.now());
     if (statusEl) {
       statusEl.textContent = isClosed ? "Uzavřeno" : "Aktivní";
       statusEl.classList.toggle("active", !isClosed);
