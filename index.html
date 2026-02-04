@@ -5,20 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>People Can Vote</title>
 <style>
-  :root { --muted:#555; --border:#e6e6e6; --bg:#fff; }
-  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: var(--bg); }
+  :root {
+    --muted:#5d6470;
+    --border:#e5e7eb;
+    --bg:#f7f8fb;
+    --card:#ffffff;
+    --text:#111827;
+    --accent:#2563eb;
+    --yes:#16a34a;
+    --no:#dc2626;
+    --dk:#f59e0b;
+  }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
   main { padding: 20px 24px 64px; max-width: 1100px; margin: 0 auto; }
   h1 { margin: 12px 0 12px; }
   #boot { position: fixed; bottom: 10px; left: 10px; font-size: 12px; color: var(--muted);
           background: rgba(255,255,255,0.92); padding: 6px 8px; border-radius: 10px; border: 1px solid var(--border); }
   .row { display:flex; gap: 12px; align-items:center; flex-wrap:wrap; }
-  .card { border: 1px solid var(--border); border-radius: 14px; padding: 12px; margin: 12px 0; background:#fff; }
+  .card { border: 1px solid var(--border); border-radius: 14px; padding: 12px; margin: 12px 0; background:var(--card); }
   .muted { color: var(--muted); }
   .hidden { display:none !important; }
   select, button, input { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: white; }
   input { min-width: 260px; }
   button { cursor: pointer; }
   button.primary { font-weight: 800; }
+  button.answer-yes { background: color-mix(in srgb, var(--yes) 14%, #fff); border-color: color-mix(in srgb, var(--yes) 40%, var(--border)); }
+  button.answer-no { background: color-mix(in srgb, var(--no) 14%, #fff); border-color: color-mix(in srgb, var(--no) 40%, var(--border)); }
+  button.answer-dk { background: color-mix(in srgb, var(--dk) 14%, #fff); border-color: color-mix(in srgb, var(--dk) 40%, var(--border)); }
   button.ghost { background: transparent; }
   button.link { border: none; background: transparent; padding: 0; text-decoration: underline; color: inherit; cursor: pointer; }
   button[disabled] { opacity: 0.55; cursor: not-allowed; }
@@ -31,7 +44,7 @@
   .nav {
     position: sticky; top: 0; z-index: 10;
     border-bottom: 1px solid var(--border);
-    background: rgba(255,255,255,0.95);
+    background: rgba(255,255,255,0.97);
     backdrop-filter: blur(8px);
   }
   .navInner { max-width: 1100px; margin: 0 auto; padding: 10px 24px; display:flex; justify-content:space-between; align-items:center; gap: 12px; }
@@ -47,10 +60,26 @@
     border-bottom: 1px solid var(--border);
     background: #fff;
   }
-  .subnavInner { max-width: 1100px; margin: 0 auto; padding: 10px 24px; display:flex; flex-direction:column; gap:10px; }
+  .subnavInner { max-width: 1100px; margin: 0 auto; padding: 10px 24px; display:flex; flex-direction:column; gap:10px; position: relative; }
   .continentTabs { display:flex; flex-wrap:wrap; gap:8px; }
   .continentBtn { border:1px solid var(--border); background:#fff; border-radius:999px; padding:6px 10px; cursor:pointer; }
   .continentBtn.active { font-weight:800; }
+  .countryPopover {
+    position: absolute;
+    top: 52px;
+    left: 24px;
+    right: 24px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+    max-height: 240px;
+    overflow-y: auto;
+    display: none;
+    z-index: 20;
+  }
+  .countryPopover.open { display: block; }
   .countryList { display:flex; flex-wrap:wrap; gap:8px; }
   .countryBtn { border:1px solid var(--border); background:#fff; border-radius:999px; padding:6px 10px; cursor:pointer; font-size:12px; }
 
@@ -78,9 +107,13 @@
   .resultBlock.medium { padding:10px; opacity:0.98; transform: scale(0.985); transform-origin: left top; }
   .resultBlock.small { padding:9px; opacity:0.96; transform: scale(0.97); transform-origin: left top; }
   .resultTitle { font-weight:900; margin-bottom:8px; }
+  .resultBlock.large .resultTitle { font-size: 18px; }
   .rowBar { display:grid; grid-template-columns: 58px 1fr 62px; gap:10px; align-items:center; margin:6px 0; }
   .bar { height:10px; border:1px solid var(--border); border-radius:999px; overflow:hidden; background:#fafafa; }
   .barFill { height:100%; width:0%; background:#111; }
+  .barFill[data-k="yes"] { background: var(--yes); }
+  .barFill[data-k="no"] { background: var(--no); }
+  .barFill[data-k="dk"] { background: var(--dk); }
   .pct { text-align:right; font-variant-numeric: tabular-nums; }
   .countLine { margin-top:6px; font-size:12px; color: var(--muted); }
   .view { display:none; }
@@ -120,7 +153,9 @@
 <div class="subnav">
   <div class="subnavInner">
     <div id="continentTabs" class="continentTabs"></div>
-    <div id="countryList" class="countryList"></div>
+    <div id="countryPopover" class="countryPopover">
+      <div id="countryList" class="countryList"></div>
+    </div>
   </div>
 </div>
 
@@ -652,10 +687,10 @@ if (window.__PCV_INIT_DONE__) {
       const answers = document.createElement("div");
       answers.className = "answers";
 
-      function mkAnswer(label, choice) {
+      function mkAnswer(label, choice, className) {
         const b = document.createElement("button");
         b.textContent = label;
-        b.className = "primary";
+        b.className = `primary ${className || ""}`.trim();
         b.disabled = ended || !canVote() || hasVoted;
 
         b.onclick = async () => {
@@ -698,9 +733,9 @@ if (window.__PCV_INIT_DONE__) {
         return b;
       }
 
-      answers.appendChild(mkAnswer("Ano", "yes"));
-      answers.appendChild(mkAnswer("Ne", "no"));
-      answers.appendChild(mkAnswer("Nevím", "dont_know"));
+      answers.appendChild(mkAnswer("Ano", "yes", "answer-yes"));
+      answers.appendChild(mkAnswer("Ne", "no", "answer-no"));
+      answers.appendChild(mkAnswer("Nevím", "dont_know", "answer-dk"));
       if (!clickable) {
         div.appendChild(answers);
       }
@@ -900,10 +935,12 @@ if (error) throw new Error("Events load failed: " + error.message);
     cachedContinents = continents || [];
     const continentTabs = document.getElementById("continentTabs");
     const countryList = document.getElementById("countryList");
+    const countryPopover = document.getElementById("countryPopover");
     continentTabs.innerHTML = "";
 
     async function fillCountries(continentId) {
       countryList.innerHTML = "";
+      countryPopover.classList.add("open");
       const { data: countries, error: coErr } = await supabaseClient
         .from("countries")
         .select("code,name,continent_id")
@@ -917,7 +954,10 @@ if (error) throw new Error("Events load failed: " + error.message);
         btn.type = "button";
         btn.className = "countryBtn";
         btn.textContent = co.name + " (" + co.code + ")";
-        btn.onclick = () => navigateCountry(co.code);
+        btn.onclick = () => {
+          navigateCountry(co.code);
+          countryPopover.classList.remove("open");
+        };
         countryList.appendChild(btn);
       }
       rebuildSearchIndex();
@@ -948,6 +988,8 @@ if (error) throw new Error("Events load failed: " + error.message);
   function goHome() {
     window.scrollTo({ top: 0, behavior: "smooth" });
     navigateHome();
+    const countryPopover = document.getElementById("countryPopover");
+    if (countryPopover) countryPopover.classList.remove("open");
     boot("UI: home");
   }
 
