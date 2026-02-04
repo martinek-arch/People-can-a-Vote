@@ -129,6 +129,8 @@
   .eventStatus { font-weight:700; font-size:13px; padding:5px 12px; border-radius:999px; border:1px solid var(--border); background:#fff; }
   .eventStatus.active { border-color: color-mix(in srgb, var(--yes) 40%, var(--border)); color: var(--yes); }
   .eventStatus.closed { border-color: var(--border); color: var(--muted); }
+  .eventTitleRow { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .eventVotedPill { margin-left:auto; white-space:nowrap; }
   .eventMetaRow { display:grid; grid-template-columns: 1fr auto; align-items:center; gap:12px; margin-top:6px; }
   .eventMetaRow.single { grid-template-columns: 1fr; }
   .eventCountry { font-weight:600; }
@@ -730,7 +732,12 @@ if (window.__PCV_INIT_DONE__) {
         ? "Hlasování ukončeno"
         : `Do konce hlasování zbývá: ${escapeHtml(formatRemainingTime(endAt))}`;
       const titleLine = clickable
-        ? `<div class="eventTitle">${escapeHtml(eventItem.title || "Untitled")} ${statusPill}</div>`
+        ? `
+          <div class="eventTitleRow">
+            <div class="eventTitle">${escapeHtml(eventItem.title || "Untitled")} ${statusPill}</div>
+            ${hasVoted ? `<span class="pill eventVotedPill">Odhlasováno</span>` : ""}
+          </div>
+        `
         : "";
       const descClass = clickable ? "muted" : "eventQuestion";
       div.innerHTML = `
@@ -768,7 +775,12 @@ if (window.__PCV_INIT_DONE__) {
 
           boot("Vote: submitting…");
           const payload = { event_id: eventItem.id, user_id: session.user.id, choice };
-          const { error } = await supabaseClient.from("votes").insert(payload);
+          let { error } = await supabaseClient.from("votes").insert(payload);
+          if (error && choice === "dk" && error.message?.includes("votes_choice_check")) {
+            const retryPayload = { ...payload, choice: "dont_know" };
+            const retry = await supabaseClient.from("votes").insert(retryPayload);
+            error = retry.error;
+          }
 
           if (error) {
             // Duplicate vote (unique constraint) -> show friendly message
