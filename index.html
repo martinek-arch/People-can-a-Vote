@@ -938,9 +938,11 @@ if (error) throw new Error("Events load failed: " + error.message);
     const countryPopover = document.getElementById("countryPopover");
     continentTabs.innerHTML = "";
 
-    async function fillCountries(continentId) {
+    async function fillCountries(continentId, shouldOpen = true) {
       countryList.innerHTML = "";
-      countryPopover.classList.add("open");
+      if (shouldOpen) {
+        countryPopover.classList.add("open");
+      }
       const { data: countries, error: coErr } = await supabaseClient
         .from("countries")
         .select("code,name,continent_id")
@@ -971,7 +973,7 @@ if (error) throw new Error("Events load failed: " + error.message);
       btn.onclick = async () => {
         document.querySelectorAll(".continentBtn").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
-        await fillCountries(c.id);
+        await fillCountries(c.id, true);
       };
       continentTabs.appendChild(btn);
     }
@@ -979,7 +981,7 @@ if (error) throw new Error("Events load failed: " + error.message);
     if (cachedContinents[0]) {
       const firstBtn = continentTabs.querySelector(".continentBtn");
       if (firstBtn) firstBtn.classList.add("active");
-      await fillCountries(cachedContinents[0].id);
+      await fillCountries(cachedContinents[0].id, false);
     }
 
     boot("Init: geo ready");
@@ -1122,6 +1124,16 @@ if (error) throw new Error("Events load failed: " + error.message);
       globalSearch.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
           handleSearchSubmit();
+        }
+      });
+      document.addEventListener("click", (event) => {
+        const popover = document.getElementById("countryPopover");
+        const tabs = document.getElementById("continentTabs");
+        if (!popover || !tabs) return;
+        if (!popover.classList.contains("open")) return;
+        const clickedInside = popover.contains(event.target) || tabs.contains(event.target);
+        if (!clickedInside) {
+          popover.classList.remove("open");
         }
       });
 
