@@ -134,6 +134,7 @@
   .eventCountry { font-weight:600; }
   .eventRemaining { text-align:right; }
   .eventHeaderRight { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .eventCountryRow { display:flex; justify-content:flex-end; margin-top:6px; }
   .eventCountryHeader { font-weight:600; }
   .votedBadge { display:inline-block; font-weight:700; color: var(--accent); border:1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); border-radius:999px; padding:4px 10px; background:#f1f5ff; }
   .backBtn { border:1px solid var(--border); border-radius:999px; padding:7px 12px; background:#fff; cursor:pointer; font-size:13px; }
@@ -238,8 +239,10 @@
           <span id="eventStatus" class="eventStatus">Aktivní</span>
           <button id="backToCountryBtn" class="backBtn" type="button">Zpět na zemi</button>
         </div>
-        <div id="eventCountryHeader" class="eventCountryHeader muted"></div>
       </div>
+    </div>
+    <div class="eventCountryRow">
+      <div id="eventCountryHeader" class="eventCountryHeader muted"></div>
     </div>
 
     <div id="eventDetailCard" class="card"></div>
@@ -726,9 +729,12 @@ if (window.__PCV_INIT_DONE__) {
       const remainingLabel = ended
         ? "Hlasování ukončeno"
         : `Do konce hlasování zbývá: ${escapeHtml(formatRemainingTime(endAt))}`;
+      const titleLine = clickable
+        ? `<div class="eventTitle">${escapeHtml(eventItem.title || "Untitled")} ${statusPill}</div>`
+        : "";
       const descClass = clickable ? "muted" : "eventQuestion";
       div.innerHTML = `
-        <div class="eventTitle">${escapeHtml(eventItem.title || "Untitled")} ${statusPill}</div>
+        ${titleLine}
         <div class="${descClass}">${escapeHtml(eventItem.description || "")}</div>
         <div class="eventMetaRow${clickable ? "" : " single"}">
           ${clickable ? `<div class="eventCountry muted">Země: ${escapeHtml(eventItem.country_code || "")}</div>` : ""}
@@ -951,9 +957,13 @@ if (window.__PCV_INIT_DONE__) {
       }
     }
 
+    const eventMeta = document.getElementById("eventMeta");
     document.getElementById("eventTitle").textContent = eventData.title || "Událost";
-    document.getElementById("eventMeta").textContent = eventData.description || "";
-    document.getElementById("eventMeta").classList.add("eventQuestion");
+    if (eventMeta) {
+      eventMeta.textContent = "";
+      eventMeta.classList.add("hidden");
+      eventMeta.classList.remove("eventQuestion");
+    }
     const eventCountryHeader = document.getElementById("eventCountryHeader");
     if (eventCountryHeader) {
       eventCountryHeader.textContent = `Země: ${eventData.country_code || ""}`;
