@@ -39,6 +39,10 @@
   .eventTitle { font-weight:900; margin-bottom:4px; }
   .pill { display:inline-block; padding:2px 8px; border:1px solid var(--border); border-radius:999px; font-size:12px; color:#333; margin-left:6px; }
   .top3grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .top3Item { cursor:pointer; }
+  .top3Meta { display:flex; align-items:center; gap:8px; margin-top:6px; }
+  .top3Bar { flex:1; height:8px; border:1px solid var(--border); border-radius:999px; overflow:hidden; background:#f3f4f6; }
+  .top3BarFill { height:100%; width:0%; background: var(--accent); }
 
   /* navbar */
   .nav {
@@ -536,7 +540,6 @@ if (window.__PCV_INIT_DONE__) {
       .replaceAll("'", "&#039;");
   }
 
-
   function pct(n, d) {
     if (!d || d <= 0) return 0;
     return Math.round((n / d) * 100);
@@ -589,14 +592,24 @@ if (window.__PCV_INIT_DONE__) {
       top3.innerHTML = "<div class='muted'>Zatím žádná data pro TOP 3.</div>";
       return;
     }
+    const maxVotes = Math.max(...items.map(it => it.votes || 0), 1);
     for (const it of items) {
       const div = document.createElement("div");
-      div.className = "card";
+      div.className = "card top3Item";
       div.innerHTML = `
         <div class="eventTitle">${escapeHtml(it.title || "Untitled")}</div>
         <div class="muted">${escapeHtml(it.country_code || "")}</div>
-        <div style="margin-top:6px;"><span class="pill">hlasujících: ${it.votes ?? 0}</span></div>
+        <div class="top3Meta">
+          <div class="top3Bar"><div class="top3BarFill" style="width:${Math.round(((it.votes || 0) / maxVotes) * 100)}%"></div></div>
+          <span class="pill">hlasujících: ${it.votes ?? 0}</span>
+        </div>
       `;
+      div.onclick = () => {
+        if (it.country_code) {
+          currentCountry = it.country_code;
+        }
+        navigateEvent(it.event_id);
+      };
       top3.appendChild(div);
     }
   }
@@ -794,7 +807,6 @@ if (window.__PCV_INIT_DONE__) {
     );
   }
 
-
   async function loadEventsForCountry(countryCode) {
     if (!countryCode) return;
     boot("Data: loading events…");
@@ -805,8 +817,7 @@ if (window.__PCV_INIT_DONE__) {
       .eq("country_code", countryCode)
       .order("created_at", { ascending: false });
 
-    
-if (error) throw new Error("Events load failed: " + error.message);
+    if (error) throw new Error("Events load failed: " + error.message);
 
     const events = data || [];
     const ids = events.map(x => x.id);
@@ -1044,8 +1055,12 @@ if (error) throw new Error("Events load failed: " + error.message);
   let searchTimer = null;
   async function updateSearch(term) {
     const list = document.getElementById("searchOptions");
-    if (!term || term.length < 2) {
+    const trimmed = (term || "").trim();
+    if (!trimmed || trimmed.length < 2) {
       rebuildSearchIndex();
+      return;
+    }
+    if (searchIndex.has(trimmed)) {
       return;
     }
     if (searchTimer) clearTimeout(searchTimer);
@@ -1054,7 +1069,7 @@ if (error) throw new Error("Events load failed: " + error.message);
       const { data, error } = await supabaseClient
         .from("events")
         .select("id,title,country_code")
-        .ilike("title", `%${term}%`)
+        .ilike("title", `%${trimmed}%`)
         .limit(8);
       if (error || !data) return;
       for (const ev of data) {
