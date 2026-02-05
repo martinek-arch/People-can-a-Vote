@@ -797,19 +797,8 @@ if (window.__PCV_INIT_DONE__) {
           }
 
           boot("Vote: submitting…");
-          const choiceFallbacks = choice === "dk"
-            ? ["dont_know", "dk", "dontknow", "unknown", "idk"]
-            : [choice];
-          let error = null;
-          for (const candidate of choiceFallbacks) {
-            const payload = { event_id: eventItem.id, user_id: session.user.id, choice: candidate };
-            const result = await supabaseClient.from("votes").insert(payload);
-            error = result.error;
-            if (!error) break;
-            if (!error.message?.includes("votes_choice_check")) {
-              break;
-            }
-          }
+          const payload = { event_id: eventItem.id, user_id: session.user.id, choice };
+          const { error } = await supabaseClient.from("votes").insert(payload);
 
           if (error) {
             // Duplicate vote (unique constraint) -> show friendly message
@@ -835,7 +824,7 @@ if (window.__PCV_INIT_DONE__) {
 
       answers.appendChild(mkAnswer("Ano", "yes", "answer-yes"));
       answers.appendChild(mkAnswer("Ne", "no", "answer-no"));
-      answers.appendChild(mkAnswer("Nevím", "dk", "answer-dk"));
+      answers.appendChild(mkAnswer("Nevím", "dont_know", "answer-dk"));
       if (!clickable) {
         if (hasVoted) {
           const votedMsg = document.createElement("div");
