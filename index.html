@@ -131,6 +131,8 @@
   .eventStatus.closed { border-color: var(--border); color: var(--muted); }
   .eventTitleRow { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
   .eventVotedPill { margin-left:auto; white-space:nowrap; }
+  .top3TitleRow { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .top3VotedPill { margin-left:auto; white-space:nowrap; }
   .eventMetaRow { display:grid; grid-template-columns: 1fr auto; align-items:center; gap:12px; margin-top:6px; }
   .eventMetaRow.single { grid-template-columns: 1fr; }
   .eventCountry { font-weight:600; }
@@ -624,7 +626,7 @@ if (window.__PCV_INIT_DONE__) {
     return wrap;
   }
 
-  function renderTop3(items) {
+  function renderTop3(items, votedMap) {
     const top3 = document.getElementById("top3");
     top3.innerHTML = "";
     if (!items?.length) {
@@ -635,8 +637,12 @@ if (window.__PCV_INIT_DONE__) {
     for (const it of items) {
       const div = document.createElement("div");
       div.className = "card top3Item";
+      const hasVoted = votedMap && votedMap.has(it.event_id);
       div.innerHTML = `
-        <div class="eventTitle">${escapeHtml(it.title || "Untitled")}</div>
+        <div class="top3TitleRow">
+          <div class="eventTitle">${escapeHtml(it.title || "Untitled")}</div>
+          ${hasVoted ? `<span class="pill top3VotedPill">Odhlasováno</span>` : ""}
+        </div>
         <div class="muted">${escapeHtml(it.country_code || "")}</div>
         <div class="top3Meta">
           <div class="top3Bar"><div class="top3BarFill" style="width:${Math.round(((it.votes || 0) / maxVotes) * 100)}%"></div></div>
@@ -699,7 +705,24 @@ if (window.__PCV_INIT_DONE__) {
       }))
       .filter(x => x.is_active !== false);
 
-    renderTop3(normalized);
+    let votedMap = new Map();
+    if (session?.user?.id && normalized.length) {
+      const ids = normalized.map(it => it.event_id);
+      try {
+        const { data: myVotes, error: vErr } = await supabaseClient
+          .from("votes")
+          .select("event_id")
+          .eq("user_id", session.user.id)
+          .in("event_id", ids);
+        if (!vErr && myVotes) {
+          votedMap = new Map(myVotes.map(v => [v.event_id, true]));
+        }
+      } catch (e) {
+        console.warn("Top3 votes lookup failed", e);
+      }
+    }
+
+    renderTop3(normalized, votedMap);
     boot("Data: TOP3 ready");
   }
 
@@ -774,10 +797,11 @@ if (window.__PCV_INIT_DONE__) {
           }
 
           boot("Vote: submitting…");
-          const payload = { event_id: eventItem.id, user_id: session.user.id, choice };
+          const normalizedChoice = choice === "dk" ? "dont_know" : choice;
+          const payload = { event_id: eventItem.id, user_id: session.user.id, choice: normalizedChoice };
           let { error } = await supabaseClient.from("votes").insert(payload);
           if (error && choice === "dk" && error.message?.includes("votes_choice_check")) {
-            const retryPayload = { ...payload, choice: "dont_know" };
+            const retryPayload = { ...payload, choice: "dk" };
             const retry = await supabaseClient.from("votes").insert(retryPayload);
             error = retry.error;
           }
