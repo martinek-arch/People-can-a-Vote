@@ -797,13 +797,18 @@ if (window.__PCV_INIT_DONE__) {
           }
 
           boot("Vote: submitting…");
-          const normalizedChoice = choice === "dk" ? "dont_know" : choice;
-          const payload = { event_id: eventItem.id, user_id: session.user.id, choice: normalizedChoice };
-          let { error } = await supabaseClient.from("votes").insert(payload);
-          if (error && choice === "dk" && error.message?.includes("votes_choice_check")) {
-            const retryPayload = { ...payload, choice: "dk" };
-            const retry = await supabaseClient.from("votes").insert(retryPayload);
-            error = retry.error;
+          const choiceFallbacks = choice === "dk"
+            ? ["dont_know", "dk", "dontknow", "unknown", "idk"]
+            : [choice];
+          let error = null;
+          for (const candidate of choiceFallbacks) {
+            const payload = { event_id: eventItem.id, user_id: session.user.id, choice: candidate };
+            const result = await supabaseClient.from("votes").insert(payload);
+            error = result.error;
+            if (!error) break;
+            if (!error.message?.includes("votes_choice_check")) {
+              break;
+            }
           }
 
           if (error) {
