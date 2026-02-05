@@ -797,7 +797,11 @@ if (window.__PCV_INIT_DONE__) {
           }
 
           boot("Vote: submitting…");
-          const normalizedChoice = choice === "dk" ? "dont_know" : choice;
+          const normalizedChoice = String(choice || "")
+            .trim()
+            .toLowerCase() === "dk"
+            ? "dont_know"
+            : String(choice || "").trim().toLowerCase();
           const payload = { event_id: eventItem.id, user_id: session.user.id, choice: normalizedChoice };
           const { error } = await supabaseClient.from("votes").insert(payload);
 
