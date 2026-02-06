@@ -450,7 +450,268 @@ if (window.__PCV_INIT_DONE__) {
         const { error } = await supabaseClient.auth.signUp({
           email,
           password: p1,
-          o…2237 tokens truncated…     const { data: myVotes, error: vErr } = await supabaseClient
+          options: { emailRedirectTo: APP_BASE_URL + "#auth" }
+        });
+        if (error) throw error;
+        authMsg.textContent = "Registrace vytvořena. Zkontroluj email a potvrď adresu. Pak se přihlas heslem.";
+        boot("Auth: signUp ok");
+        return;
+      }
+
+      // update
+      const { error } = await supabaseClient.auth.updateUser({ password: p1 });
+      if (error) throw error;
+      authMsg.textContent = "Heslo změněno.";
+      boot("Auth: password updated");
+      setTimeout(() => { try { closeModal(); } catch(e){} }, 700);
+    } catch (err) {
+      console.error(err);
+      authMsg.textContent = (err && err.message) ? err.message : "Neznámá chyba";
+      boot("Auth: error");
+    } finally {
+      submitAuthBtn.disabled = false;
+    }
+  }
+
+  submitAuthBtn.onclick = runAuth;
+  authPassword.addEventListener("keydown", (e) => { if (e.key === "Enter") runAuth(); });
+  authPassword2.addEventListener("keydown", (e) => { if (e.key === "Enter") runAuth(); });
+
+  async function forgotPasswordFlow() {
+    const email = (authEmail.value || "").trim();
+    if (!email) {
+      authMsg.textContent = "Zadej email.";
+      return;
+    }
+
+    authMsg.textContent = "Odesílám…";
+    boot("Auth: reset");
+
+    try {
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: APP_BASE_URL + "#auth"
+      });
+      if (error) throw error;
+      authMsg.textContent = "Hotovo. Zkontroluj email, klikni na odkaz a nastav nové heslo.";
+      boot("Auth: reset sent");
+    } catch (err) {
+      authMsg.textContent = (err && err.message) ? err.message : "Chyba";
+      boot("Auth: reset error");
+    } finally {
+      forgotBtn.disabled = false;
+    }
+  }
+  forgotBtn.onclick = forgotPasswordFlow;
+
+  /* ===== App auth UI ===== */
+  function disableVoteButtons(disabled) {
+    document.querySelectorAll("button[data-vote-btn='1']").forEach(b => { b.disabled = disabled; });
+  }
+
+  function setAuthUI() {
+    const navUser = document.getElementById("navUser");
+    const navHint = document.getElementById("navHint");
+
+    const loginBtn = document.getElementById("loginNavBtn");
+    const registerBtn = document.getElementById("registerNavBtn");
+    const changeBtn = document.getElementById("changePassNavBtn");
+    const logoutBtn = document.getElementById("logoutNavBtn");
+
+    if (!session) {
+      isVerified = false;
+      navUser.textContent = "Nepřihlášen";
+      navHint.textContent = "Hlasování je dostupné pouze pro přihlášené a ověřené uživatele.";
+
+      loginBtn.classList.remove("hidden");
+      registerBtn.classList.remove("hidden");
+      changeBtn.classList.add("hidden");
+      logoutBtn.classList.add("hidden");
+
+      disableVoteButtons(true);
+      return;
+    }
+
+    isVerified = !!session.user?.email_confirmed_at;
+    const email = session.user?.email || "uživatel";
+
+    navUser.textContent = email + (isVerified ? " (ověřený)" : " (neověřený)");
+    navHint.textContent = isVerified
+      ? ""
+      : "Prosím potvrď email (odkaz v emailu) – bez ověření nejde hlasovat.";
+
+    loginBtn.classList.add("hidden");
+    registerBtn.classList.add("hidden");
+    changeBtn.classList.remove("hidden");
+    logoutBtn.classList.remove("hidden");
+
+    disableVoteButtons(!isVerified);
+  }
+
+  function canVote() { return !!session && !!isVerified; }
+
+  async function signOut() {
+    boot("Auth: signing out…");
+    await supabaseClient.auth.signOut();
+    boot("Auth: signed out");
+  }
+
+  /* ===== Data rendering ===== */
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function pct(n, d) {
+    if (!d || d <= 0) return 0;
+    return Math.round((n / d) * 100);
+  }
+  function formatDate(value) {
+    if (!value) return "neuvedeno";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "neuvedeno";
+    return d.toLocaleDateString("cs-CZ");
+  }
+  function formatRemainingTime(value) {
+    if (!value) return "neuvedeno";
+    const now = Date.now();
+    const end = new Date(value).getTime();
+    if (Number.isNaN(end)) return "neuvedeno";
+    const diff = Math.max(0, end - now);
+    const hours = Math.floor(diff / 36e5);
+    const minutes = Math.floor((diff % 36e5) / 6e4);
+    return `${hours} h ${minutes} min`;
+  }
+  function getEventEnd(eventItem) {
+    if (eventItem?.ends_at) return new Date(eventItem.ends_at).getTime();
+    if (eventItem?.created_at) {
+      return new Date(eventItem.created_at).getTime() + 30 * 24 * 60 * 60 * 1000;
+    }
+    return NaN;
+  }
+  function setBar(el, valuePct) {
+    const v = Math.max(0, Math.min(100, Number(valuePct) || 0));
+    if (el) el.style.width = v + "%";
+  }
+  function renderResultBlock(title, r, sizeClass) {
+    const yes = r?.yes || 0, no = r?.no || 0, dk = r?.dk || 0, total = r?.total || 0;
+    const wrap = document.createElement("div");
+    wrap.className = "resultBlock " + (sizeClass || "large");
+    wrap.innerHTML = `
+      <div class="resultTitle">${escapeHtml(title)}</div>
+
+      <div class="rowBar">
+        <div><b>Ano</b></div>
+        <div class="bar"><div class="barFill" data-k="yes"></div></div>
+        <div class="pct">${pct(yes,total)}%</div>
+      </div>
+      <div class="rowBar">
+        <div><b>Ne</b></div>
+        <div class="bar"><div class="barFill" data-k="no"></div></div>
+        <div class="pct">${pct(no,total)}%</div>
+      </div>
+      <div class="rowBar">
+        <div><b>Nevím</b></div>
+        <div class="bar"><div class="barFill" data-k="dk"></div></div>
+        <div class="pct">${pct(dk,total)}%</div>
+      </div>
+
+      <div class="countLine">Hlasů celkem: <b>${total}</b> (Ano: ${yes}, Ne: ${no}, Nevím: ${dk})</div>
+    `;
+    setBar(wrap.querySelector('[data-k="yes"]'), pct(yes,total));
+    setBar(wrap.querySelector('[data-k="no"]'),  pct(no,total));
+    setBar(wrap.querySelector('[data-k="dk"]'),  pct(dk,total));
+    return wrap;
+  }
+  window.renderResultBlock = renderResultBlock;
+
+  function renderTop3(items, votedMap) {
+    const top3 = document.getElementById("top3");
+    top3.innerHTML = "";
+    if (!items?.length) {
+      top3.innerHTML = "<div class='muted'>Zatím žádná data pro TOP 3.</div>";
+      return;
+    }
+    const maxVotes = Math.max(...items.map(it => it.votes || 0), 1);
+    for (const it of items) {
+      const div = document.createElement("div");
+      div.className = "card top3Item";
+      const hasVoted = votedMap && votedMap.has(it.event_id);
+      div.innerHTML = `
+        <div class="top3TitleRow">
+          <div class="eventTitle">${escapeHtml(it.title || "Untitled")}</div>
+          ${hasVoted ? `<span class="pill top3VotedPill">Odhlasováno</span>` : ""}
+        </div>
+        <div class="muted">${escapeHtml(it.country_code || "")}</div>
+        <div class="top3Meta">
+          <div class="top3Bar"><div class="top3BarFill" style="width:${Math.round(((it.votes || 0) / maxVotes) * 100)}%"></div></div>
+          <span class="pill">hlasujících: ${it.votes ?? 0}</span>
+        </div>
+      `;
+      div.onclick = () => {
+        if (it.country_code) {
+          currentCountry = it.country_code;
+        }
+        navigateEvent(it.event_id);
+      };
+      top3.appendChild(div);
+    }
+  }
+
+  function setActiveView(viewId) {
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    const view = document.getElementById(viewId);
+    if (view) view.classList.add("active");
+  }
+
+  function navigateHome() {
+    history.replaceState({}, "", "#home");
+    setActiveView("homeView");
+  }
+
+  function navigateCountry(code) {
+    if (!code) return;
+    currentCountry = code;
+    history.replaceState({}, "", `#country=${code}`);
+    setActiveView("countryView");
+    loadCountryDetail(code);
+  }
+
+  function navigateEvent(eventId) {
+    if (!eventId || !currentCountry) return;
+    history.replaceState({}, "", `#event=${eventId}`);
+    setActiveView("eventView");
+    loadEventDetail(eventId);
+  }
+
+  async function loadTop3() {
+    boot("Data: loading TOP3…");
+    const { data, error } = await supabaseClient
+      .from("event_vote_counts")
+      .select("event_id,votes,events(title,country_code,is_active)")
+      .order("votes", { ascending: false })
+      .limit(3);
+
+    if (error) throw new Error("TOP3 load failed: " + error.message);
+
+    const normalized = (data || [])
+      .map(r => ({
+        event_id: r.event_id,
+        votes: r.votes,
+        title: r.events?.title,
+        country_code: r.events?.country_code,
+        is_active: r.events?.is_active
+      }))
+      .filter(x => x.is_active !== false);
+
+    let votedMap = new Map();
+    if (session?.user?.id && normalized.length) {
+      const ids = normalized.map(it => it.event_id);
+      try {
+        const { data: myVotes, error: vErr } = await supabaseClient
           .from("votes")
           .select("event_id")
           .eq("user_id", session.user.id)
@@ -634,7 +895,405 @@ if (window.__PCV_INIT_DONE__) {
     );
   }
 
-  /* ... zbytek souboru beze změny ... */
+  async function loadEventsForCountry(countryCode) {
+    if (!countryCode) return;
+    boot("Data: loading events…");
+    currentCountry = countryCode;
+    const { data, error } = await supabaseClient
+      .from("events")
+      .select("id,title,description,country_code,is_active,is_top,ends_at,created_at")
+      .eq("country_code", countryCode)
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error("Events load failed: " + error.message);
+
+    const events = data || [];
+    const ids = events.map(x => x.id);
+
+    // My votes (for disabling buttons) - only when logged in
+    let votesMap = new Map();
+    if (session?.user?.id && ids.length) {
+      try {
+        const { data: myVotes, error: vErr } = await supabaseClient
+          .from("votes")
+          .select("event_id")
+          .eq("user_id", session.user.id)
+          .in("event_id", ids);
+
+        if (!vErr && myVotes) {
+          votesMap = new Map(myVotes.map(v => [v.event_id, true]));
+        }
+      } catch (e) {
+        console.warn("Votes lookup failed", e);
+      }
+    }
+
+    // Public results (visible to everyone) via RPC
+    let resultsMap = new Map();
+    if (ids.length) {
+      try {
+        const { data: rows, error: rErr } = await supabaseClient.rpc("get_event_results", { event_ids: ids });
+        if (!rErr && rows) {
+          resultsMap = new Map(rows.map(r => [r.event_id, r]));
+        } else if (rErr) {
+          console.warn("Results RPC error", rErr);
+        }
+      } catch (e) {
+        console.warn("Results lookup failed", e);
+      }
+    }
+
+    renderEvents(events, votesMap, resultsMap);
+    await loadCountryTop(events);
+    const countryName = cachedCountries.find(c => c.code === countryCode)?.name || countryCode;
+    document.getElementById("countryTitle").textContent = countryName;
+    document.getElementById("countrySubtitle").textContent = `Země: ${countryName} (${countryCode})`;
+    const homeTitle = document.getElementById("homeTitle");
+    if (homeTitle) {
+      homeTitle.textContent = `Země: ${countryCode}`;
+    }
+    boot("Data: events ready");
+  }
+
+  async function loadCountryDetail(code) {
+    await loadEventsForCountry(code);
+  }
+
+  async function loadEventDetail(eventId) {
+    const detailCard = document.getElementById("eventDetailCard");
+    detailCard.innerHTML = "<div class='muted'>Načítání události…</div>";
+
+    const { data: eventData, error } = await supabaseClient
+      .from("events")
+      .select("id,title,description,country_code,is_active,ends_at,created_at")
+      .eq("id", eventId)
+      .single();
+
+    if (error || !eventData) {
+      detailCard.innerHTML = "<div class='muted'>Událost se nepodařilo načíst.</div>";
+      return;
+    }
+
+    const { data: rows } = await supabaseClient.rpc("get_event_results", { event_ids: [eventId] });
+    const resultsMap = new Map((rows || []).map(r => [r.event_id, r]));
+
+    let votesMap = new Map();
+    if (session?.user?.id) {
+      const { data: myVotes } = await supabaseClient
+        .from("votes")
+        .select("event_id")
+        .eq("user_id", session.user.id)
+        .eq("event_id", eventId);
+      if (myVotes?.length) {
+        votesMap.set(eventId, true);
+      }
+    }
+
+    const eventMeta = document.getElementById("eventMeta");
+    document.getElementById("eventTitle").textContent = eventData.title || "Událost";
+    if (eventMeta) {
+      eventMeta.textContent = "";
+      eventMeta.classList.add("hidden");
+      eventMeta.classList.remove("eventQuestion");
+    }
+    const eventCountryHeader = document.getElementById("eventCountryHeader");
+    if (eventCountryHeader) {
+      eventCountryHeader.textContent = `Země: ${eventData.country_code || ""}`;
+    }
+    const statusEl = document.getElementById("eventStatus");
+    const eventEndAt = getEventEnd(eventData);
+    const isClosed = eventData.is_active === false || (Number.isNaN(eventEndAt) ? false : eventEndAt < Date.now());
+    if (statusEl) {
+      statusEl.textContent = isClosed ? "Uzavřeno" : "Aktivní";
+      statusEl.classList.toggle("active", !isClosed);
+      statusEl.classList.toggle("closed", isClosed);
+    }
+    detailCard.innerHTML = "";
+    const wrap = document.createElement("div");
+    renderEventList(wrap, [eventData], votesMap, resultsMap, "", false);
+    detailCard.appendChild(wrap.firstElementChild || wrap);
+  }
+
+  async function loadCountryTop(events) {
+    const target = document.getElementById("countryTop");
+    if (!events?.length) {
+      target.textContent = "Zatím žádná data pro TOP událost.";
+      return;
+    }
+
+    const ids = events.map(e => e.id);
+    const { data, error } = await supabaseClient
+      .from("event_vote_counts")
+      .select("event_id,votes")
+      .in("event_id", ids)
+      .order("votes", { ascending: false })
+      .limit(1);
+
+    if (error || !data?.length) {
+      target.textContent = "Zatím žádná data pro TOP událost.";
+      return;
+    }
+
+    const top = data[0];
+    const event = events.find(e => e.id === top.event_id);
+    target.innerHTML = `
+      <div class="eventTitle">${escapeHtml(event?.title || "Událost")}</div>
+      <div class="muted">Hlasujících celkem: <b>${top.votes || 0}</b></div>
+    `;
+  }
+
+  async function loadContinentsAndCountries() {
+    boot("Init: loading continents/countries…");
+
+    const { data: continents, error: cErr } = await supabaseClient
+      .from("continents")
+      .select("id,name,code")
+      .order("id", { ascending: true });
+
+    if (cErr) throw new Error("Continents load failed: " + cErr.message);
+
+    cachedContinents = continents || [];
+    const continentTabs = document.getElementById("continentTabs");
+    const countryList = document.getElementById("countryList");
+    const countryPopover = document.getElementById("countryPopover");
+    continentTabs.innerHTML = "";
+
+    async function fillCountries(continentId, shouldOpen = true) {
+      countryList.innerHTML = "";
+      if (shouldOpen) {
+        countryPopover.classList.add("open");
+      }
+      const { data: countries, error: coErr } = await supabaseClient
+        .from("countries")
+        .select("code,name,continent_id")
+        .eq("continent_id", Number(continentId))
+        .order("name", { ascending: true });
+
+      if (coErr) throw new Error("Countries load failed: " + coErr.message);
+      cachedCountries = countries || [];
+      for (const co of cachedCountries) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "countryBtn";
+        btn.textContent = co.name + " (" + co.code + ")";
+        btn.onclick = () => {
+          navigateCountry(co.code);
+          countryPopover.classList.remove("open");
+        };
+        countryList.appendChild(btn);
+      }
+      rebuildSearchIndex();
+    }
+
+    for (const c of cachedContinents) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "continentBtn";
+      btn.textContent = c.name;
+      btn.onclick = async () => {
+        document.querySelectorAll(".continentBtn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        await fillCountries(c.id, true);
+      };
+      continentTabs.appendChild(btn);
+    }
+
+    if (cachedContinents[0]) {
+      const firstBtn = continentTabs.querySelector(".continentBtn");
+      if (firstBtn) firstBtn.classList.add("active");
+      await fillCountries(cachedContinents[0].id, false);
+    }
+
+    boot("Init: geo ready");
+  }
+
+  function goHome() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    navigateHome();
+    const countryPopover = document.getElementById("countryPopover");
+    if (countryPopover) countryPopover.classList.remove("open");
+    boot("UI: home");
+  }
+
+  function maybeOpenRecoveryModal() {
+    // If user comes back from reset email link, Supabase usually triggers PASSWORD_RECOVERY event.
+    // We also check hash for "type=recovery" or our "#reset" marker.
+    const h = window.location.hash || "";
+    const isRecoveryHint = h.includes("type=recovery") || h.includes("access_token") || h.includes("#reset");
+    if (isRecoveryHint) {
+      authMode = "update";
+      setModeUI();
+      openModal("update");
+      authMsg.textContent = "Nastav nové heslo (z reset odkazu).";
+    }
+  }
+
+  function handleInitialRoute() {
+    const hash = window.location.hash || "";
+    if (hash.startsWith("#country=")) {
+      const code = hash.replace("#country=", "").trim();
+      if (code) {
+        navigateCountry(code);
+        return;
+      }
+    }
+    if (hash.startsWith("#event=")) {
+      const id = hash.replace("#event=", "").trim();
+      if (id) {
+        setActiveView("eventView");
+        loadEventDetail(id);
+        return;
+      }
+    }
+    navigateHome();
+  }
+
+  function rebuildSearchIndex() {
+    const list = document.getElementById("searchOptions");
+    list.innerHTML = "";
+    searchIndex = new Map();
+    for (const c of cachedCountries) {
+      const label = `Země: ${c.name} (${c.code})`;
+      const opt = document.createElement("option");
+      opt.value = label;
+      list.appendChild(opt);
+      searchIndex.set(label.toLowerCase(), { type: "country", code: c.code });
+    }
+  }
+
+  let searchTimer = null;
+  async function updateSearch(term) {
+    const list = document.getElementById("searchOptions");
+    const trimmed = (term || "").trim();
+    const normalized = trimmed.toLowerCase();
+    if (!trimmed || trimmed.length < 2) {
+      rebuildSearchIndex();
+      return;
+    }
+    if (searchIndex.has(normalized)) {
+      return;
+    }
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(async () => {
+      rebuildSearchIndex();
+      const { data, error } = await supabaseClient
+        .from("events")
+        .select("id,title,country_code")
+        .ilike("title", `%${trimmed}%`)
+        .limit(8);
+      if (error || !data) return;
+      for (const ev of data) {
+        const label = `Událost: ${ev.title} (${ev.country_code || "??"})`;
+        const opt = document.createElement("option");
+        opt.value = label;
+        list.appendChild(opt);
+        searchIndex.set(label.toLowerCase(), { type: "event", id: ev.id, country: ev.country_code });
+      }
+    }, 250);
+  }
+
+  function handleSearchSubmit() {
+    const input = document.getElementById("globalSearch");
+    const value = (input.value || "").trim();
+    const normalized = value.toLowerCase();
+    if (!value) return;
+    const hit = searchIndex.get(normalized);
+    if (hit?.type === "country") {
+      navigateCountry(hit.code);
+      return;
+    }
+    if (hit?.type === "event") {
+      if (hit.country) {
+        currentCountry = hit.country;
+      }
+      navigateEvent(hit.id);
+      return;
+    }
+  }
+
+  (async function init() {
+    try {
+      boot("Init: JS running");
+      const supabaseLib = await loadSupabase();
+
+      supabaseClient = supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true
+        }
+      });
+
+      boot("Init: Supabase ready");
+
+      // Navbar actions
+      document.getElementById("homeBtn").onclick = goHome;
+      document.getElementById("backToHomeBtn").onclick = goHome;
+      document.getElementById("backToCountryBtn").onclick = () => {
+        if (currentCountry) {
+          navigateCountry(currentCountry);
+        } else {
+          navigateHome();
+        }
+      };
+      document.getElementById("loginNavBtn").onclick = () => openModal("login");
+      document.getElementById("registerNavBtn").onclick = () => openModal("register");
+      document.getElementById("changePassNavBtn").onclick = () => openModal("update");
+      document.getElementById("logoutNavBtn").onclick = signOut;
+
+      // Refresh actions
+      document.getElementById("refreshTop3Btn").onclick = loadTop3;
+      const globalSearch = document.getElementById("globalSearch");
+      globalSearch.setAttribute("list", "searchOptions");
+      globalSearch.addEventListener("input", (e) => updateSearch(e.target.value));
+      globalSearch.addEventListener("change", handleSearchSubmit);
+      globalSearch.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          handleSearchSubmit();
+        }
+      });
+      document.addEventListener("click", (event) => {
+        const popover = document.getElementById("countryPopover");
+        const tabs = document.getElementById("continentTabs");
+        if (!popover || !tabs) return;
+        if (!popover.classList.contains("open")) return;
+        const clickedInside = popover.contains(event.target) || tabs.contains(event.target);
+        if (!clickedInside) {
+          popover.classList.remove("open");
+        }
+      });
+
+      // Session
+      const { data: sessData } = await supabaseClient.auth.getSession();
+      session = sessData?.session || null;
+      setAuthUI();
+
+      supabaseClient.auth.onAuthStateChange(async (event, newSession) => {
+        session = newSession;
+        setAuthUI();
+
+        if (event === "PASSWORD_RECOVERY") {
+          // open change password modal automatically
+          openModal("update");
+          authMsg.textContent = "Nastav nové heslo (reset).";
+        }
+
+        if (currentCountry) await loadEventsForCountry(currentCountry);
+      });
+
+      await loadContinentsAndCountries();
+      await loadTop3();
+      handleInitialRoute();
+
+      // If user lands with recovery hash, open the update modal
+      maybeOpenRecoveryModal();
+
+      boot("Boot: ready");
+    } catch (err) {
+      boot("Startup error: " + err.message);
+      console.error(err);
+    }
+  })();
 }
 </script>
 </body>
