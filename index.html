@@ -328,7 +328,7 @@ if (window.__PCV_INIT_DONE__) {
   const SUPABASE_URL = "https://jqoomnhpyuikbntnrukw.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h";
   const APP_BASE_URL = "https://martinek-arch.github.io/People-can-a-Vote/";
-  const MAPBOX_TOKEN = "pk.eyJIjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ";
+  const MAPBOX_TOKEN = "pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ";
 
   let supabaseClient = null;
   let session = null;
@@ -545,7 +545,8 @@ if (window.__PCV_INIT_DONE__) {
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
-      .replaceAll("\"", "&quot;");
+      .replaceAll("\"", "&quot;")
+      .replaceAll("'", "&#039;");
   }
 
   function formatRemainingTime(endAt) {
@@ -794,9 +795,9 @@ if (window.__PCV_INIT_DONE__) {
 
         const r = resultsMap && resultsMap.has(eventItem.id) ? resultsMap.get(eventItem.id) : null;
         if (r) {
-          resWrap.appendChild(renderResultBlock("Celkem (všichni)", { yes: r.yes_total, no: r.no_total, dk: r.dk_total, total: r.votes_total }, "large"));
-          resWrap.appendChild(renderResultBlock("Občané cílové země", { yes: r.yes_dom, no: r.no_dom, dk: r.dk_dom, total: r.votes_dom_total }, "medium"));
-          resWrap.appendChild(renderResultBlock("Ostatní země", { yes: r.yes_for, no: r.no_for, dk: r.dk_for, total: r.votes_for_total }, "small"));
+          resWrap.appendChild(window.renderResultBlock("Celkem (všichni)", { yes: r.yes_total, no: r.no_total, dk: r.dk_total, total: r.votes_total }, "large"));
+          resWrap.appendChild(window.renderResultBlock("Občané cílové země", { yes: r.yes_dom, no: r.no_dom, dk: r.dk_dom, total: r.votes_dom_total }, "medium"));
+          resWrap.appendChild(window.renderResultBlock("Ostatní země", { yes: r.yes_for, no: r.no_for, dk: r.dk_for, total: r.votes_for_total }, "small"));
         } else {
           resWrap.innerHTML = "<div class='muted'>Výsledky se načítají…</div>";
         }
