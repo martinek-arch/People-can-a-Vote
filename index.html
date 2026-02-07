@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>People Can Vote</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
 <style>
   :root {
     --muted:#5d6470;
@@ -123,6 +124,8 @@
   .view { display:none; }
   .view.active { display:block; }
   .mapPlaceholder { border:1px dashed var(--border); border-radius:14px; padding:18px; text-align:center; color: var(--muted); }
+  #worldMap { width: 100%; height: 360px; border-radius: 14px; border: 1px solid var(--border); overflow: hidden; }
+  .mapNote { font-size: 12px; color: var(--muted); margin-top: 8px; }
   .eventItem { cursor:pointer; }
   .eventDetailHeader { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; }
   .eventQuestion { font-size: 20px; font-weight: 800; color: var(--accent); margin-top: 6px; }
@@ -195,9 +198,8 @@
       <div class="row" style="justify-content:space-between;">
         <b>Interaktivní mapa světa</b>
       </div>
-      <div class="mapPlaceholder" style="margin-top:10px;">
-        Mapa světa se připravuje. Po spuštění bude možné kliknout na zemi a zobrazit její události.
-      </div>
+      <div id="worldMap" style="margin-top:10px;"></div>
+      <div class="mapNote">Klikni na zemi a zobraz její události.</div>
     </div>
   </section>
 
@@ -325,6 +327,21 @@ if (window.__PCV_INIT_DONE__) {
     });
   }
 
+  async function loadMapbox() {
+    return new Promise((resolve, reject) => {
+      if (window.mapboxgl) {
+        resolve(window.mapboxgl);
+        return;
+      }
+      const s = document.createElement("script");
+      s.src = "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js";
+      s.async = true;
+      s.onload = () => resolve(window.mapboxgl);
+      s.onerror = () => reject(new Error("Mapbox load failed"));
+      document.head.appendChild(s);
+    });
+  }
+
   const SUPABASE_URL = "https://jqoomnhpyuikbntnrukw.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h";
   const APP_BASE_URL = "https://martinek-arch.github.io/People-can-a-Vote/";
@@ -337,6 +354,8 @@ if (window.__PCV_INIT_DONE__) {
   let cachedCountries = [];
   let searchIndex = new Map();
   let currentCountry = null;
+  let mapInstance = null;
+  let mapMarker = null;
 
   /* ===== Modal state ===== */
   // login | register | update
@@ -478,24 +497,23 @@ if (window.__PCV_INIT_DONE__) {
   authPassword2.addEventListener("keydown", (e) => { if (e.key === "Enter") runAuth(); });
 
   async function forgotPasswordFlow() {
-    const email = (authEmail.value || "").trim();
-    if (!email) {
-      authMsg.textContent = "Zadej email.";
-      return;
-    }
+    const email = (authEmail.value || "").trim() || prompt("Zadej email pro reset hesla:");
+    if (!email) return;
 
-    authMsg.textContent = "Odesílám…";
-    boot("Auth: reset");
+    forgotBtn.disabled = true;
+    authMsg.textContent = "Odesílám email pro reset hesla…";
+    boot("Auth: reset email…");
 
     try {
       const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-        redirectTo: APP_BASE_URL + "#auth"
+        redirectTo: APP_BASE_URL + "#reset"
       });
       if (error) throw error;
       authMsg.textContent = "Hotovo. Zkontroluj email, klikni na odkaz a nastav nové heslo.";
       boot("Auth: reset sent");
     } catch (err) {
-      authMsg.textContent = (err && err.message) ? err.message : "Chyba";
+      console.error(err);
+      authMsg.textContent = (err && err.message) ? err.message : "Neznámá chyba";
       boot("Auth: reset error");
     } finally {
       forgotBtn.disabled = false;
@@ -1161,6 +1179,60 @@ if (window.__PCV_INIT_DONE__) {
     }
   }
 
+  function findCountryByCode(code) {
+    if (!code) return null;
+    const normalized = code.toUpperCase();
+    return cachedCountries.find(c => String(c.code || "").toUpperCase() === normalized) || null;
+  }
+
+  function findCountryByName(name) {
+    if (!name) return null;
+    const normalized = name.toLowerCase();
+    return cachedCountries.find(c => String(c.name || "").toLowerCase() === normalized) || null;
+  }
+
+  async function initWorldMap() {
+    const mapHost = document.getElementById("worldMap");
+    if (!mapHost) return;
+    const mapboxgl = await loadMapbox();
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+    mapInstance = new mapboxgl.Map({
+      container: mapHost,
+      style: "mapbox://styles/mapbox/light-v11",
+      center: [10, 20],
+      zoom: 1.1
+    });
+
+    mapInstance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+    mapInstance.on("click", async (e) => {
+      const { lng, lat } = e.lngLat;
+      if (mapMarker) {
+        mapMarker.remove();
+      }
+      mapMarker = new mapboxgl.Marker({ color: "#2563eb" })
+        .setLngLat([lng, lat])
+        .addTo(mapInstance);
+
+      try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=country&access_token=${MAPBOX_TOKEN}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Mapbox geocoding failed");
+        const data = await res.json();
+        const feature = data?.features?.[0];
+        const shortCode = feature?.properties?.short_code;
+        const name = feature?.text;
+        const country = findCountryByCode(shortCode) || findCountryByName(name);
+        if (country) {
+          navigateCountry(country.code);
+        } else if (name) {
+          alert(`Země „${name}“ není v seznamu.`);
+        }
+      } catch (err) {
+        console.warn("Map lookup failed", err);
+      }
+    });
+  }
+
   let searchTimer = null;
   async function updateSearch(term) {
     const list = document.getElementById("searchOptions");
@@ -1282,6 +1354,7 @@ if (window.__PCV_INIT_DONE__) {
       });
 
       await loadContinentsAndCountries();
+      await initWorldMap();
       await loadTop3();
       handleInitialRoute();
 
