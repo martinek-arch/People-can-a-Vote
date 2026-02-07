@@ -583,6 +583,7 @@ if (window.__PCV_INIT_DONE__) {
       .replaceAll("'", "&#039;");
   }
 
+
   function pct(n, d) {
     if (!d || d <= 0) return 0;
     return Math.round((n / d) * 100);
@@ -913,6 +914,7 @@ if (window.__PCV_INIT_DONE__) {
     );
   }
 
+
   async function loadEventsForCountry(countryCode) {
     if (!countryCode) return;
     boot("Data: loading events…");
@@ -923,7 +925,8 @@ if (window.__PCV_INIT_DONE__) {
       .eq("country_code", countryCode)
       .order("created_at", { ascending: false });
 
-    if (error) throw new Error("Events load failed: " + error.message);
+    
+if (error) throw new Error("Events load failed: " + error.message);
 
     const events = data || [];
     const ids = events.map(x => x.id);
@@ -1194,43 +1197,138 @@ if (window.__PCV_INIT_DONE__) {
   async function initWorldMap() {
     const mapHost = document.getElementById("worldMap");
     if (!mapHost) return;
-    const mapboxgl = await loadMapbox();
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-    mapInstance = new mapboxgl.Map({
-      container: mapHost,
-      style: "mapbox://styles/mapbox/light-v11",
-      center: [10, 20],
-      zoom: 1.1
-    });
+    const mapNote = document.querySelector(".mapNote");
 
-    mapInstance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
-    mapInstance.on("click", async (e) => {
-      const { lng, lat } = e.lngLat;
-      if (mapMarker) {
-        mapMarker.remove();
+    function showMapFallback(message) {
+      mapHost.classList.add("mapPlaceholder");
+      mapHost.innerHTML = message;
+      if (mapNote) {
+        mapNote.textContent = "Mapa momentálně není dostupná.";
       }
-      mapMarker = new mapboxgl.Marker({ color: "#2563eb" })
-        .setLngLat([lng, lat])
-        .addTo(mapInstance);
+    }
 
-      try {
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=country&access_token=${MAPBOX_TOKEN}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Mapbox geocoding failed");
-        const data = await res.json();
-        const feature = data?.features?.[0];
-        const shortCode = feature?.properties?.short_code;
-        const name = feature?.text;
-        const country = findCountryByCode(shortCode) || findCountryByName(name);
-        if (country) {
-          navigateCountry(country.code);
-        } else if (name) {
-          alert(`Země „${name}“ není v seznamu.`);
+    if (!MAPBOX_TOKEN) {
+      showMapFallback("Mapa není dostupná (chybí token).");
+      return;
+    }
+
+    try {
+      const mapboxgl = await loadMapbox();
+      mapboxgl.accessToken = MAPBOX_TOKEN;
+      mapInstance = new mapboxgl.Map({
+        container: mapHost,
+        style: "mapbox://styles/mapbox/light-v11",
+        center: [10, 20],
+        zoom: 1.1
+      });
+
+      mapInstance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+      let hoveredCountryId = null;
+
+      mapInstance.on("load", () => {
+        if (!mapInstance.getSource("countries")) {
+          mapInstance.addSource("countries", {
+            type: "vector",
+            url: "mapbox://mapbox.country-boundaries-v1",
+            promoteId: "iso_3166_1"
+          });
         }
-      } catch (err) {
-        console.warn("Map lookup failed", err);
-      }
-    });
+
+        if (!mapInstance.getLayer("country-fills")) {
+          mapInstance.addLayer({
+            id: "country-fills",
+            type: "fill",
+            source: "countries",
+            "source-layer": "country_boundaries",
+            paint: {
+              "fill-color": [
+                "case",
+                ["boolean", ["feature-state", "hover"], false],
+                "#93c5fd",
+                "rgba(0, 0, 0, 0)"
+              ],
+              "fill-opacity": 0.45
+            }
+          });
+        }
+
+        if (!mapInstance.getLayer("country-lines")) {
+          mapInstance.addLayer({
+            id: "country-lines",
+            type: "line",
+            source: "countries",
+            "source-layer": "country_boundaries",
+            paint: {
+              "line-color": "#60a5fa",
+              "line-width": [
+                "case",
+                ["boolean", ["feature-state", "hover"], false],
+                1.5,
+                0.3
+              ]
+            }
+          });
+        }
+
+        mapInstance.on("mousemove", "country-fills", (e) => {
+          if (!e.features?.length) return;
+          mapInstance.getCanvas().style.cursor = "pointer";
+          const nextId = e.features[0].id;
+          if (hoveredCountryId !== null && hoveredCountryId !== nextId) {
+            mapInstance.setFeatureState(
+              { source: "countries", sourceLayer: "country_boundaries", id: hoveredCountryId },
+              { hover: false }
+            );
+          }
+          hoveredCountryId = nextId;
+          mapInstance.setFeatureState(
+            { source: "countries", sourceLayer: "country_boundaries", id: hoveredCountryId },
+            { hover: true }
+          );
+        });
+
+        mapInstance.on("mouseleave", "country-fills", () => {
+          mapInstance.getCanvas().style.cursor = "";
+          if (hoveredCountryId !== null) {
+            mapInstance.setFeatureState(
+              { source: "countries", sourceLayer: "country_boundaries", id: hoveredCountryId },
+              { hover: false }
+            );
+          }
+          hoveredCountryId = null;
+        });
+      });
+      mapInstance.on("click", async (e) => {
+        const { lng, lat } = e.lngLat;
+        if (mapMarker) {
+          mapMarker.remove();
+        }
+        mapMarker = new mapboxgl.Marker({ color: "#2563eb" })
+          .setLngLat([lng, lat])
+          .addTo(mapInstance);
+
+        try {
+          const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=country&access_token=${MAPBOX_TOKEN}`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error("Mapbox geocoding failed");
+          const data = await res.json();
+          const feature = data?.features?.[0];
+          const shortCode = feature?.properties?.short_code;
+          const name = feature?.text;
+          const country = findCountryByCode(shortCode) || findCountryByName(name);
+          if (country) {
+            navigateCountry(country.code);
+          } else if (name) {
+            alert(`Země „${name}“ není v seznamu.`);
+          }
+        } catch (err) {
+          console.warn("Map lookup failed", err);
+        }
+      });
+    } catch (err) {
+      console.warn("Mapbox init failed", err);
+      showMapFallback("Mapa se nepodařilo načíst.");
+    }
   }
 
   let searchTimer = null;
