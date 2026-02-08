@@ -1302,13 +1302,6 @@ if (error) throw new Error("Events load failed: " + error.message);
       });
       mapInstance.on("click", async (e) => {
         const { lng, lat } = e.lngLat;
-        if (mapMarker) {
-          mapMarker.remove();
-        }
-        mapMarker = new mapboxgl.Marker({ color: "#2563eb" })
-          .setLngLat([lng, lat])
-          .addTo(mapInstance);
-
         try {
           const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=country&access_token=${MAPBOX_TOKEN}`;
           const res = await fetch(url);
@@ -1369,7 +1362,15 @@ if (error) throw new Error("Events load failed: " + error.message);
     const value = (input.value || "").trim();
     const normalized = value.toLowerCase();
     if (!value) return;
-    const hit = searchIndex.get(normalized);
+    let hit = searchIndex.get(normalized);
+    if (!hit) {
+      for (const [key, entry] of searchIndex.entries()) {
+        if (key.includes(normalized)) {
+          hit = entry;
+          break;
+        }
+      }
+    }
     if (hit?.type === "country") {
       navigateCountry(hit.code);
       return;
