@@ -353,10 +353,13 @@ if (window.__PCV_INIT_DONE__) {
   let cachedContinents = [];
   let cachedCountries = [];
   let cachedCountriesAll = [];
+  let countryStats = new Map();
+  let maxCountryVotes = 0;
   let searchIndex = new Map();
   let currentCountry = null;
+  let currentContinentId = null;
   let mapInstance = null;
-  let mapMarker = null;
+  let mapReady = false;
 
   /* ===== Modal state ===== */
   // login | register | update
@@ -748,6 +751,73 @@ if (window.__PCV_INIT_DONE__) {
     boot("Data: TOP3 ready");
   }
 
+  async function fillCountries(continentId, shouldOpen = true) {
+    const countryList = document.getElementById("countryList");
+    const countryPopover = document.getElementById("countryPopover");
+    if (!countryList || !countryPopover) return;
+    countryList.innerHTML = "";
+    if (shouldOpen) {
+      countryPopover.classList.add("open");
+    }
+    currentContinentId = Number(continentId);
+    cachedCountries = cachedCountriesAll.filter(c => Number(c.continent_id) === Number(continentId));
+    for (const co of cachedCountries) {
+      const btn = document.createElement("button");
+      const code = String(co.code || "").toUpperCase();
+      const eventCount = countryStats.get(code)?.events || 0;
+      btn.type = "button";
+      btn.className = "countryBtn";
+      btn.textContent = `${co.name} (${co.code}) · ${eventCount}`;
+      btn.onclick = () => {
+        navigateCountry(co.code);
+        countryPopover.classList.remove("open");
+      };
+      countryList.appendChild(btn);
+    }
+  }
+
+  async function loadCountryStats() {
+    const { data: events, error: eventsErr } = await supabaseClient
+      .from("events")
+      .select("id,country_code");
+    if (eventsErr) throw new Error("Country stats events load failed: " + eventsErr.message);
+
+    const countMap = new Map();
+    for (const ev of events || []) {
+      if (!ev.country_code) continue;
+      const code = String(ev.country_code).toUpperCase();
+      countMap.set(code, (countMap.get(code) || 0) + 1);
+    }
+
+    const { data: voteRows, error: votesErr } = await supabaseClient
+      .from("event_vote_counts")
+      .select("votes,events(country_code)");
+    if (votesErr) throw new Error("Country stats votes load failed: " + votesErr.message);
+
+    const votesMap = new Map();
+    for (const row of voteRows || []) {
+      const code = row.events?.country_code;
+      if (!code) continue;
+      const normalized = String(code).toUpperCase();
+      votesMap.set(normalized, (votesMap.get(normalized) || 0) + (row.votes || 0));
+    }
+
+    countryStats = new Map();
+    maxCountryVotes = 0;
+    for (const co of cachedCountriesAll) {
+      const code = String(co.code || "").toUpperCase();
+      const eventCount = countMap.get(code) || 0;
+      const totalVotes = votesMap.get(code) || 0;
+      countryStats.set(code, { events: eventCount, votes: totalVotes });
+      if (totalVotes > maxCountryVotes) maxCountryVotes = totalVotes;
+    }
+
+    updateMapChoropleth();
+    if (currentContinentId !== null) {
+      await fillCountries(currentContinentId, false);
+    }
+  }
+
   function renderEventList(container, items, votesMap, resultsMap, emptyMessage, clickable) {
     container.innerHTML = "";
     if (!items?.length) {
@@ -968,8 +1038,9 @@ if (error) throw new Error("Events load failed: " + error.message);
     renderEvents(events, votesMap, resultsMap);
     await loadCountryTop(events);
     const countryName = cachedCountriesAll.find(c => c.code === countryCode)?.name || countryCode;
+    const eventCount = events.length;
     document.getElementById("countryTitle").textContent = countryName;
-    document.getElementById("countrySubtitle").textContent = `Země: ${countryName} (${countryCode})`;
+    document.getElementById("countrySubtitle").textContent = `Země: ${countryName} (${countryCode}) · Událostí: ${eventCount}`;
     const homeTitle = document.getElementById("homeTitle");
     if (homeTitle) {
       homeTitle.textContent = `Země: ${countryCode}`;
@@ -1076,8 +1147,6 @@ if (error) throw new Error("Events load failed: " + error.message);
 
     cachedContinents = continents || [];
     const continentTabs = document.getElementById("continentTabs");
-    const countryList = document.getElementById("countryList");
-    const countryPopover = document.getElementById("countryPopover");
     continentTabs.innerHTML = "";
 
     const { data: allCountries, error: allErr } = await supabaseClient
@@ -1088,25 +1157,6 @@ if (error) throw new Error("Events load failed: " + error.message);
     if (allErr) throw new Error("Countries load failed: " + allErr.message);
     cachedCountriesAll = allCountries || [];
     rebuildSearchIndex();
-
-    async function fillCountries(continentId, shouldOpen = true) {
-      countryList.innerHTML = "";
-      if (shouldOpen) {
-        countryPopover.classList.add("open");
-      }
-      cachedCountries = cachedCountriesAll.filter(c => Number(c.continent_id) === Number(continentId));
-      for (const co of cachedCountries) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "countryBtn";
-        btn.textContent = co.name + " (" + co.code + ")";
-        btn.onclick = () => {
-          navigateCountry(co.code);
-          countryPopover.classList.remove("open");
-        };
-        countryList.appendChild(btn);
-      }
-    }
 
     for (const c of cachedContinents) {
       const btn = document.createElement("button");
@@ -1196,6 +1246,19 @@ if (error) throw new Error("Events load failed: " + error.message);
     return cachedCountriesAll.find(c => String(c.name || "").toLowerCase() === normalized) || null;
   }
 
+  function updateMapChoropleth() {
+    if (!mapInstance || !mapReady || !countryStats.size) return;
+    const denom = maxCountryVotes || 1;
+    for (const [code, stats] of countryStats.entries()) {
+      if (!code) continue;
+      const intensity = stats.events > 0 ? Math.max(0.1, stats.votes / denom) : 0;
+      mapInstance.setFeatureState(
+        { source: "countries", sourceLayer: "country_boundaries", id: code },
+        { intensity }
+      );
+    }
+  }
+
   async function initWorldMap() {
     const mapHost = document.getElementById("worldMap");
     if (!mapHost) return;
@@ -1247,9 +1310,22 @@ if (error) throw new Error("Events load failed: " + error.message);
                 "case",
                 ["boolean", ["feature-state", "hover"], false],
                 "#93c5fd",
-                "rgba(0, 0, 0, 0)"
+                [
+                  "case",
+                  [">", ["feature-state", "intensity"], 0],
+                  [
+                    "interpolate",
+                    ["linear"],
+                    ["feature-state", "intensity"],
+                    0,
+                    "#fee2e2",
+                    1,
+                    "#b91c1c"
+                  ],
+                  "rgba(0, 0, 0, 0)"
+                ]
               ],
-              "fill-opacity": 0.45
+              "fill-opacity": 0.6
             }
           });
         }
@@ -1271,6 +1347,9 @@ if (error) throw new Error("Events load failed: " + error.message);
             }
           });
         }
+
+        mapReady = true;
+        updateMapChoropleth();
 
         mapInstance.on("mousemove", "country-fills", (e) => {
           if (!e.features?.length) return;
@@ -1455,6 +1534,7 @@ if (error) throw new Error("Events load failed: " + error.message);
       });
 
       await loadContinentsAndCountries();
+      await loadCountryStats();
       await initWorldMap();
       await loadTop3();
       handleInitialRoute();
