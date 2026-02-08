@@ -352,6 +352,7 @@ if (window.__PCV_INIT_DONE__) {
   let isVerified = false;
   let cachedContinents = [];
   let cachedCountries = [];
+  let cachedCountriesAll = [];
   let searchIndex = new Map();
   let currentCountry = null;
   let mapInstance = null;
@@ -664,7 +665,7 @@ if (window.__PCV_INIT_DONE__) {
           <div class="eventTitle">${escapeHtml(it.title || "Untitled")}</div>
           ${hasVoted ? `<span class="pill top3VotedPill">Odhlasováno</span>` : ""}
         </div>
-        <div class="muted">${escapeHtml(it.country_code || "")}</div>
+        <div class="muted">${escapeHtml(cachedCountriesAll.find(c => c.code === it.country_code)?.name || it.country_code || "")}</div>
         <div class="top3Meta">
           <div class="top3Bar"><div class="top3BarFill" style="width:${Math.round(((it.votes || 0) / maxVotes) * 100)}%"></div></div>
           <span class="pill">hlasujících: ${it.votes ?? 0}</span>
@@ -966,7 +967,7 @@ if (error) throw new Error("Events load failed: " + error.message);
 
     renderEvents(events, votesMap, resultsMap);
     await loadCountryTop(events);
-    const countryName = cachedCountries.find(c => c.code === countryCode)?.name || countryCode;
+    const countryName = cachedCountriesAll.find(c => c.code === countryCode)?.name || countryCode;
     document.getElementById("countryTitle").textContent = countryName;
     document.getElementById("countrySubtitle").textContent = `Země: ${countryName} (${countryCode})`;
     const homeTitle = document.getElementById("homeTitle");
@@ -1079,19 +1080,21 @@ if (error) throw new Error("Events load failed: " + error.message);
     const countryPopover = document.getElementById("countryPopover");
     continentTabs.innerHTML = "";
 
+    const { data: allCountries, error: allErr } = await supabaseClient
+      .from("countries")
+      .select("code,name,continent_id")
+      .order("name", { ascending: true });
+
+    if (allErr) throw new Error("Countries load failed: " + allErr.message);
+    cachedCountriesAll = allCountries || [];
+    rebuildSearchIndex();
+
     async function fillCountries(continentId, shouldOpen = true) {
       countryList.innerHTML = "";
       if (shouldOpen) {
         countryPopover.classList.add("open");
       }
-      const { data: countries, error: coErr } = await supabaseClient
-        .from("countries")
-        .select("code,name,continent_id")
-        .eq("continent_id", Number(continentId))
-        .order("name", { ascending: true });
-
-      if (coErr) throw new Error("Countries load failed: " + coErr.message);
-      cachedCountries = countries || [];
+      cachedCountries = cachedCountriesAll.filter(c => Number(c.continent_id) === Number(continentId));
       for (const co of cachedCountries) {
         const btn = document.createElement("button");
         btn.type = "button";
@@ -1103,7 +1106,6 @@ if (error) throw new Error("Events load failed: " + error.message);
         };
         countryList.appendChild(btn);
       }
-      rebuildSearchIndex();
     }
 
     for (const c of cachedContinents) {
@@ -1173,7 +1175,7 @@ if (error) throw new Error("Events load failed: " + error.message);
     const list = document.getElementById("searchOptions");
     list.innerHTML = "";
     searchIndex = new Map();
-    for (const c of cachedCountries) {
+    for (const c of cachedCountriesAll) {
       const label = `Země: ${c.name} (${c.code})`;
       const opt = document.createElement("option");
       opt.value = label;
@@ -1185,13 +1187,13 @@ if (error) throw new Error("Events load failed: " + error.message);
   function findCountryByCode(code) {
     if (!code) return null;
     const normalized = code.toUpperCase();
-    return cachedCountries.find(c => String(c.code || "").toUpperCase() === normalized) || null;
+    return cachedCountriesAll.find(c => String(c.code || "").toUpperCase() === normalized) || null;
   }
 
   function findCountryByName(name) {
     if (!name) return null;
     const normalized = name.toLowerCase();
-    return cachedCountries.find(c => String(c.name || "").toLowerCase() === normalized) || null;
+    return cachedCountriesAll.find(c => String(c.name || "").toLowerCase() === normalized) || null;
   }
 
   async function initWorldMap() {
