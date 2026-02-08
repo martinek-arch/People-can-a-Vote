@@ -60,6 +60,9 @@
   .navHint { font-size:11px; color: var(--muted); }
   .searchWrap { display:flex; align-items:center; gap:6px; }
   .searchInput { min-width: 220px; }
+  .breadcrumb { display:flex; align-items:center; gap:6px; font-size:13px; color: var(--muted); flex-wrap:wrap; }
+  .breadcrumb button { border:none; background:transparent; padding:0; color: var(--accent); text-decoration: underline; cursor:pointer; }
+  .breadcrumb .crumb { color: var(--muted); }
 
   .subnav {
     border-bottom: 1px solid var(--border);
@@ -175,6 +178,7 @@
 
 <div class="subnav">
   <div class="subnavInner">
+    <div id="breadcrumb" class="breadcrumb"></div>
     <div id="continentTabs" class="continentTabs"></div>
     <div id="countryPopover" class="countryPopover">
       <div id="countryList" class="countryList"></div>
@@ -358,6 +362,8 @@ if (window.__PCV_INIT_DONE__) {
   let searchIndex = new Map();
   let currentCountry = null;
   let currentContinentId = null;
+  let currentEventId = null;
+  let currentEventTitle = null;
   let mapInstance = null;
   let mapReady = false;
 
@@ -688,16 +694,22 @@ if (window.__PCV_INIT_DONE__) {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     const view = document.getElementById(viewId);
     if (view) view.classList.add("active");
+    updateBreadcrumb();
   }
 
   function navigateHome() {
     history.replaceState({}, "", "#home");
+    currentCountry = null;
+    currentEventId = null;
+    currentEventTitle = null;
     setActiveView("homeView");
   }
 
   function navigateCountry(code) {
     if (!code) return;
     currentCountry = code;
+    currentEventId = null;
+    currentEventTitle = null;
     history.replaceState({}, "", `#country=${code}`);
     setActiveView("countryView");
     loadCountryDetail(code);
@@ -705,6 +717,7 @@ if (window.__PCV_INIT_DONE__) {
 
   function navigateEvent(eventId) {
     if (!eventId || !currentCountry) return;
+    currentEventId = eventId;
     history.replaceState({}, "", `#event=${eventId}`);
     setActiveView("eventView");
     loadEventDetail(eventId);
@@ -816,6 +829,47 @@ if (window.__PCV_INIT_DONE__) {
     if (currentContinentId !== null) {
       await fillCountries(currentContinentId, false);
     }
+  }
+
+  function updateBreadcrumb() {
+    const breadcrumb = document.getElementById("breadcrumb");
+    if (!breadcrumb) return;
+    const country = currentCountry
+      ? (cachedCountriesAll.find(c => c.code === currentCountry)?.name || currentCountry)
+      : null;
+    const eventTitle = currentEventTitle;
+    const parts = [];
+
+    const homeBtn = document.createElement("button");
+    homeBtn.type = "button";
+    homeBtn.textContent = "Domů";
+    homeBtn.onclick = navigateHome;
+    parts.push(homeBtn);
+
+    if (country) {
+      const sep1 = document.createElement("span");
+      sep1.className = "crumb";
+      sep1.textContent = "›";
+      parts.push(sep1);
+      const countryBtn = document.createElement("button");
+      countryBtn.type = "button";
+      countryBtn.textContent = country;
+      countryBtn.onclick = () => navigateCountry(currentCountry);
+      parts.push(countryBtn);
+    }
+
+    if (eventTitle) {
+      const sep2 = document.createElement("span");
+      sep2.className = "crumb";
+      sep2.textContent = "›";
+      parts.push(sep2);
+      const eventSpan = document.createElement("span");
+      eventSpan.className = "crumb";
+      eventSpan.textContent = eventTitle;
+      parts.push(eventSpan);
+    }
+
+    breadcrumb.replaceChildren(...parts);
   }
 
   function renderEventList(container, items, votesMap, resultsMap, emptyMessage, clickable) {
@@ -1046,6 +1100,7 @@ if (error) throw new Error("Events load failed: " + error.message);
       homeTitle.textContent = `Země: ${countryCode}`;
     }
     boot("Data: events ready");
+    updateBreadcrumb();
   }
 
   async function loadCountryDetail(code) {
@@ -1084,6 +1139,8 @@ if (error) throw new Error("Events load failed: " + error.message);
 
     const eventMeta = document.getElementById("eventMeta");
     document.getElementById("eventTitle").textContent = eventData.title || "Událost";
+    currentEventTitle = eventData.title || "Událost";
+    currentEventId = eventId;
     if (eventMeta) {
       eventMeta.textContent = "";
       eventMeta.classList.add("hidden");
@@ -1178,6 +1235,7 @@ if (error) throw new Error("Events load failed: " + error.message);
     }
 
     boot("Init: geo ready");
+    updateBreadcrumb();
   }
 
   function goHome() {
@@ -1538,6 +1596,7 @@ if (error) throw new Error("Events load failed: " + error.message);
       await initWorldMap();
       await loadTop3();
       handleInitialRoute();
+      updateBreadcrumb();
 
       // If user lands with recovery hash, open the update modal
       maybeOpenRecoveryModal();
