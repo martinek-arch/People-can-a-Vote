@@ -913,7 +913,7 @@ if (window.__PCV_INIT_DONE__) {
         };
       }
 
-      const endAt = getEventEnd(eventItem);
+      const endAt = typeof window.getEventEnd === "function" ? window.getEventEnd(eventItem) : NaN;
       const ended = eventItem.is_active === false
         ? true
         : (Number.isNaN(endAt) ? false : endAt < Date.now());
@@ -984,7 +984,7 @@ if (window.__PCV_INIT_DONE__) {
     const active = [];
     const archived = [];
     for (const e of items || []) {
-      const endAt = getEventEnd(e);
+      const endAt = typeof window.getEventEnd === "function" ? window.getEventEnd(e) : NaN;
       const ended = e.is_active === false
         ? true
         : (Number.isNaN(endAt) ? false : endAt < now);
@@ -1124,7 +1124,7 @@ if (error) throw new Error("Events load failed: " + error.message);
       eventCountryHeader.textContent = `Země: ${eventData.country_code || ""}`;
     }
     const statusEl = document.getElementById("eventStatus");
-    const eventEndAt = getEventEnd(eventData);
+    const eventEndAt = typeof window.getEventEnd === "function" ? window.getEventEnd(eventData) : NaN;
     const isClosed = eventData.is_active === false || (Number.isNaN(eventEndAt) ? false : eventEndAt < Date.now());
     if (statusEl) {
       statusEl.textContent = isClosed ? "Uzavřeno" : "Aktivní";
