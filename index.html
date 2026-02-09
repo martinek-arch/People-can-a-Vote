@@ -320,7 +320,7 @@ if (window.__PCV_INIT_DONE__) {
   }
 
   async function loadSupabase() {
-    boot("Init: loading Supabase…");
+    boot("Init: loading Supabase");
     return new Promise((resolve, reject) => {
       const s = document.createElement("script");
       s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
@@ -575,15 +575,13 @@ if (window.__PCV_INIT_DONE__) {
   }
 
   function updateBreadcrumb() {
-    const el = document.getElementById("breadcrumb");
-    if (!el) return;
+    const breadcrumb = document.getElementById("breadcrumb");
+    if (!breadcrumb) return;
+    const country = currentCountry
+      ? (cachedCountriesAll.find(c => c.code === currentCountry)?.name || currentCountry)
+      : null;
+    const eventTitle = currentEventTitle;
     const parts = [];
-    const pushSep = () => {
-      const sep = document.createElement("span");
-      sep.textContent = "›";
-      sep.className = "crumb";
-      parts.push(sep);
-    };
 
     const homeBtn = document.createElement("button");
     homeBtn.type = "button";
@@ -591,26 +589,30 @@ if (window.__PCV_INIT_DONE__) {
     homeBtn.onclick = navigateHome;
     parts.push(homeBtn);
 
-    if (currentCountry) {
-      pushSep();
-      const country = findCountryByCode(currentCountry);
-      const cBtn = document.createElement("button");
-      cBtn.type = "button";
-      cBtn.textContent = country?.name || currentCountry;
-      cBtn.onclick = () => navigateCountry(currentCountry);
-      parts.push(cBtn);
-    }
-    if (currentEventId) {
-      pushSep();
-      const eBtn = document.createElement("button");
-      eBtn.type = "button";
-      eBtn.textContent = currentEventTitle || "Událost";
-      eBtn.onclick = () => navigateEvent(currentEventId);
-      parts.push(eBtn);
+    if (country) {
+      const sep1 = document.createElement("span");
+      sep1.className = "crumb";
+      sep1.textContent = "›";
+      parts.push(sep1);
+      const countryBtn = document.createElement("button");
+      countryBtn.type = "button";
+      countryBtn.textContent = country;
+      countryBtn.onclick = () => navigateCountry(currentCountry);
+      parts.push(countryBtn);
     }
 
-    el.innerHTML = "";
-    parts.forEach(p => el.appendChild(p));
+    if (eventTitle) {
+      const sep2 = document.createElement("span");
+      sep2.className = "crumb";
+      sep2.textContent = "›";
+      parts.push(sep2);
+      const eventSpan = document.createElement("span");
+      eventSpan.className = "crumb";
+      eventSpan.textContent = eventTitle;
+      parts.push(eventSpan);
+    }
+
+    breadcrumb.replaceChildren(...parts);
   }
 
   function navigateHome() {
@@ -1044,7 +1046,7 @@ if (error) throw new Error("Events load failed: " + error.message);
       btn.onclick = async () => {
         document.querySelectorAll(".continentBtn").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
-        await fillCountries(c.id, true);
+        await window.fillCountries(c.id, true);
       };
       continentTabs.appendChild(btn);
     }
@@ -1052,7 +1054,7 @@ if (error) throw new Error("Events load failed: " + error.message);
     if (cachedContinents[0]) {
       const firstBtn = continentTabs.querySelector(".continentBtn");
       if (firstBtn) firstBtn.classList.add("active");
-      await fillCountries(cachedContinents[0].id, false);
+      await window.fillCountries(cachedContinents[0].id, false);
     }
 
     boot("Init: geo ready");
