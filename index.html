@@ -320,7 +320,7 @@ if (window.__PCV_INIT_DONE__) {
   }
 
   async function loadSupabase() {
-    boot("Init: loading Supabase");
+    boot("Init: loading Supabase…");
     return new Promise((resolve, reject) => {
       const s = document.createElement("script");
       s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
@@ -1046,7 +1046,7 @@ if (error) throw new Error("Events load failed: " + error.message);
       btn.onclick = async () => {
         document.querySelectorAll(".continentBtn").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
-        await window.fillCountries(c.id, true);
+        await fillCountries(c.id, true);
       };
       continentTabs.appendChild(btn);
     }
@@ -1054,7 +1054,7 @@ if (error) throw new Error("Events load failed: " + error.message);
     if (cachedContinents[0]) {
       const firstBtn = continentTabs.querySelector(".continentBtn");
       if (firstBtn) firstBtn.classList.add("active");
-      await window.fillCountries(cachedContinents[0].id, false);
+      await fillCountries(cachedContinents[0].id, false);
     }
 
     boot("Init: geo ready");
