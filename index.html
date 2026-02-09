@@ -1046,7 +1046,9 @@ if (error) throw new Error("Events load failed: " + error.message);
       btn.onclick = async () => {
         document.querySelectorAll(".continentBtn").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
-        await fillCountries(c.id, true);
+        if (typeof window.fillCountries === "function") {
+          await window.fillCountries(c.id, true);
+        }
       };
       continentTabs.appendChild(btn);
     }
@@ -1054,7 +1056,9 @@ if (error) throw new Error("Events load failed: " + error.message);
     if (cachedContinents[0]) {
       const firstBtn = continentTabs.querySelector(".continentBtn");
       if (firstBtn) firstBtn.classList.add("active");
-      await fillCountries(cachedContinents[0].id, false);
+      if (typeof window.fillCountries === "function") {
+        await window.fillCountries(cachedContinents[0].id, false);
+      }
     }
 
     boot("Init: geo ready");
