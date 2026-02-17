@@ -642,8 +642,8 @@ if (window.__PCV_INIT_DONE__) {
         return b;
       }
 
-      answers.appendChild(mkAnswer("Ano", "yes", "answer-yes"));
-      answers.appendChild(mkAnswer("Ne", "no", "answer-no"));
+      answers.appendChild(mkAnswer(t("vote.option.yes"), "yes", "answer-yes"));
+      answers.appendChild(mkAnswer(t("vote.option.no"), "no", "answer-no"));
       answers.appendChild(mkAnswer(t("vote.option.dk"), "dont_know", "answer-dk"));
       if (!clickable) {
         if (hasVoted) {
