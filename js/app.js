@@ -1,6 +1,5 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN } from "./constants.js";
 import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js";
-import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js";
 
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");
@@ -8,8 +7,6 @@ if (window.__PCV_INIT_DONE__) {
   window.__PCV_INIT_DONE__ = true;
 
   const debugBoot = window.localStorage.getItem("pcvDebug") === "1";
-
-  applyStaticTranslations();
 
   function boot(msg) {
     const el = document.getElementById("boot");
@@ -117,14 +114,14 @@ if (window.__PCV_INIT_DONE__) {
     tabUpdate.classList.toggle("hidden", !canShowUpdateTab);
 
     if (authMode === "login") {
-      submitAuthBtn.textContent = t("auth.submit.login");
+      submitAuthBtn.textContent = "Přihlásit";
       emailField.classList.remove("hidden");
       passwordField.classList.remove("hidden");
       password2Field.classList.add("hidden");
       forgotWrap.classList.remove("hidden");
       authPassword.setAttribute("autocomplete", "current-password");
     } else if (authMode === "register") {
-      submitAuthBtn.textContent = t("auth.submit.register");
+      submitAuthBtn.textContent = "Registrovat";
       emailField.classList.remove("hidden");
       passwordField.classList.remove("hidden");
       password2Field.classList.remove("hidden");
@@ -133,7 +130,7 @@ if (window.__PCV_INIT_DONE__) {
       authPassword2.setAttribute("autocomplete", "new-password");
     } else {
       // update password (for logged-in "change password" OR recovery)
-      submitAuthBtn.textContent = t("auth.submit.update");
+      submitAuthBtn.textContent = "Nastavit nové heslo";
       emailField.classList.add("hidden");
       passwordField.classList.remove("hidden");
       password2Field.classList.remove("hidden");
@@ -828,7 +825,7 @@ if (error) throw new Error("Events load failed: " + error.message);
     const eventEndAt = typeof window.getEventEnd === "function" ? window.getEventEnd(eventData) : NaN;
     const isClosed = eventData.is_active === false || (Number.isNaN(eventEndAt) ? false : eventEndAt < Date.now());
     if (statusEl) {
-      statusEl.textContent = isClosed ? t("event.closed") : t("event.active");
+      statusEl.textContent = isClosed ? "Uzavřeno" : "Aktivní";
       statusEl.classList.toggle("active", !isClosed);
       statusEl.classList.toggle("closed", isClosed);
     }
@@ -962,7 +959,7 @@ if (error) throw new Error("Events load failed: " + error.message);
     list.innerHTML = "";
     searchIndex = new Map();
     for (const c of cachedCountriesAll) {
-      const label = t("search.countryLabel", { name: c.name, code: c.code });
+      const label = `Země: ${c.name} (${c.code})`;
       const opt = document.createElement("option");
       opt.value = label;
       list.appendChild(opt);
@@ -1163,7 +1160,7 @@ if (error) throw new Error("Events load failed: " + error.message);
         .limit(8);
       if (error || !data) return;
       for (const ev of data) {
-        const label = t("search.eventLabel", { title: ev.title, code: ev.country_code || "??" });
+        const label = `Událost: ${ev.title} (${ev.country_code || "??"})`;
         const opt = document.createElement("option");
         opt.value = label;
         list.appendChild(opt);
@@ -1227,18 +1224,6 @@ if (error) throw new Error("Events load failed: " + error.message);
       document.getElementById("registerNavBtn").onclick = () => openModal("register");
       document.getElementById("changePassNavBtn").onclick = () => openModal("update");
       document.getElementById("logoutNavBtn").onclick = signOut;
-
-      initI18nSelector(async () => {
-        setModeUI();
-        setAuthUI();
-        await loadTop3();
-        if (currentCountry) {
-          await loadEventsForCountry(currentCountry);
-        }
-        if (currentEventId) {
-          await navigateEvent(currentEventId);
-        }
-      });
 
       // Refresh actions
       document.getElementById("refreshTop3Btn").onclick = loadTop3;
