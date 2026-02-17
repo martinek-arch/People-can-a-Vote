@@ -1,5 +1,6 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN } from "./constants.js";
 import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js";
+import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js";
 
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");
@@ -7,6 +8,8 @@ if (window.__PCV_INIT_DONE__) {
   window.__PCV_INIT_DONE__ = true;
 
   const debugBoot = window.localStorage.getItem("pcvDebug") === "1";
+
+  applyStaticTranslations();
 
   function boot(msg) {
     const el = document.getElementById("boot");
@@ -114,14 +117,14 @@ if (window.__PCV_INIT_DONE__) {
     tabUpdate.classList.toggle("hidden", !canShowUpdateTab);
 
     if (authMode === "login") {
-      submitAuthBtn.textContent = "Přihlásit";
+      submitAuthBtn.textContent = t("auth.submit.login");
       emailField.classList.remove("hidden");
       passwordField.classList.remove("hidden");
       password2Field.classList.add("hidden");
       forgotWrap.classList.remove("hidden");
       authPassword.setAttribute("autocomplete", "current-password");
     } else if (authMode === "register") {
-      submitAuthBtn.textContent = "Registrovat";
+      submitAuthBtn.textContent = t("auth.submit.register");
       emailField.classList.remove("hidden");
       passwordField.classList.remove("hidden");
       password2Field.classList.remove("hidden");
@@ -130,7 +133,7 @@ if (window.__PCV_INIT_DONE__) {
       authPassword2.setAttribute("autocomplete", "new-password");
     } else {
       // update password (for logged-in "change password" OR recovery)
-      submitAuthBtn.textContent = "Nastavit nové heslo";
+      submitAuthBtn.textContent = t("auth.submit.update");
       emailField.classList.add("hidden");
       passwordField.classList.remove("hidden");
       password2Field.classList.remove("hidden");
@@ -155,13 +158,13 @@ if (window.__PCV_INIT_DONE__) {
     if (authMode !== "update") {
       if (!email) { authMsg.textContent = "Zadej email."; return; }
     }
-    if (p1.length < 8) { authMsg.textContent = "Heslo musí mít alespoň 8 znaků."; return; }
+    if (p1.length < 8) { authMsg.textContent = t("auth.passwordMin"); return; }
     if (authMode !== "login") {
-      if (p1 !== p2) { authMsg.textContent = "Hesla se neshodují."; return; }
+      if (p1 !== p2) { authMsg.textContent = t("auth.passwordMismatch"); return; }
     }
 
     submitAuthBtn.disabled = true;
-    authMsg.textContent = authMode === "login" ? "Přihlašuji…" : (authMode === "register" ? "Registruji…" : "Nastavuji nové heslo…");
+    authMsg.textContent = authMode === "login" ? t("auth.working.login") : (authMode === "register" ? t("auth.working.register") : t("auth.working.update"));
     boot("Auth: working…");
 
     try {
@@ -180,7 +183,7 @@ if (window.__PCV_INIT_DONE__) {
           options: { emailRedirectTo: APP_BASE_URL + "#auth" }
         });
         if (error) throw error;
-        authMsg.textContent = "Registrace vytvořena. Zkontroluj email a potvrď adresu. Pak se přihlas heslem.";
+        authMsg.textContent = t("auth.registerCreated");
         boot("Auth: signUp ok");
         return;
       }
@@ -188,12 +191,12 @@ if (window.__PCV_INIT_DONE__) {
       // update
       const { error } = await supabaseClient.auth.updateUser({ password: p1 });
       if (error) throw error;
-      authMsg.textContent = "Heslo změněno.";
+      authMsg.textContent = t("auth.passwordUpdated");
       boot("Auth: password updated");
       setTimeout(() => { try { closeModal(); } catch(e){} }, 700);
     } catch (err) {
       console.error(err);
-      authMsg.textContent = (err && err.message) ? err.message : "Neznámá chyba";
+      authMsg.textContent = (err && err.message) ? err.message : t("auth.unknownError");
       boot("Auth: error");
     } finally {
       submitAuthBtn.disabled = false;
@@ -205,11 +208,11 @@ if (window.__PCV_INIT_DONE__) {
   authPassword2.addEventListener("keydown", (e) => { if (e.key === "Enter") runAuth(); });
 
   async function forgotPasswordFlow() {
-    const email = (authEmail.value || "").trim() || prompt("Zadej email pro reset hesla:");
+    const email = (authEmail.value || "").trim() || prompt(t("auth.resetPrompt"));
     if (!email) return;
 
     forgotBtn.disabled = true;
-    authMsg.textContent = "Odesílám email pro reset hesla…";
+    authMsg.textContent = t("auth.resetSending");
     boot("Auth: reset email…");
 
     try {
@@ -217,11 +220,11 @@ if (window.__PCV_INIT_DONE__) {
         redirectTo: APP_BASE_URL + "#reset"
       });
       if (error) throw error;
-      authMsg.textContent = "Hotovo. Zkontroluj email, klikni na odkaz a nastav nové heslo.";
+      authMsg.textContent = t("auth.resetSent");
       boot("Auth: reset sent");
     } catch (err) {
       console.error(err);
-      authMsg.textContent = (err && err.message) ? err.message : "Neznámá chyba";
+      authMsg.textContent = (err && err.message) ? err.message : t("auth.unknownError");
       boot("Auth: reset error");
     } finally {
       forgotBtn.disabled = false;
@@ -245,8 +248,8 @@ if (window.__PCV_INIT_DONE__) {
 
     if (!session) {
       isVerified = false;
-      navUser.textContent = "Nepřihlášen";
-      navHint.textContent = "Hlasování je dostupné pouze pro přihlášené a ověřené uživatele.";
+      navUser.textContent = t("auth.notLogged");
+      navHint.textContent = t("auth.navHintLoggedOut");
 
       loginBtn.classList.remove("hidden");
       registerBtn.classList.remove("hidden");
@@ -258,12 +261,12 @@ if (window.__PCV_INIT_DONE__) {
     }
 
     isVerified = !!session.user?.email_confirmed_at;
-    const email = session.user?.email || "uživatel";
+    const email = session.user?.email || t("auth.userFallback");
 
-    navUser.textContent = email + (isVerified ? " (ověřený)" : " (neověřený)");
+    navUser.textContent = email + (isVerified ? ` (${t("auth.verified")})` : ` (${t("auth.unverified")})`);
     navHint.textContent = isVerified
       ? ""
-      : "Prosím potvrď email (odkaz v emailu) – bez ověření nejde hlasovat.";
+      : t("auth.navHintUnverified");
 
     loginBtn.classList.add("hidden");
     registerBtn.classList.add("hidden");
@@ -302,12 +305,12 @@ if (window.__PCV_INIT_DONE__) {
         <div class="pct">${pct(no,total)}%</div>
       </div>
       <div class="rowBar">
-        <div><b>Nevím</b></div>
+        <div><b>${escapeHtml(t("vote.option.dk"))}</b></div>
         <div class="bar"><div class="barFill" data-k="dk"></div></div>
         <div class="pct">${pct(dk,total)}%</div>
       </div>
 
-      <div class="countLine">Hlasů celkem: <b>${total}</b> (Ano: ${yes}, Ne: ${no}, Nevím: ${dk})</div>
+      <div class="countLine">${t("vote.totalLine", { total, yes, no, dk })}</div>
     `;
     setBar(wrap.querySelector('[data-k="yes"]'), pct(yes,total));
     setBar(wrap.querySelector('[data-k="no"]'),  pct(no,total));
@@ -325,7 +328,7 @@ if (window.__PCV_INIT_DONE__) {
     const top3 = document.getElementById("top3");
     top3.innerHTML = "";
     if (!items?.length) {
-      top3.innerHTML = "<div class='muted'>Zatím žádná data pro TOP 3.</div>";
+      top3.innerHTML = `<div class='muted'>${escapeHtml(t("top3.empty"))}</div>`;
       return;
     }
     const maxVotes = Math.max(...items.map(it => it.votes || 0), 1);
@@ -336,12 +339,12 @@ if (window.__PCV_INIT_DONE__) {
       div.innerHTML = `
         <div class="top3TitleRow">
           <div class="eventTitle"><span class="top3Rank">${idx + 1}</span>${escapeHtml(it.title || "Untitled")}</div>
-          ${hasVoted ? `<span class="pill top3VotedPill">Odhlasováno</span>` : ""}
+          ${hasVoted ? `<span class="pill top3VotedPill">${escapeHtml(t("vote.voted"))}</span>` : ""}
         </div>
         <div class="muted">${escapeHtml(cachedCountriesAll.find(c => c.code === it.country_code)?.name || it.country_code || "")}</div>
         <div class="top3Meta">
           <div class="top3Bar"><div class="top3BarFill" style="width:${Math.round(((it.votes || 0) / maxVotes) * 100)}%"></div></div>
-          <span class="pill">hlasujících: ${it.votes ?? 0}</span>
+          <span class="pill">${escapeHtml(t("top3.voters", { count: it.votes ?? 0 }))}</span>
         </div>
       `;
       div.onclick = () => {
@@ -513,7 +516,7 @@ if (window.__PCV_INIT_DONE__) {
 
     const homeBtn = document.createElement("button");
     homeBtn.type = "button";
-    homeBtn.textContent = "Domů";
+    homeBtn.textContent = t("nav.home");
     homeBtn.onclick = navigateHome;
     parts.push(homeBtn);
 
@@ -566,16 +569,16 @@ if (window.__PCV_INIT_DONE__) {
       const ended = eventItem.is_active === false
         ? true
         : (Number.isNaN(endAt) ? false : endAt < Date.now());
-      const statusPill = ended ? "<span class='pill'>ukončeno</span>" : "<span class='pill'>aktivní</span>";
+      const statusPill = ended ? `<span class='pill'>${escapeHtml(t("event.status.ended"))}</span>` : `<span class='pill'>${escapeHtml(t("event.status.active"))}</span>`;
 
       const remainingLabel = ended
-        ? "Hlasování ukončeno"
-        : `Do konce hlasování zbývá: ${escapeHtml(formatRemainingTime(endAt))}`;
+        ? t("event.votingEnded")
+        : t("event.remaining", { time: escapeHtml(formatRemainingTime(endAt)) });
       const titleLine = clickable
         ? `
           <div class="eventTitleRow">
             <div class="eventTitle">${escapeHtml(eventItem.title || "Untitled")} ${statusPill}</div>
-            ${hasVoted ? `<span class="pill eventVotedPill">Odhlasováno</span>` : ""}
+            ${hasVoted ? `<span class="pill eventVotedPill">${escapeHtml(t("vote.voted"))}</span>` : ""}
           </div>
         `
         : "";
@@ -584,7 +587,7 @@ if (window.__PCV_INIT_DONE__) {
         ${titleLine}
         <div class="${descClass}">${escapeHtml(eventItem.description || "")}</div>
         <div class="eventMetaRow${clickable ? "" : " single"}">
-          ${clickable ? `<div class="eventCountry muted">Země: ${escapeHtml(eventItem.country_code || "")}</div>` : ""}
+          ${clickable ? `<div class="eventCountry muted">${t("event.country", { code: escapeHtml(eventItem.country_code || "") })}</div>` : ""}
           <div class="eventRemaining muted">${remainingLabel}</div>
         </div>
       `;
@@ -601,15 +604,15 @@ if (window.__PCV_INIT_DONE__) {
 
         b.onclick = async () => {
           if (!canVote()) {
-            alert("Hlasování je dostupné jen pro přihlášené a ověřené uživatele.");
+            alert(t("vote.needAuth"));
             return;
           }
           if (ended) {
-            alert("Tato událost už je ukončená.");
+            alert(t("vote.eventEnded"));
             return;
           }
           if (hasVoted) {
-            alert("Už jste pro tuto událost hlasoval.");
+            alert(t("vote.alreadyVoted"));
             return;
           }
 
@@ -620,15 +623,15 @@ if (window.__PCV_INIT_DONE__) {
           if (error) {
             // Duplicate vote (unique constraint) -> show friendly message
             if (error.code === "23505") {
-              alert("Už jste pro tuto událost hlasoval.");
+              alert(t("vote.alreadyVoted"));
             } else {
-              alert("Hlasování se nepodařilo: " + error.message);
+              alert(t("vote.submitFailed", { message: error.message }));
             }
             boot("Vote: error");
             return;
           }
 
-          alert("Díky! Hlas byl uložen.");
+          alert(t("vote.saved"));
           boot("Vote: OK");
 
           // Refresh events + TOP3 so results update immediately
@@ -641,12 +644,12 @@ if (window.__PCV_INIT_DONE__) {
 
       answers.appendChild(mkAnswer("Ano", "yes", "answer-yes"));
       answers.appendChild(mkAnswer("Ne", "no", "answer-no"));
-      answers.appendChild(mkAnswer("Nevím", "dont_know", "answer-dk"));
+      answers.appendChild(mkAnswer(t("vote.option.dk"), "dont_know", "answer-dk"));
       if (!clickable) {
         if (hasVoted) {
           const votedMsg = document.createElement("div");
           votedMsg.className = "votedBadge";
-          votedMsg.textContent = "Odhlasováno";
+          votedMsg.textContent = t("vote.voted");
           div.appendChild(votedMsg);
         } else {
           div.appendChild(answers);
@@ -660,11 +663,11 @@ if (window.__PCV_INIT_DONE__) {
 
         const r = resultsMap && resultsMap.has(eventItem.id) ? resultsMap.get(eventItem.id) : null;
         if (r) {
-          resWrap.appendChild(window.renderResultBlock("Celkem (všichni)", { yes: r.yes_total, no: r.no_total, dk: r.dk_total, total: r.votes_total }, "large"));
-          resWrap.appendChild(window.renderResultBlock("Občané cílové země", { yes: r.yes_dom, no: r.no_dom, dk: r.dk_dom, total: r.votes_dom_total }, "medium"));
-          resWrap.appendChild(window.renderResultBlock("Ostatní země", { yes: r.yes_for, no: r.no_for, dk: r.dk_for, total: r.votes_for_total }, "small"));
+          resWrap.appendChild(window.renderResultBlock(t("results.total"), { yes: r.yes_total, no: r.no_total, dk: r.dk_total, total: r.votes_total }, "large"));
+          resWrap.appendChild(window.renderResultBlock(t("results.domestic"), { yes: r.yes_dom, no: r.no_dom, dk: r.dk_dom, total: r.votes_dom_total }, "medium"));
+          resWrap.appendChild(window.renderResultBlock(t("results.foreign"), { yes: r.yes_for, no: r.no_for, dk: r.dk_for, total: r.votes_for_total }, "small"));
         } else {
-          resWrap.innerHTML = "<div class='muted'>Výsledky se načítají…</div>";
+          resWrap.innerHTML = `<div class='muted'>${escapeHtml(t("results.loading"))}</div>`;
         }
 
         div.appendChild(resWrap);
@@ -697,7 +700,7 @@ if (window.__PCV_INIT_DONE__) {
       active,
       votesMap,
       resultsMap,
-      "V této zemi zatím nejsou žádné aktivní události.",
+      t("events.emptyActive"),
       true
     );
     renderEventList(
@@ -705,7 +708,7 @@ if (window.__PCV_INIT_DONE__) {
       archived,
       votesMap,
       resultsMap,
-      "Zatím tu nejsou žádné ukončené události.",
+      t("events.emptyArchive"),
       true
     );
   }
@@ -765,10 +768,10 @@ if (error) throw new Error("Events load failed: " + error.message);
     const countryName = cachedCountriesAll.find(c => c.code === countryCode)?.name || countryCode;
     const eventCount = events.length;
     document.getElementById("countryTitle").textContent = countryName;
-    document.getElementById("countrySubtitle").textContent = `Země: ${countryName} (${countryCode}) · Událostí: ${eventCount}`;
+    document.getElementById("countrySubtitle").textContent = t("country.subtitleStats", { name: countryName, code: countryCode, count: eventCount });
     const homeTitle = document.getElementById("homeTitle");
     if (homeTitle) {
-      homeTitle.textContent = `Země: ${countryCode}`;
+      homeTitle.textContent = t("country.homeTitleCode", { code: countryCode });
     }
     boot("Data: events ready");
     updateBreadcrumb();
@@ -780,7 +783,7 @@ if (error) throw new Error("Events load failed: " + error.message);
 
   async function loadEventDetail(eventId) {
     const detailCard = document.getElementById("eventDetailCard");
-    detailCard.innerHTML = "<div class='muted'>Načítání události…</div>";
+    detailCard.innerHTML = `<div class='muted'>${escapeHtml(t("event.loading"))}</div>`;
 
     const { data: eventData, error } = await supabaseClient
       .from("events")
@@ -789,7 +792,7 @@ if (error) throw new Error("Events load failed: " + error.message);
       .single();
 
     if (error || !eventData) {
-      detailCard.innerHTML = "<div class='muted'>Událost se nepodařilo načíst.</div>";
+      detailCard.innerHTML = `<div class='muted'>${escapeHtml(t("event.loadFailed"))}</div>`;
       return;
     }
 
@@ -809,8 +812,8 @@ if (error) throw new Error("Events load failed: " + error.message);
     }
 
     const eventMeta = document.getElementById("eventMeta");
-    document.getElementById("eventTitle").textContent = eventData.title || "Událost";
-    currentEventTitle = eventData.title || "Událost";
+    document.getElementById("eventTitle").textContent = eventData.title || t("event.title");
+    currentEventTitle = eventData.title || t("event.title");
     currentEventId = eventId;
     if (eventMeta) {
       eventMeta.textContent = "";
@@ -819,13 +822,13 @@ if (error) throw new Error("Events load failed: " + error.message);
     }
     const eventCountryHeader = document.getElementById("eventCountryHeader");
     if (eventCountryHeader) {
-      eventCountryHeader.textContent = `Země: ${eventData.country_code || ""}`;
+      eventCountryHeader.textContent = t("event.countryName", { code: eventData.country_code || "" });
     }
     const statusEl = document.getElementById("eventStatus");
     const eventEndAt = typeof window.getEventEnd === "function" ? window.getEventEnd(eventData) : NaN;
     const isClosed = eventData.is_active === false || (Number.isNaN(eventEndAt) ? false : eventEndAt < Date.now());
     if (statusEl) {
-      statusEl.textContent = isClosed ? "Uzavřeno" : "Aktivní";
+      statusEl.textContent = isClosed ? t("event.closed") : t("event.active");
       statusEl.classList.toggle("active", !isClosed);
       statusEl.classList.toggle("closed", isClosed);
     }
@@ -838,7 +841,7 @@ if (error) throw new Error("Events load failed: " + error.message);
   async function loadCountryTop(events) {
     const target = document.getElementById("countryTop");
     if (!events?.length) {
-      target.textContent = "Zatím žádná data pro TOP událost.";
+      target.textContent = t("event.topEmpty");
       return;
     }
 
@@ -851,15 +854,15 @@ if (error) throw new Error("Events load failed: " + error.message);
       .limit(1);
 
     if (error || !data?.length) {
-      target.textContent = "Zatím žádná data pro TOP událost.";
+      target.textContent = t("event.topEmpty");
       return;
     }
 
     const top = data[0];
     const event = events.find(e => e.id === top.event_id);
     target.innerHTML = `
-      <div class="eventTitle">${escapeHtml(event?.title || "Událost")}</div>
-      <div class="muted">Hlasujících celkem: <b>${top.votes || 0}</b></div>
+      <div class="eventTitle">${escapeHtml(event?.title || t("event.title"))}</div>
+      <div class="muted">${t("event.votersTotal", { count: top.votes || 0 })}</div>
     `;
   }
 
@@ -930,7 +933,7 @@ if (error) throw new Error("Events load failed: " + error.message);
       authMode = "update";
       setModeUI();
       openModal("update");
-      authMsg.textContent = "Nastav nové heslo (z reset odkazu).";
+      authMsg.textContent = t("auth.resetFromLink");
     }
   }
 
@@ -959,7 +962,7 @@ if (error) throw new Error("Events load failed: " + error.message);
     list.innerHTML = "";
     searchIndex = new Map();
     for (const c of cachedCountriesAll) {
-      const label = `Země: ${c.name} (${c.code})`;
+      const label = t("search.countryLabel", { name: c.name, code: c.code });
       const opt = document.createElement("option");
       opt.value = label;
       list.appendChild(opt);
@@ -1001,12 +1004,12 @@ if (error) throw new Error("Events load failed: " + error.message);
       mapHost.classList.add("mapPlaceholder");
       mapHost.innerHTML = message;
       if (mapNote) {
-        mapNote.textContent = "Mapa momentálně není dostupná.";
+        mapNote.textContent = t("map.unavailable");
       }
     }
 
     if (!MAPBOX_TOKEN) {
-      showMapFallback("Mapa není dostupná (chybí token).");
+      showMapFallback(t("map.missingToken"));
       return;
     }
 
@@ -1126,7 +1129,7 @@ if (error) throw new Error("Events load failed: " + error.message);
           if (country) {
             navigateCountry(country.code);
           } else if (name) {
-            alert(`Země „${name}“ není v seznamu.`);
+            alert(t("map.countryNotFound", { name }));
           }
         } catch (err) {
           console.warn("Map lookup failed", err);
@@ -1134,7 +1137,7 @@ if (error) throw new Error("Events load failed: " + error.message);
       });
     } catch (err) {
       console.warn("Mapbox init failed", err);
-      showMapFallback("Mapa se nepodařilo načíst.");
+      showMapFallback(t("map.loadFailed"));
     }
   }
 
@@ -1160,7 +1163,7 @@ if (error) throw new Error("Events load failed: " + error.message);
         .limit(8);
       if (error || !data) return;
       for (const ev of data) {
-        const label = `Událost: ${ev.title} (${ev.country_code || "??"})`;
+        const label = t("search.eventLabel", { title: ev.title, code: ev.country_code || "??" });
         const opt = document.createElement("option");
         opt.value = label;
         list.appendChild(opt);
@@ -1225,6 +1228,18 @@ if (error) throw new Error("Events load failed: " + error.message);
       document.getElementById("changePassNavBtn").onclick = () => openModal("update");
       document.getElementById("logoutNavBtn").onclick = signOut;
 
+      initI18nSelector(async () => {
+        setModeUI();
+        setAuthUI();
+        await loadTop3();
+        if (currentCountry) {
+          await loadEventsForCountry(currentCountry);
+        }
+        if (currentEventId) {
+          await navigateEvent(currentEventId);
+        }
+      });
+
       // Refresh actions
       document.getElementById("refreshTop3Btn").onclick = loadTop3;
       const globalSearch = document.getElementById("globalSearch");
@@ -1259,7 +1274,7 @@ if (error) throw new Error("Events load failed: " + error.message);
         if (event === "PASSWORD_RECOVERY") {
           // open change password modal automatically
           openModal("update");
-          authMsg.textContent = "Nastav nové heslo (reset).";
+          authMsg.textContent = t("auth.resetMode");
         }
 
         if (currentCountry) await loadEventsForCountry(currentCountry);

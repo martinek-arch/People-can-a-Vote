@@ -17,17 +17,32 @@
     </div>
     <div class="navRight">
       <div class="searchWrap">
-        <input id="globalSearch" class="searchInput" type="search" placeholder="Hledat zemi nebo událost">
+        <input id="globalSearch" class="searchInput" type="search" data-i18n-placeholder="nav.searchPlaceholder" placeholder="Hledat zemi nebo událost">
         <datalist id="searchOptions"></datalist>
       </div>
       <div class="navStatus">
-        <span id="navUser" class="muted small">Načítání…</span>
+        <span id="navUser" class="muted small" data-i18n="nav.loading">Načítání…</span>
         <span id="navHint" class="navHint"></span>
       </div>
-      <button id="loginNavBtn">Přihlásit</button>
-      <button id="registerNavBtn">Registrovat</button>
-      <button id="changePassNavBtn" class="hidden">Změnit heslo</button>
-      <button id="logoutNavBtn" class="hidden">Odhlásit</button>
+      <button id="loginNavBtn" data-i18n="nav.login">Přihlásit</button>
+      <button id="registerNavBtn" data-i18n="nav.register">Registrovat</button>
+      <button id="changePassNavBtn" class="hidden" data-i18n="nav.changePassword">Změnit heslo</button>
+      <button id="logoutNavBtn" class="hidden" data-i18n="nav.logout">Odhlásit</button>
+      <label class="small muted" for="languageSelect">🌐</label>
+      <select id="languageSelect" class="langSelect" aria-label="Language">
+        <option value="cs">Čeština</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="subnav">
+  <div class="subnavInner">
+    <div id="breadcrumb" class="breadcrumb"></div>
+    <div id="continentTabs" class="continentTabs"></div>
+    <div id="countryPopover" class="countryPopover">
+      <div id="countryList" class="countryList"></div>
     </div>
   </div>
 </div>
@@ -46,49 +61,49 @@
   <section id="homeView" class="view active">
     <div class="card">
       <div class="row" style="justify-content:space-between;">
-        <b class="top3Title">TOP 3 události (nejvíc hlasujících)</b>
-        <button id="refreshTop3Btn">Obnovit</button>
+        <b class="top3Title" data-i18n="home.top3Title">TOP 3 události (nejvíc hlasujících)</b>
+        <button id="refreshTop3Btn" data-i18n="home.refresh">Obnovit</button>
       </div>
       <div id="top3" class="top3grid" style="margin-top:10px;"></div>
     </div>
 
-    <h1 id="homeTitle">Vyber zemi</h1>
+    <h1 id="homeTitle" data-i18n="home.chooseCountry">Vyber zemi</h1>
 
     <div class="card">
       <div class="row" style="justify-content:space-between;">
-        <b>Interaktivní mapa světa</b>
+        <b data-i18n="home.mapTitle">Interaktivní mapa světa</b>
       </div>
       <div id="worldMap" style="margin-top:10px;"></div>
-      <div class="mapNote">Klikni na zemi a zobraz její události.</div>
+      <div class="mapNote" data-i18n="home.mapNote">Klikni na zemi a zobraz její události.</div>
     </div>
   </section>
 
   <section id="countryView" class="view">
     <div class="eventDetailHeader">
       <div>
-        <h1 id="countryTitle">Země</h1>
-        <div id="countrySubtitle" class="muted">Výběr země podle kontinentu</div>
+        <h1 id="countryTitle" data-i18n="country.title">Země</h1>
+        <div id="countrySubtitle" class="muted" data-i18n="country.subtitle">Výběr země podle kontinentu</div>
       </div>
-      <button id="backToHomeBtn" class="backBtn" type="button">Zpět na úvod</button>
+      <button id="backToHomeBtn" class="backBtn" type="button" data-i18n="country.backHome">Zpět na úvod</button>
     </div>
 
     <div class="card">
       <div class="row" style="justify-content:space-between;">
-        <b>TOP událost v zemi</b>
+        <b data-i18n="country.topEvent">TOP událost v zemi</b>
       </div>
       <div id="countryTop" class="muted" style="margin-top:10px;">Načítání…</div>
     </div>
 
     <div class="card">
       <div class="row" style="justify-content:space-between;">
-        <b>Aktivní události</b>
+        <b data-i18n="country.activeEvents">Aktivní události</b>
       </div>
       <div id="eventsActive" class="list" style="margin-top:10px;"></div>
     </div>
 
     <div class="card">
       <div class="row" style="justify-content:space-between;">
-        <b>Archiv / ukončené hlasování</b>
+        <b data-i18n="country.archive">Archiv / ukončené hlasování</b>
       </div>
       <div id="eventsArchive" class="list" style="margin-top:10px;"></div>
     </div>
@@ -97,13 +112,13 @@
   <section id="eventView" class="view">
     <div class="eventDetailHeader">
       <div>
-        <h1 id="eventTitle">Událost</h1>
+        <h1 id="eventTitle" data-i18n="event.title">Událost</h1>
         <div id="eventMeta" class="muted"></div>
       </div>
       <div class="eventHeaderRight">
         <div class="row" style="gap:8px;">
-          <span id="eventStatus" class="eventStatus">Aktivní</span>
-          <button id="backToCountryBtn" class="backBtn" type="button">Zpět na zemi</button>
+          <span id="eventStatus" class="eventStatus" data-i18n="event.active">Aktivní</span>
+          <button id="backToCountryBtn" class="backBtn" type="button" data-i18n="event.backToCountry">Zpět na zemi</button>
         </div>
       </div>
     </div>
