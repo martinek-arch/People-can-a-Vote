@@ -1,6 +1,7 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN } from "./constants.js";
 import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js";
 import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js";
+import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js";
 
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");
@@ -11,46 +12,7 @@ if (window.__PCV_INIT_DONE__) {
 
   applyStaticTranslations();
 
-  function boot(msg) {
-    const el = document.getElementById("boot");
-    if (el) {
-      el.textContent = msg;
-      if (!debugBoot && (msg === "Boot: ready" || msg.startsWith("Startup error:"))) {
-        el.style.display = "none";
-      }
-    }
-    if (debugBoot) {
-      console.log(msg);
-    }
-  }
-
-  async function loadSupabase() {
-    boot("Init: loading Supabase…");
-    return new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
-      s.async = true;
-      s.onload = () => resolve(window.supabase);
-      s.onerror = () => reject(new Error("Supabase load failed"));
-      document.head.appendChild(s);
-      setTimeout(() => reject(new Error("Supabase load timeout")), 12000);
-    });
-  }
-
-  async function loadMapbox() {
-    return new Promise((resolve, reject) => {
-      if (window.mapboxgl) {
-        resolve(window.mapboxgl);
-        return;
-      }
-      const s = document.createElement("script");
-      s.src = "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js";
-      s.async = true;
-      s.onload = () => resolve(window.mapboxgl);
-      s.onerror = () => reject(new Error("Mapbox load failed"));
-      document.head.appendChild(s);
-    });
-  }
+  const boot = createBoot(debugBoot);
 
   let supabaseClient = null;
   let session = null;
@@ -1014,7 +976,7 @@ if (error) throw new Error("Events load failed: " + error.message);
     }
 
     try {
-      const mapboxgl = await loadMapbox();
+      const mapboxgl = await loadMapboxLib();
       mapboxgl.accessToken = MAPBOX_TOKEN;
       mapInstance = new mapboxgl.Map({
         container: mapHost,
@@ -1202,7 +1164,7 @@ if (error) throw new Error("Events load failed: " + error.message);
   (async function init() {
     try {
       boot("Init: JS running");
-      const supabaseLib = await loadSupabase();
+      const supabaseLib = await loadSupabaseLib(boot);
 
       supabaseClient = supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: {
