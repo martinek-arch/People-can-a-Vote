@@ -1,11 +1,12 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/js/app.js b/js/app.js
 index 1a2595bdf7082061191b2c4b26f136c87c4d2418..f323067d08d86f0e59996b3db62edbb9cc7d1bd9 100644
 --- a/js/app.js
 +++ b/js/app.js
 @@ -1,69 +1,67 @@
-+import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN } from "./constants.js";
-+import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js";
-+
+import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN } from "./constants.js";
+import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js";
+
  if (window.__PCV_INIT_DONE__) {
    console.warn("PCV: duplicate init prevented");
  } else {
@@ -45,11 +46,7 @@ index 1a2595bdf7082061191b2c4b26f136c87c4d2418..f323067d08d86f0e59996b3db62edbb9
      });
    }
  
--  const SUPABASE_URL = "https://jqoomnhpyuikbntnrukw.supabase.co";
--  const SUPABASE_ANON_KEY = "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h";
--  const APP_BASE_URL = "https://martinek-arch.github.io/People-can-a-Vote/";
--  const MAPBOX_TOKEN = "pk.eyJ1IjoiaGVyZ290dCIsImEiOiJjbWttdHQ3cmYwZ2hmM2pyMjd2bmk1c3ZmIn0.-9CViuw1h3-gy49EsKvFiQ";
--
+
    let supabaseClient = null;
    let session = null;
    let isVerified = false;
@@ -101,49 +98,8 @@ index 1a2595bdf7082061191b2c4b26f136c87c4d2418..f323067d08d86f0e59996b3db62edbb9
    }
  
    /* ===== Data rendering ===== */
--  function escapeHtml(s) {
--    return String(s ?? "")
--      .replaceAll("&", "&amp;")
--      .replaceAll("<", "&lt;")
--      .replaceAll(">", "&gt;")
--      .replaceAll('"', "&quot;")
--      .replaceAll("'", "&#039;");
--  }
--
--
--  function pct(n, d) {
--    if (!d || d <= 0) return 0;
--    return Math.round((n / d) * 100);
--  }
--  function formatDate(value) {
--    if (!value) return "neuvedeno";
--    const d = new Date(value);
--    if (Number.isNaN(d.getTime())) return "neuvedeno";
--    return d.toLocaleDateString("cs-CZ");
--  }
--  function formatRemainingTime(value) {
--    if (!value) return "neuvedeno";
--    const now = Date.now();
--    const end = new Date(value).getTime();
--    if (Number.isNaN(end)) return "neuvedeno";
--    const diff = Math.max(0, end - now);
--    const hours = Math.floor(diff / 36e5);
--    const minutes = Math.floor((diff % 36e5) / 6e4);
--    return `${hours} h ${minutes} min`;
--  }
--  function getEventEnd(eventItem) {
--    if (eventItem?.ends_at) return new Date(eventItem.ends_at).getTime();
--    if (eventItem?.created_at) {
--      return new Date(eventItem.created_at).getTime() + 30 * 24 * 60 * 60 * 1000;
--    }
--    return NaN;
--  }
    window.getEventEnd = getEventEnd;
--  function setBar(el, valuePct) {
--    const v = Math.max(0, Math.min(100, Number(valuePct) || 0));
--    if (el) el.style.width = v + "%";
--  }
-+
+
    function renderResultBlock(title, r, sizeClass) {
      const yes = r?.yes || 0, no = r?.no || 0, dk = r?.dk || 0, total = r?.total || 0;
      const wrap = document.createElement("div");
@@ -169,3 +125,6 @@ index 1a2595bdf7082061191b2c4b26f136c87c4d2418..f323067d08d86f0e59996b3db62edbb9
  
        <div class="countLine">Hlasů celkem: <b>${total}</b> (Ano: ${yes}, Ne: ${no}, Nevím: ${dk})</div>
      `;
+ 
+EOF
+)
