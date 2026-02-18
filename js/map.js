@@ -41,6 +41,33 @@ export function createMapController({
     if (!mapHost) return;
     const mapNote = document.querySelector(".mapNote");
 
+<<<<<<< codex/ahoj-cusqbk
+    function showMapFallback(message, withSetup = false) {
+      mapHost.classList.add("mapPlaceholder");
+      mapHost.innerHTML = withSetup
+        ? `<div>${message}</div><div style="margin-top:10px;"><button id="setMapTokenBtn" type="button">${t("map.setToken")}</button></div>`
+        : message;
+      if (mapNote) {
+        mapNote.textContent = t("map.unavailable");
+      }
+      if (withSetup) {
+        const btn = document.getElementById("setMapTokenBtn");
+        if (btn) {
+          btn.onclick = () => {
+            const value = prompt(t("map.tokenPrompt")) || "";
+            const token = value.trim();
+            if (!token) return;
+            window.localStorage.setItem("pcvMapboxToken", token);
+            alert(t("map.tokenSaved"));
+            window.location.reload();
+          };
+        }
+      }
+    }
+
+    if (!mapboxToken) {
+      showMapFallback(t("map.missingToken"), true);
+=======
     function showMapFallback(message) {
       mapHost.classList.add("mapPlaceholder");
       mapHost.innerHTML = message;
@@ -51,6 +78,7 @@ export function createMapController({
 
     if (!mapboxToken) {
       showMapFallback(t("map.missingToken"));
+>>>>>>> main
       return;
     }
 
