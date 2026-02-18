@@ -4,6 +4,7 @@ import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js";
 import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js";
 import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js";
 import { createAuthController } from "./auth.js";
+import { createEventsUI } from "./events-ui.js";
 
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");
@@ -49,75 +50,25 @@ if (window.__PCV_INIT_DONE__) {
   /* ===== Data rendering ===== */
   window.getEventEnd = getEventEnd;
 
-  function renderResultBlock(title, r, sizeClass) {
-    const yes = r?.yes || 0, no = r?.no || 0, dk = r?.dk || 0, total = r?.total || 0;
-    const wrap = document.createElement("div");
-    wrap.className = "resultBlock " + (sizeClass || "large");
-    wrap.innerHTML = `
-      <div class="resultTitle">${escapeHtml(title)}</div>
+  const eventsUI = createEventsUI({
+    t,
+    escapeHtml,
+    pct,
+    setBar,
+    getCountryNameByCode: (code) => cachedCountriesAll.find((c) => c.code === code)?.name,
+    onTop3Click: (item) => {
+      if (item.country_code) {
+        currentCountry = item.country_code;
+      }
+      navigateEvent(item.event_id);
+    }
+  });
 
-      <div class="rowBar">
-        <div><b>Ano</b></div>
-        <div class="bar"><div class="barFill" data-k="yes"></div></div>
-        <div class="pct">${pct(yes,total)}%</div>
-      </div>
-      <div class="rowBar">
-        <div><b>Ne</b></div>
-        <div class="bar"><div class="barFill" data-k="no"></div></div>
-        <div class="pct">${pct(no,total)}%</div>
-      </div>
-      <div class="rowBar">
-        <div><b>${escapeHtml(t("vote.option.dk"))}</b></div>
-        <div class="bar"><div class="barFill" data-k="dk"></div></div>
-        <div class="pct">${pct(dk,total)}%</div>
-      </div>
-
-      <div class="countLine">${t("vote.totalLine", { total, yes, no, dk })}</div>
-    `;
-    setBar(wrap.querySelector('[data-k="yes"]'), pct(yes,total));
-    setBar(wrap.querySelector('[data-k="no"]'),  pct(no,total));
-    setBar(wrap.querySelector('[data-k="dk"]'),  pct(dk,total));
-    return wrap;
-  }
+  const renderResultBlock = (...args) => eventsUI.renderResultBlock(...args);
   window.renderResultBlock = renderResultBlock;
 
-  function renderTop3(...args) {
-    return renderTop3Impl(...args);
-  }
+  const renderTop3 = (...args) => eventsUI.renderTop3(...args);
   window.renderTop3 = renderTop3;
-
-  function renderTop3Impl(items, votedMap) {
-    const top3 = document.getElementById("top3");
-    top3.innerHTML = "";
-    if (!items?.length) {
-      top3.innerHTML = `<div class='muted'>${escapeHtml(t("top3.empty"))}</div>`;
-      return;
-    }
-    const maxVotes = Math.max(...items.map(it => it.votes || 0), 1);
-    for (const [idx, it] of items.entries()) {
-      const div = document.createElement("div");
-      div.className = "card top3Item";
-      const hasVoted = votedMap && votedMap.has(it.event_id);
-      div.innerHTML = `
-        <div class="top3TitleRow">
-          <div class="eventTitle"><span class="top3Rank">${idx + 1}</span>${escapeHtml(it.title || "Untitled")}</div>
-          ${hasVoted ? `<span class="pill top3VotedPill">${escapeHtml(t("vote.voted"))}</span>` : ""}
-        </div>
-        <div class="muted">${escapeHtml(cachedCountriesAll.find(c => c.code === it.country_code)?.name || it.country_code || "")}</div>
-        <div class="top3Meta">
-          <div class="top3Bar"><div class="top3BarFill" style="width:${Math.round(((it.votes || 0) / maxVotes) * 100)}%"></div></div>
-          <span class="pill">${escapeHtml(t("top3.voters", { count: it.votes ?? 0 }))}</span>
-        </div>
-      `;
-      div.onclick = () => {
-        if (it.country_code) {
-          currentCountry = it.country_code;
-        }
-        navigateEvent(it.event_id);
-      };
-      top3.appendChild(div);
-    }
-  }
 
   function setActiveView(viewId) {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
