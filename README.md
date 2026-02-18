@@ -1,1 +1,1 @@
-# Peple-can-a-Vote
+# People-can-a-Vote
