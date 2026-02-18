@@ -90,12 +90,9 @@ const translations = {
     "auth.resetFromLink": "Nastav nové heslo (z reset odkazu).",
     "map.unavailable": "Mapa momentálně není dostupná.",
     "map.missingToken": "Mapa není dostupná (chybí token).",
-<<<<<<< codex/ahoj-cusqbk
     "map.setToken": "Nastavit Mapbox token",
     "map.tokenPrompt": "Vlož Mapbox public token (pk...)",
     "map.tokenSaved": "Token uložen. Stránka se obnoví.",
-=======
->>>>>>> main
     "map.countryNotFound": "Země „{name}“ není v seznamu.",
     "map.loadFailed": "Mapa se nepodařilo načíst.",
     "auth.resetMode": "Nastav nové heslo (reset).",
@@ -193,12 +190,9 @@ const translations = {
     "auth.resetFromLink": "Set new password (from reset link).",
     "map.unavailable": "Map is currently unavailable.",
     "map.missingToken": "Map unavailable (missing token).",
-<<<<<<< codex/ahoj-cusqbk
     "map.setToken": "Set Mapbox token",
     "map.tokenPrompt": "Paste Mapbox public token (pk...)",
     "map.tokenSaved": "Token saved. Reloading page.",
-=======
->>>>>>> main
     "map.countryNotFound": "Country “{name}” is not in the list.",
     "map.loadFailed": "Failed to load map.",
     "auth.resetMode": "Set new password (reset).",

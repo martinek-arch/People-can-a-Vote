@@ -1,11 +1,11 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN } from "./constants.js";
-import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js";
-import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js";
-import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js";
-import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js";
-import { createAuthController } from "./auth.js";
-import { createEventsUI } from "./events-ui.js";
-import { createMapController } from "./map.js";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN } from "./constants.js?v=20260218";
+import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260218";
+import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260218";
+import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260218";
+import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260218";
+import { createAuthController } from "./auth.js?v=20260218";
+import { createEventsUI } from "./events-ui.js?v=20260218";
+import { createMapController } from "./map.js?v=20260218";
 
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");

@@ -41,7 +41,6 @@ export function createMapController({
     if (!mapHost) return;
     const mapNote = document.querySelector(".mapNote");
 
-<<<<<<< codex/ahoj-cusqbk
     function showMapFallback(message, withSetup = false) {
       mapHost.classList.add("mapPlaceholder");
       mapHost.innerHTML = withSetup
@@ -67,18 +66,6 @@ export function createMapController({
 
     if (!mapboxToken) {
       showMapFallback(t("map.missingToken"), true);
-=======
-    function showMapFallback(message) {
-      mapHost.classList.add("mapPlaceholder");
-      mapHost.innerHTML = message;
-      if (mapNote) {
-        mapNote.textContent = t("map.unavailable");
-      }
-    }
-
-    if (!mapboxToken) {
-      showMapFallback(t("map.missingToken"));
->>>>>>> main
       return;
     }
 
