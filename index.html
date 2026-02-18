@@ -9,6 +9,21 @@
 <script>
   // Optional runtime config injected by hosting (do not commit secrets here).
   window.__PCV_CONFIG__ = window.__PCV_CONFIG__ || {};
+<<<<<<< codex/ahoj-xc2x9a
+=======
+  // One-time token bootstrap via URL: ?mapboxToken=... (stored to localStorage, then removed from URL).
+  try {
+    const url = new URL(window.location.href);
+    const tokenFromQuery = url.searchParams.get("mapboxToken");
+    if (tokenFromQuery) {
+      window.localStorage.setItem("pcvMapboxToken", tokenFromQuery);
+      url.searchParams.delete("mapboxToken");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+  } catch (e) {
+    // noop
+  }
+>>>>>>> main
 </script>
 
 </head>
