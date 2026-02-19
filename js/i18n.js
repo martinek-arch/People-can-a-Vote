@@ -246,4 +246,3 @@ export function initI18nSelector(onChange) {
     if (typeof onChange === "function") onChange();
   });
 }
-}

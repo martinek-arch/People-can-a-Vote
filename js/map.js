@@ -185,4 +185,3 @@ export function createMapController({
 
   return { initWorldMap, updateMapChoropleth };
 }
-}
