@@ -1,3 +1,32 @@
+async function loadLeafletLib() {
+  if (window.L) return window.L;
+
+  if (!document.querySelector('link[data-pcv-leaflet="1"]')) {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    link.setAttribute("data-pcv-leaflet", "1");
+    document.head.appendChild(link);
+  }
+
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-pcv-leaflet="1"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.L), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Leaflet load failed")), { once: true });
+      return;
+    }
+
+    const s = document.createElement("script");
+    s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    s.async = true;
+    s.setAttribute("data-pcv-leaflet", "1");
+    s.onload = () => resolve(window.L);
+    s.onerror = () => reject(new Error("Leaflet load failed"));
+    document.head.appendChild(s);
+  });
+}
+
 export function createMapController({
   t,
   mapboxToken,
@@ -24,7 +53,7 @@ export function createMapController({
 
   function updateMapChoropleth() {
     const countryStats = getCountryStats();
-    if (!mapInstance || !mapReady || !countryStats.size) return;
+    if (!mapInstance || !mapReady || !countryStats.size || !mapInstance.setFeatureState) return;
     const denom = getMaxCountryVotes() || 1;
     for (const [code, stats] of countryStats.entries()) {
       if (!code) continue;
@@ -34,6 +63,42 @@ export function createMapController({
         { intensity }
       );
     }
+  }
+
+  async function initTokenlessMap(mapHost, mapNote) {
+    const L = await loadLeafletLib();
+    mapHost.classList.remove("mapPlaceholder");
+    mapHost.innerHTML = "";
+
+    const leafletMap = L.map(mapHost).setView([20, 10], 2);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 6,
+      attribution: "© OpenStreetMap"
+    }).addTo(leafletMap);
+
+    if (mapNote) {
+      mapNote.textContent = t("map.tokenlessMode");
+    }
+
+    leafletMap.on("click", async (e) => {
+      try {
+        const { lat, lng } = e.latlng;
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=3`;
+        const res = await fetch(url, { headers: { "Accept": "application/json" } });
+        if (!res.ok) throw new Error("Nominatim reverse failed");
+        const data = await res.json();
+        const code = (data?.address?.country_code || "").toUpperCase();
+        const name = data?.address?.country;
+        const country = findCountryByCode(code) || findCountryByName(name);
+        if (country) {
+          navigateCountry(country.code);
+        } else if (name) {
+          alert(t("map.countryNotFound", { name }));
+        }
+      } catch (err) {
+        console.warn("Tokenless map lookup failed", err);
+      }
+    });
   }
 
   async function initWorldMap() {
@@ -50,7 +115,12 @@ export function createMapController({
     }
 
     if (!mapboxToken) {
-      showMapFallback(t("map.missingToken"));
+      try {
+        await initTokenlessMap(mapHost, mapNote);
+      } catch (e) {
+        console.warn("Tokenless map init failed", e);
+        showMapFallback(t("map.missingToken"));
+      }
       return;
     }
 
