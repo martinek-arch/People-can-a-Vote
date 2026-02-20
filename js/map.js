@@ -38,6 +38,7 @@ export function createMapController({
 }) {
   let mapInstance = null;
   let mapReady = false;
+  let mapFallbackActivated = false;
 
   function findCountryByCode(code) {
     if (!code) return null;
@@ -114,6 +115,26 @@ export function createMapController({
       }
     }
 
+    async function switchToTokenlessMap(reason) {
+      if (mapFallbackActivated) return;
+      mapFallbackActivated = true;
+      mapReady = false;
+      if (mapInstance && mapInstance.remove) {
+        try {
+          mapInstance.remove();
+        } catch (removeError) {
+          console.warn("Mapbox cleanup failed", removeError);
+        }
+      }
+      mapInstance = null;
+      try {
+        await initTokenlessMap(mapHost, mapNote);
+      } catch (tokenlessErr) {
+        console.warn("Tokenless map init failed after Mapbox error", reason, tokenlessErr);
+        showMapFallback(t("map.loadFailed"));
+      }
+    }
+
     if (!mapboxToken) {
       try {
         await initTokenlessMap(mapHost, mapNote);
@@ -132,6 +153,16 @@ export function createMapController({
         style: "mapbox://styles/mapbox/light-v11",
         center: [10, 20],
         zoom: 1.1
+      });
+
+      mapInstance.on("error", async (event) => {
+        const status = event?.error?.status;
+        const message = String(event?.error?.message || "");
+        const shouldFallback = status === 401 || status === 403 || /access token|unauthorized|forbidden/i.test(message);
+        if (shouldFallback) {
+          console.warn("Mapbox token invalid/forbidden, switching to tokenless map", event?.error || event);
+          await switchToTokenlessMap(event?.error || event);
+        }
       });
 
       mapInstance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
@@ -249,7 +280,7 @@ export function createMapController({
       });
     } catch (err) {
       console.warn("Mapbox init failed", err);
-      showMapFallback(t("map.loadFailed"));
+      await switchToTokenlessMap(err);
     }
   }
 
