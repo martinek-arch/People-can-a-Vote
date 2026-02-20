@@ -4,8 +4,11 @@
 - Mapbox token is loaded at runtime from `window.__PCV_CONFIG__.mapboxToken` or `localStorage["pcvMapboxToken"]`.
 - This avoids committing tokens directly in the repository.
 - Token should be configured by deploy/runtime (`window.__PCV_CONFIG__.mapboxToken`) or localStorage key `pcvMapboxToken` for local testing.
+<<<<<<< codex/ahoj-oukbb7
 - Recommended production setup: create `js/runtime-config.json` on hosting (not in git) with `{ "mapboxToken": "pk..." }`.
 - See `js/runtime-config.example.json` for format.
+=======
+>>>>>>> main
 - Local quick setup in browser console:
   - `localStorage.setItem("pcvMapboxToken", "pk.YOUR_PUBLIC_TOKEN")`
   - reload page
