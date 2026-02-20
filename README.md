@@ -7,6 +7,8 @@
 - Recommended production setup: inject `window.__PCV_CONFIG__.mapboxToken` in host HTML/template.
 - Optional file-based setup: set `window.__PCV_RUNTIME_CONFIG_URL__ = "js/runtime-config.json"` and provide the JSON file on host (not in git).
 - See `js/runtime-config.example.json` for format.
+- Recommended production setup: create `js/runtime-config.json` on hosting (not in git) with `{ "mapboxToken": "pk..." }`.
+- See `js/runtime-config.example.json` for format.
 - Local quick setup in browser console:
   - `localStorage.setItem("pcvMapboxToken", "pk.YOUR_PUBLIC_TOKEN")`
   - reload page
