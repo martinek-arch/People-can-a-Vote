@@ -1,19 +1,12 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN } from "./constants.js?v=20260218e";
-import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260218e";
-import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260218e";
-import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260218e";
-import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260218e";
-import { createAuthController } from "./auth.js?v=20260218e";
-import { createEventsUI } from "./events-ui.js?v=20260218e";
-import { createMapController } from "./map.js?v=20260218e";
-import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN } from "./constants.js?v=20260218d";
-import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260218d";
-import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260218d";
-import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260218d";
-import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260218d";
-import { createAuthController } from "./auth.js?v=20260218d";
-import { createEventsUI } from "./events-ui.js?v=20260218d";
-import { createMapController } from "./map.js?v=20260218d";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN } from "./constants.js?v=20260220a";
+import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220a";
+import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220a";
+import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220a";
+import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220a";
+import { createAuthController } from "./auth.js?v=20260220a";
+import { createEventsUI } from "./events-ui.js?v=20260220a";
+import { createMapController } from "./map.js?v=20260220a";
+
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");
 } else {
