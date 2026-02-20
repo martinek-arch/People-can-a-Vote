@@ -175,21 +175,29 @@
 <script>
   (async () => {
     window.__PCV_CONFIG__ = window.__PCV_CONFIG__ || {};
-    try {
-      const res = await fetch("js/runtime-config.json", { cache: "no-store" });
-      if (res.ok) {
-        const cfg = await res.json();
-        if (cfg && typeof cfg === "object") {
-          Object.assign(window.__PCV_CONFIG__, cfg);
+
+    const path = window.location.pathname || "/";
+    const basePath = path.endsWith("/") ? path : path.slice(0, path.lastIndexOf("/") + 1);
+    const baseUrl = `${window.location.origin}${basePath}`;
+
+    const runtimeConfigUrl = window.__PCV_RUNTIME_CONFIG_URL__;
+    if (runtimeConfigUrl) {
+      try {
+        const res = await fetch(new URL(runtimeConfigUrl, baseUrl), { cache: "no-store" });
+        if (res.ok) {
+          const cfg = await res.json();
+          if (cfg && typeof cfg === "object") {
+            Object.assign(window.__PCV_CONFIG__, cfg);
+          }
         }
+      } catch (e) {
+        // optional config file missing/unavailable
       }
-    } catch (e) {
-      // optional config file missing/unavailable
     }
 
     const script = document.createElement("script");
     script.type = "module";
-    script.src = "js/app.js?v=20260218d";
+    script.src = new URL("js/app.js?v=20260218e", baseUrl).href;
     document.body.appendChild(script);
   })();
 </script>
