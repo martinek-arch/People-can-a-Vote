@@ -35,6 +35,7 @@ export function createMapController({
   getMaxCountryVotes,
   getCountries,
   navigateCountry,
+  onStatusChange = () => {},
 }) {
   let mapInstance = null;
   let mapReady = false;
@@ -128,6 +129,7 @@ export function createMapController({
       }
       mapInstance = null;
       try {
+        onStatusChange({ renderer: "leaflet", reason: "mapbox-fallback", error: String(reason?.message || reason || "") });
         await initTokenlessMap(mapHost, mapNote);
       } catch (tokenlessErr) {
         console.warn("Tokenless map init failed after Mapbox error", reason, tokenlessErr);
@@ -137,6 +139,7 @@ export function createMapController({
 
     if (!mapboxToken) {
       try {
+        onStatusChange({ renderer: "leaflet", reason: "no-token" });
         await initTokenlessMap(mapHost, mapNote);
       } catch (e) {
         console.warn("Tokenless map init failed", e);
@@ -154,6 +157,8 @@ export function createMapController({
         center: [10, 20],
         zoom: 1.1
       });
+
+      onStatusChange({ renderer: "mapbox", reason: "active" });
 
       mapInstance.on("error", async (event) => {
         const status = event?.error?.status;
@@ -280,6 +285,7 @@ export function createMapController({
       });
     } catch (err) {
       console.warn("Mapbox init failed", err);
+      onStatusChange({ renderer: "leaflet", reason: "mapbox-init-failed", error: String(err?.message || err || "") });
       await switchToTokenlessMap(err);
     }
   }

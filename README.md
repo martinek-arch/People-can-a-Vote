@@ -13,3 +13,5 @@
 ## Troubleshooting
 - If browser console shows stale syntax errors (for example `Unexpected token <<` in `i18n.js`), do a hard refresh (`Ctrl+F5`) to clear cached modules.
 - Messages starting with `contentScript.js` or `runtime.lastError` usually come from browser extensions, not from this app code.
+
+- Debug panel (build/token-source/map renderer): set `localStorage.setItem("pcvDebug", "1")` and reload.

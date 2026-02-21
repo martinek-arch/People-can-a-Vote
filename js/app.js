@@ -1,11 +1,11 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN } from "./constants.js?v=20260220b";
-import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220b";
-import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220b";
-import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220b";
-import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220b";
-import { createAuthController } from "./auth.js?v=20260220b";
-import { createEventsUI } from "./events-ui.js?v=20260220b";
-import { createMapController } from "./map.js?v=20260220b";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN, MAPBOX_TOKEN_SOURCE, APP_BUILD_VERSION } from "./constants.js?v=20260220c";
+import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220c";
+import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220c";
+import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220c";
+import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220c";
+import { createAuthController } from "./auth.js?v=20260220c";
+import { createEventsUI } from "./events-ui.js?v=20260220c";
+import { createMapController } from "./map.js?v=20260220c";
 
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");
@@ -13,6 +13,46 @@ if (window.__PCV_INIT_DONE__) {
   window.__PCV_INIT_DONE__ = true;
 
   const debugBoot = window.localStorage.getItem("pcvDebug") === "1";
+
+  const mapDebugState = { renderer: "pending", reason: "boot" };
+
+  function setupDebugPanel() {
+    if (!debugBoot) return { updateMapStatus: () => {} };
+
+    const panel = document.createElement("div");
+    panel.id = "pcvDebugPanel";
+    panel.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:9999;background:#111827;color:#f9fafb;padding:10px 12px;border-radius:10px;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;box-shadow:0 10px 30px rgba(0,0,0,.35);max-width:360px";
+
+    const rows = {
+      build: document.createElement("div"),
+      renderer: document.createElement("div"),
+      tokenSource: document.createElement("div"),
+      mapReason: document.createElement("div"),
+      mapError: document.createElement("div"),
+    };
+
+    rows.build.textContent = `build: ${APP_BUILD_VERSION}`;
+    rows.renderer.textContent = "renderer: pending";
+    rows.tokenSource.textContent = `token-source: ${MAPBOX_TOKEN_SOURCE}`;
+    rows.mapReason.textContent = "reason: boot";
+    rows.mapError.textContent = "error: -";
+
+    panel.append(rows.build, rows.renderer, rows.tokenSource, rows.mapReason, rows.mapError);
+    document.body.appendChild(panel);
+
+    return {
+      updateMapStatus(status) {
+        mapDebugState.renderer = status?.renderer || mapDebugState.renderer;
+        mapDebugState.reason = status?.reason || mapDebugState.reason;
+        mapDebugState.error = status?.error || "";
+        rows.renderer.textContent = `renderer: ${mapDebugState.renderer}`;
+        rows.mapReason.textContent = `reason: ${mapDebugState.reason}`;
+        rows.mapError.textContent = `error: ${mapDebugState.error || "-"}`;
+      }
+    };
+  }
+
+  const debugPanel = setupDebugPanel();
 
   applyStaticTranslations();
 
@@ -77,6 +117,7 @@ if (window.__PCV_INIT_DONE__) {
     getMaxCountryVotes: () => maxCountryVotes,
     getCountries: () => cachedCountriesAll,
     navigateCountry,
+    onStatusChange: (status) => debugPanel.updateMapStatus(status),
   });
 
   function setActiveView(viewId) {
