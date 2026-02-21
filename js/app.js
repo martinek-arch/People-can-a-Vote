@@ -1,12 +1,12 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN, MAPBOX_TOKEN_SOURCE, APP_BUILD_VERSION } from "./constants.js?v=20260220d";
-import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220d";
-import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220d";
-import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220d";
-import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220d";
-import { createAuthController } from "./auth.js?v=20260220d";
-import { createEventsUI } from "./events-ui.js?v=20260220d";
-import { createMapController } from "./map.js?v=20260220d";
-import { fetchTop3Events, fetchUserVotesForEvents, fetchEventById, fetchEventResults, fetchCountryTopEvent, fetchContinents, fetchCountries, searchEvents } from "./data-layer.js?v=20260220d";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN, MAPBOX_TOKEN_SOURCE, APP_BUILD_VERSION } from "./constants.js?v=20260220e";
+import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220e";
+import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220e";
+import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220e";
+import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220e";
+import { createAuthController } from "./auth.js?v=20260220e";
+import { createEventsUI } from "./events-ui.js?v=20260220e";
+import { createMapController } from "./map.js?v=20260220e";
+import { fetchTop3Events, fetchUserVotesForEvents, fetchEventById, fetchEventResults, fetchCountryTopEvent, fetchContinents, fetchCountries, searchEvents, fetchCountryStatsEvents, fetchCountryStatsVotes, insertVote, fetchEventsByCountry } from "./data-layer.js?v=20260220e";
 
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");
@@ -220,9 +220,7 @@ if (window.__PCV_INIT_DONE__) {
   }
 
   async function loadCountryStats() {
-    const { data: events, error: eventsErr } = await supabaseClient
-      .from("events")
-      .select("id,country_code");
+    const { data: events, error: eventsErr } = await fetchCountryStatsEvents(supabaseClient);
     if (eventsErr) throw new Error("Country stats events load failed: " + eventsErr.message);
 
     const countMap = new Map();
@@ -232,9 +230,7 @@ if (window.__PCV_INIT_DONE__) {
       countMap.set(code, (countMap.get(code) || 0) + 1);
     }
 
-    const { data: voteRows, error: votesErr } = await supabaseClient
-      .from("event_vote_counts")
-      .select("votes,events(country_code)");
+    const { data: voteRows, error: votesErr } = await fetchCountryStatsVotes(supabaseClient);
     if (votesErr) throw new Error("Country stats votes load failed: " + votesErr.message);
 
     const votesMap = new Map();
@@ -374,7 +370,7 @@ if (window.__PCV_INIT_DONE__) {
 
           boot("Vote: submitting…");
           const payload = { event_id: eventItem.id, user_id: session.user.id, choice };
-          const { error } = await supabaseClient.from("votes").insert(payload);
+          const { error } = await insertVote(supabaseClient, payload);
 
           if (error) {
             // Duplicate vote (unique constraint) -> show friendly message
@@ -474,14 +470,9 @@ if (window.__PCV_INIT_DONE__) {
     if (!countryCode) return;
     boot("Data: loading events…");
     currentCountry = countryCode;
-    const { data, error } = await supabaseClient
-      .from("events")
-      .select("id,title,description,country_code,is_active,is_top,ends_at,created_at")
-      .eq("country_code", countryCode)
-      .order("created_at", { ascending: false });
+    const { data, error } = await fetchEventsByCountry(supabaseClient, countryCode);
 
-    
-if (error) throw new Error("Events load failed: " + error.message);
+    if (error) throw new Error("Events load failed: " + error.message);
 
     const events = data || [];
     const ids = events.map(x => x.id);
@@ -504,7 +495,7 @@ if (error) throw new Error("Events load failed: " + error.message);
     let resultsMap = new Map();
     if (ids.length) {
       try {
-        const { data: rows, error: rErr } = await supabaseClient.rpc("get_event_results", { event_ids: ids });
+        const { data: rows, error: rErr } = await fetchEventResults(supabaseClient, ids);
         if (!rErr && rows) {
           resultsMap = new Map(rows.map(r => [r.event_id, r]));
         } else if (rErr) {

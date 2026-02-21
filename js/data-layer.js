@@ -56,3 +56,28 @@ export async function searchEvents(client, term, limit = 8) {
     .ilike("title", `%${term}%`)
     .limit(limit);
 }
+
+
+export async function fetchCountryStatsEvents(client) {
+  return client
+    .from("events")
+    .select("id,country_code");
+}
+
+export async function fetchCountryStatsVotes(client) {
+  return client
+    .from("event_vote_counts")
+    .select("votes,events(country_code)");
+}
+
+export async function insertVote(client, payload) {
+  return client.from("votes").insert(payload);
+}
+
+export async function fetchEventsByCountry(client, countryCode) {
+  return client
+    .from("events")
+    .select("id,title,description,country_code,is_active,is_top,ends_at,created_at")
+    .eq("country_code", countryCode)
+    .order("created_at", { ascending: false });
+}
