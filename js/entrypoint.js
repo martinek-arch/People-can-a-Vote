@@ -15,4 +15,4 @@ if (runtimeConfigUrl) {
   }
 }
 
-await import("./app.js?v=20260220e");
+await import("./app.js?v=20260220f");

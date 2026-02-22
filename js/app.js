@@ -1,12 +1,13 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN, MAPBOX_TOKEN_SOURCE, APP_BUILD_VERSION } from "./constants.js?v=20260220e";
-import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220e";
-import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220e";
-import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220e";
-import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220e";
-import { createAuthController } from "./auth.js?v=20260220e";
-import { createEventsUI } from "./events-ui.js?v=20260220e";
-import { createMapController } from "./map.js?v=20260220e";
-import { fetchTop3Events, fetchUserVotesForEvents, fetchEventById, fetchEventResults, fetchCountryTopEvent, fetchContinents, fetchCountries, searchEvents, fetchCountryStatsEvents, fetchCountryStatsVotes, insertVote, fetchEventsByCountry } from "./data-layer.js?v=20260220e";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN, MAPBOX_TOKEN_SOURCE, APP_BUILD_VERSION } from "./constants.js?v=20260220f";
+import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220f";
+import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220f";
+import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220f";
+import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220f";
+import { createAuthController } from "./auth.js?v=20260220f";
+import { createEventsUI } from "./events-ui.js?v=20260220f";
+import { createMapController } from "./map.js?v=20260220f";
+import { createCountryFlow } from "./country-flow.js?v=20260220f";
+import { fetchTop3Events, fetchUserVotesForEvents, fetchEventById, fetchEventResults, fetchContinents, fetchCountries, searchEvents, insertVote } from "./data-layer.js?v=20260220f";
 
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");
@@ -121,6 +122,28 @@ if (window.__PCV_INIT_DONE__) {
     onStatusChange: (status) => debugPanel.updateMapStatus(status),
   });
 
+
+  const countryFlow = createCountryFlow({
+    t,
+    boot,
+    mapController,
+    getSupabaseClient: () => supabaseClient,
+    getSession: () => session,
+    getCachedCountriesAll: () => cachedCountriesAll,
+    getCurrentContinentId: () => currentContinentId,
+    setCountryStats: (next) => { countryStats = next; },
+    setMaxCountryVotes: (next) => { maxCountryVotes = next; },
+    setCurrentCountry: (code) => { currentCountry = code; },
+    fillCountries,
+    renderEvents,
+    updateBreadcrumb,
+    escapeHtml,
+  });
+
+  const loadCountryStats = (...args) => countryFlow.loadCountryStats(...args);
+  const loadEventsForCountry = (...args) => countryFlow.loadEventsForCountry(...args);
+  const loadCountryDetail = (...args) => countryFlow.loadCountryDetail(...args);
+
   function setActiveView(viewId) {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     const view = document.getElementById(viewId);
@@ -219,43 +242,6 @@ if (window.__PCV_INIT_DONE__) {
     }
   }
 
-  async function loadCountryStats() {
-    const { data: events, error: eventsErr } = await fetchCountryStatsEvents(supabaseClient);
-    if (eventsErr) throw new Error("Country stats events load failed: " + eventsErr.message);
-
-    const countMap = new Map();
-    for (const ev of events || []) {
-      if (!ev.country_code) continue;
-      const code = String(ev.country_code).toUpperCase();
-      countMap.set(code, (countMap.get(code) || 0) + 1);
-    }
-
-    const { data: voteRows, error: votesErr } = await fetchCountryStatsVotes(supabaseClient);
-    if (votesErr) throw new Error("Country stats votes load failed: " + votesErr.message);
-
-    const votesMap = new Map();
-    for (const row of voteRows || []) {
-      const code = row.events?.country_code;
-      if (!code) continue;
-      const normalized = String(code).toUpperCase();
-      votesMap.set(normalized, (votesMap.get(normalized) || 0) + (row.votes || 0));
-    }
-
-    countryStats = new Map();
-    maxCountryVotes = 0;
-    for (const co of cachedCountriesAll) {
-      const code = String(co.code || "").toUpperCase();
-      const eventCount = countMap.get(code) || 0;
-      const totalVotes = votesMap.get(code) || 0;
-      countryStats.set(code, { events: eventCount, votes: totalVotes });
-      if (totalVotes > maxCountryVotes) maxCountryVotes = totalVotes;
-    }
-
-    mapController.updateMapChoropleth();
-    if (currentContinentId !== null && typeof window.fillCountries === "function") {
-      await window.fillCountries(currentContinentId, false);
-    }
-  }
 
   function updateBreadcrumb() {
     const breadcrumb = document.getElementById("breadcrumb");
@@ -466,64 +452,6 @@ if (window.__PCV_INIT_DONE__) {
   }
 
 
-  async function loadEventsForCountry(countryCode) {
-    if (!countryCode) return;
-    boot("Data: loading events…");
-    currentCountry = countryCode;
-    const { data, error } = await fetchEventsByCountry(supabaseClient, countryCode);
-
-    if (error) throw new Error("Events load failed: " + error.message);
-
-    const events = data || [];
-    const ids = events.map(x => x.id);
-
-    // My votes (for disabling buttons) - only when logged in
-    let votesMap = new Map();
-    if (session?.user?.id && ids.length) {
-      try {
-        const { data: myVotes, error: vErr } = await fetchUserVotesForEvents(supabaseClient, session.user.id, ids);
-
-        if (!vErr && myVotes) {
-          votesMap = new Map(myVotes.map(v => [v.event_id, true]));
-        }
-      } catch (e) {
-        console.warn("Votes lookup failed", e);
-      }
-    }
-
-    // Public results (visible to everyone) via RPC
-    let resultsMap = new Map();
-    if (ids.length) {
-      try {
-        const { data: rows, error: rErr } = await fetchEventResults(supabaseClient, ids);
-        if (!rErr && rows) {
-          resultsMap = new Map(rows.map(r => [r.event_id, r]));
-        } else if (rErr) {
-          console.warn("Results RPC error", rErr);
-        }
-      } catch (e) {
-        console.warn("Results lookup failed", e);
-      }
-    }
-
-    renderEvents(events, votesMap, resultsMap);
-    await loadCountryTop(events);
-    const countryName = cachedCountriesAll.find(c => c.code === countryCode)?.name || countryCode;
-    const eventCount = events.length;
-    document.getElementById("countryTitle").textContent = countryName;
-    document.getElementById("countrySubtitle").textContent = t("country.subtitleStats", { name: countryName, code: countryCode, count: eventCount });
-    const homeTitle = document.getElementById("homeTitle");
-    if (homeTitle) {
-      homeTitle.textContent = t("country.homeTitleCode", { code: countryCode });
-    }
-    boot("Data: events ready");
-    updateBreadcrumb();
-  }
-
-  async function loadCountryDetail(code) {
-    await loadEventsForCountry(code);
-  }
-
   async function loadEventDetail(eventId) {
     const detailCard = document.getElementById("eventDetailCard");
     detailCard.innerHTML = `<div class='muted'>${escapeHtml(t("event.loading"))}</div>`;
@@ -571,29 +499,6 @@ if (window.__PCV_INIT_DONE__) {
     const wrap = document.createElement("div");
     renderEventList(wrap, [eventData], votesMap, resultsMap, "", false);
     detailCard.appendChild(wrap.firstElementChild || wrap);
-  }
-
-  async function loadCountryTop(events) {
-    const target = document.getElementById("countryTop");
-    if (!events?.length) {
-      target.textContent = t("event.topEmpty");
-      return;
-    }
-
-    const ids = events.map(e => e.id);
-    const { data, error } = await fetchCountryTopEvent(supabaseClient, ids);
-
-    if (error || !data?.length) {
-      target.textContent = t("event.topEmpty");
-      return;
-    }
-
-    const top = data[0];
-    const event = events.find(e => e.id === top.event_id);
-    target.innerHTML = `
-      <div class="eventTitle">${escapeHtml(event?.title || t("event.title"))}</div>
-      <div class="muted">${t("event.votersTotal", { count: top.votes || 0 })}</div>
-    `;
   }
 
   async function loadContinentsAndCountries() {
