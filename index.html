@@ -4,72 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>People Can Vote</title>
-<style>
-  :root { --muted:#555; --border:#e6e6e6; --bg:#fff; }
-  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: var(--bg); }
-  main { padding: 20px 24px 64px; max-width: 1100px; margin: 0 auto; }
-  h1 { margin: 12px 0 12px; }
-  #boot { position: fixed; bottom: 10px; left: 10px; font-size: 12px; color: var(--muted);
-          background: rgba(255,255,255,0.92); padding: 6px 8px; border-radius: 10px; border: 1px solid var(--border); }
-  .row { display:flex; gap: 12px; align-items:center; flex-wrap:wrap; }
-  .card { border: 1px solid var(--border); border-radius: 14px; padding: 12px; margin: 12px 0; background:#fff; }
-  .muted { color: var(--muted); }
-  .hidden { display:none !important; }
-  select, button, input { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: white; }
-  input { min-width: 260px; }
-  button { cursor: pointer; }
-  button.primary { font-weight: 800; }
-  button.ghost { background: transparent; }
-  button.link { border: none; background: transparent; padding: 0; text-decoration: underline; color: inherit; cursor: pointer; }
-  button[disabled] { opacity: 0.55; cursor: not-allowed; }
-  .list { display:flex; flex-direction:column; gap: 10px; }
-  .eventTitle { font-weight:900; margin-bottom:4px; }
-  .pill { display:inline-block; padding:2px 8px; border:1px solid var(--border); border-radius:999px; font-size:12px; color:#333; margin-left:6px; }
-  .top3grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+<link rel="stylesheet" href="styles/main.css">
+<link rel="icon" href="data:,">
+<script>
+  // Optional runtime config injected by hosting (do not commit secrets here).
+  window.__PCV_CONFIG__ = window.__PCV_CONFIG__ || {};
+</script>
 
-  /* navbar */
-  .nav {
-    position: sticky; top: 0; z-index: 10;
-    border-bottom: 1px solid var(--border);
-    background: rgba(255,255,255,0.95);
-    backdrop-filter: blur(8px);
-  }
-  .navInner { max-width: 1100px; margin: 0 auto; padding: 10px 24px; display:flex; justify-content:space-between; align-items:center; gap: 12px; }
-  .brand { font-weight: 900; letter-spacing: 0.2px; }
-  .navRight { display:flex; align-items:center; gap: 8px; flex-wrap: wrap; justify-content:flex-end; }
-  .small { font-size: 12px; }
-
-  /* modal */
-  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display:none; align-items:center; justify-content:center; z-index: 50; }
-  .overlay.open { display:flex; }
-  .modal { width: min(540px, calc(100vw - 32px)); background:#fff; border-radius: 16px; border:1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.18); }
-  .modalHeader { display:flex; justify-content:space-between; align-items:center; padding: 12px 14px; border-bottom:1px solid var(--border); }
-  .modalTitle { font-weight: 900; }
-  .modalBody { padding: 14px; }
-  .field { display:flex; flex-direction:column; gap:6px; margin-bottom: 12px; }
-  .actions { display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
-  .actionsRight { display:flex; gap:10px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
-  .tabs { display:flex; gap:8px; flex-wrap:wrap; }
-  .tab { border:1px solid var(--border); border-radius: 999px; padding: 6px 10px; cursor:pointer; background:#fff; }
-  .tab.active { font-weight: 800; }
-  .msg { margin-top: 10px; }
-
-  /* Voting answers + result blocks */
-  .answers { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
-  .answers button { font-weight:800; }
-  .resultsWrap { margin-top: 12px; display:flex; flex-direction:column; gap:10px; }
-  .resultBlock { border:1px solid var(--border); border-radius: 14px; padding:10px; background:#fff; }
-  .resultBlock.large { padding:12px; }
-  .resultBlock.medium { padding:10px; opacity:0.98; transform: scale(0.985); transform-origin: left top; }
-  .resultBlock.small { padding:9px; opacity:0.96; transform: scale(0.97); transform-origin: left top; }
-  .resultTitle { font-weight:900; margin-bottom:8px; }
-  .rowBar { display:grid; grid-template-columns: 58px 1fr 62px; gap:10px; align-items:center; margin:6px 0; }
-  .bar { height:10px; border:1px solid var(--border); border-radius:999px; overflow:hidden; background:#fafafa; }
-  .barFill { height:100%; width:0%; background:#111; }
-  .pct { text-align:right; font-variant-numeric: tabular-nums; }
-  .countLine { margin-top:6px; font-size:12px; color: var(--muted); }
-
-</style>
 </head>
 <body>
 
@@ -77,55 +19,110 @@
   <div class="navInner">
     <div class="row" style="gap:10px;">
       <span class="brand">People Can Vote</span>
-      <button id="homeBtn" class="ghost">Domů</button>
     </div>
     <div class="navRight">
-      <span id="navUser" class="muted small">Načítání…</span>
-      <button id="loginNavBtn">Přihlásit</button>
-      <button id="registerNavBtn">Registrovat</button>
-      <button id="changePassNavBtn" class="hidden">Změnit heslo</button>
-      <button id="logoutNavBtn" class="hidden">Odhlásit</button>
+      <div class="searchWrap">
+        <input id="globalSearch" class="searchInput" type="search" data-i18n-placeholder="nav.searchPlaceholder" placeholder="Hledat zemi nebo událost">
+        <datalist id="searchOptions"></datalist>
+      </div>
+      <div class="navStatus">
+        <span id="navUser" class="muted small" data-i18n="nav.loading">Načítání…</span>
+        <span id="navHint" class="navHint"></span>
+      </div>
+      <button id="loginNavBtn" data-i18n="nav.login">Přihlásit</button>
+      <button id="registerNavBtn" data-i18n="nav.register">Registrovat</button>
+      <button id="changePassNavBtn" class="hidden" data-i18n="nav.changePassword">Změnit heslo</button>
+      <button id="logoutNavBtn" class="hidden" data-i18n="nav.logout">Odhlásit</button>
+      <label class="small muted" for="languageSelect">🌐</label>
+      <select id="languageSelect" class="langSelect" aria-label="Language">
+        <option value="cs">Čeština</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="subnav">
+  <div class="subnavInner">
+    <div id="breadcrumb" class="breadcrumb"></div>
+    <div id="continentTabs" class="continentTabs"></div>
+    <div id="countryPopover" class="countryPopover">
+      <div id="countryList" class="countryList"></div>
     </div>
   </div>
 </div>
 
 <main>
-  <h1>Hlasování a statistiky</h1>
-
-  <div class="card" id="authCard">
-    <div id="authStatus" class="muted">Načítání uživatele…</div>
-    <div id="voteGateMsg" class="muted" style="margin-top:8px;"></div>
-  </div>
-
-  <div class="card" id="homeCard">
-    <div class="row">
-      <label for="continentSel"><b>Kontinent</b></label>
-      <select id="continentSel"></select>
-
-      <label for="countrySel"><b>Země</b></label>
-      <select id="countrySel"></select>
-
-      <button id="refreshEventsBtn">Obnovit události</button>
+  <section id="homeView" class="view active">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <b class="top3Title" data-i18n="home.top3Title">TOP 3 události (nejvíc hlasujících)</b>
+        <button id="refreshTop3Btn" data-i18n="home.refresh">Obnovit</button>
+      </div>
+      <div id="top3" class="top3grid" style="margin-top:10px;"></div>
     </div>
-    <div class="muted" style="margin-top:8px;">
-      Statistiky jsou veřejné. Hlasovat může jen přihlášený a ověřený uživatel.
-    </div>
-  </div>
 
-  <div class="card">
-    <div class="row" style="justify-content:space-between;">
-      <b>TOP 3 události (nejvíc hlasujících)</b>
-      <button id="refreshTop3Btn">Obnovit</button>
-    </div>
-    <div id="top3" class="top3grid" style="margin-top:10px;"></div>
-  </div>
+    <h1 id="homeTitle" data-i18n="home.chooseCountry">Vyber zemi</h1>
 
-  <div class="card">
-    <div class="row" style="justify-content:space-between;">
-      <b>Události v zemi</b>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <b data-i18n="home.mapTitle">Interaktivní mapa světa</b>
+      </div>
+      <div id="worldMap" style="margin-top:10px;"></div>
+      <div class="mapNote" data-i18n="home.mapNote">Klikni na zemi a zobraz její události.</div>
     </div>
-    <div id="events" class="list" style="margin-top:10px;"></div>
-  </div>
+  </section>
+
+  <section id="countryView" class="view">
+    <div class="eventDetailHeader">
+      <div>
+        <h1 id="countryTitle" data-i18n="country.title">Země</h1>
+        <div id="countrySubtitle" class="muted" data-i18n="country.subtitle">Výběr země podle kontinentu</div>
+      </div>
+      <button id="backToHomeBtn" class="backBtn" type="button" data-i18n="country.backHome">Zpět na úvod</button>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <b data-i18n="country.topEvent">TOP událost v zemi</b>
+      </div>
+      <div id="countryTop" class="muted" style="margin-top:10px;" data-i18n="common.loading">Načítání…</div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <b data-i18n="country.activeEvents">Aktivní události</b>
+      </div>
+      <div id="eventsActive" class="list" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <b data-i18n="country.archive">Archiv / ukončené hlasování</b>
+      </div>
+      <div id="eventsArchive" class="list" style="margin-top:10px;"></div>
+    </div>
+  </section>
+
+  <section id="eventView" class="view">
+    <div class="eventDetailHeader">
+      <div>
+        <h1 id="eventTitle" data-i18n="event.title">Událost</h1>
+        <div id="eventMeta" class="muted"></div>
+      </div>
+      <div class="eventHeaderRight">
+        <div class="row" style="gap:8px;">
+          <span id="eventStatus" class="eventStatus" data-i18n="event.active">Aktivní</span>
+          <button id="backToCountryBtn" class="backBtn" type="button" data-i18n="event.backToCountry">Zpět na zemi</button>
+        </div>
+      </div>
+    </div>
+    <div class="eventCountryRow">
+      <div id="eventCountryHeader" class="eventCountryHeader muted"></div>
+    </div>
+
+    <div id="eventDetailCard" class="card"></div>
+  </section>
 </main>
 
 <!-- AUTH MODAL -->
@@ -133,38 +130,38 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modalHeader">
       <div class="row" style="gap:10px;">
-        <div id="modalTitle" class="modalTitle">Účet</div>
+        <div id="modalTitle" class="modalTitle" data-i18n="modal.title">Účet</div>
         <div class="tabs">
-          <button id="tabLogin" class="tab active" type="button">Přihlášení</button>
-          <button id="tabRegister" class="tab" type="button">Registrace</button>
-          <button id="tabUpdate" class="tab hidden" type="button">Nové heslo</button>
+          <button id="tabLogin" class="tab active" type="button" data-i18n="modal.loginTab">Přihlášení</button>
+          <button id="tabRegister" class="tab" type="button" data-i18n="modal.registerTab">Registrace</button>
+          <button id="tabUpdate" class="tab hidden" type="button" data-i18n="modal.updateTab">Nové heslo</button>
         </div>
       </div>
-      <button id="closeModalBtn" class="ghost" type="button" aria-label="Zavřít">✕</button>
+      <button id="closeModalBtn" class="ghost" type="button" data-i18n-aria-label="modal.close" aria-label="Zavřít">✕</button>
     </div>
     <div class="modalBody">
       <div class="field" id="emailField">
-        <label for="authEmail"><b>Email</b></label>
-        <input id="authEmail" type="email" autocomplete="email" placeholder="email@domena.cz">
+        <label for="authEmail"><b data-i18n="modal.email">Email</b></label>
+        <input id="authEmail" type="email" autocomplete="email" data-i18n-placeholder="modal.emailPlaceholder" placeholder="email@domena.cz">
       </div>
 
       <div class="field" id="passwordField">
-        <label for="authPassword"><b>Heslo</b></label>
-        <input id="authPassword" type="password" autocomplete="current-password" placeholder="••••••••">
-        <div class="muted small">Doporučeno aspoň 8 znaků.</div>
+        <label for="authPassword"><b data-i18n="modal.password">Heslo</b></label>
+        <input id="authPassword" type="password" autocomplete="current-password" data-i18n-placeholder="modal.passwordPlaceholder" placeholder="••••••••">
+        <div class="muted small" data-i18n="modal.passwordHint">Doporučeno aspoň 8 znaků.</div>
       </div>
 
       <div class="field hidden" id="password2Field">
-        <label for="authPassword2"><b>Heslo znovu</b></label>
-        <input id="authPassword2" type="password" autocomplete="new-password" placeholder="••••••••">
+        <label for="authPassword2"><b data-i18n="modal.passwordAgain">Heslo znovu</b></label>
+        <input id="authPassword2" type="password" autocomplete="new-password" data-i18n-placeholder="modal.passwordPlaceholder" placeholder="••••••••">
       </div>
 
       <div class="actions">
         <div id="forgotWrap">
-          <button id="forgotBtn" class="link" type="button">Zapomenuté heslo</button>
+          <button id="forgotBtn" class="link" type="button" data-i18n="modal.forgot">Zapomenuté heslo</button>
         </div>
         <div class="actionsRight">
-          <button id="submitAuthBtn" class="primary" type="button">Přihlásit</button>
+          <button id="submitAuthBtn" class="primary" type="button" data-i18n="modal.login">Přihlásit</button>
         </div>
       </div>
 
@@ -175,650 +172,7 @@
 
 <div id="boot">Booting…</div>
 
-<script>
-if (window.__PCV_INIT_DONE__) {
-  console.warn("PCV: duplicate init prevented");
-} else {
-  window.__PCV_INIT_DONE__ = true;
+<script type="module" src="./js/entrypoint.js?v=20260220f"></script>
 
-  function boot(msg) {
-    const el = document.getElementById("boot");
-    if (el) el.textContent = msg;
-    console.log(msg);
-  }
-
-  async function loadSupabase() {
-    boot("Init: loading Supabase…");
-    return new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
-      s.async = true;
-      s.onload = () => resolve(window.supabase);
-      s.onerror = () => reject(new Error("Supabase load failed"));
-      document.head.appendChild(s);
-      setTimeout(() => reject(new Error("Supabase load timeout")), 12000);
-    });
-  }
-
-  const SUPABASE_URL = "https://jqoomnhpyuikbntnrukw.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h";
-  const APP_BASE_URL = "https://martinek-arch.github.io/People-can-a-Vote/";
-
-  let supabaseClient = null;
-  let session = null;
-  let isVerified = false;
-
-  /* ===== Modal state ===== */
-  // login | register | update
-  let authMode = "login";
-
-  const overlay = document.getElementById("overlay");
-  const tabLogin = document.getElementById("tabLogin");
-  const tabRegister = document.getElementById("tabRegister");
-  const tabUpdate = document.getElementById("tabUpdate");
-  const submitAuthBtn = document.getElementById("submitAuthBtn");
-  const authMsg = document.getElementById("authMsg");
-  const authEmail = document.getElementById("authEmail");
-  const authPassword = document.getElementById("authPassword");
-  const authPassword2 = document.getElementById("authPassword2");
-
-  const emailField = document.getElementById("emailField");
-  const passwordField = document.getElementById("passwordField");
-  const password2Field = document.getElementById("password2Field");
-  const forgotWrap = document.getElementById("forgotWrap");
-  const forgotBtn = document.getElementById("forgotBtn");
-
-  function openModal(mode) {
-    authMode = mode;
-    authMsg.textContent = "";
-    authPassword.value = "";
-    authPassword2.value = "";
-    setModeUI();
-    overlay.classList.add("open");
-    overlay.setAttribute("aria-hidden", "false");
-    setTimeout(() => {
-      if (!emailField.classList.contains("hidden")) authEmail.focus();
-      else authPassword.focus();
-    }, 0);
-  }
-  function closeModal() {
-    overlay.classList.remove("open");
-    overlay.setAttribute("aria-hidden", "true");
-    authMsg.textContent = "";
-  }
-  function setModeUI() {
-    // tabs
-    tabLogin.classList.toggle("active", authMode === "login");
-    tabRegister.classList.toggle("active", authMode === "register");
-    tabUpdate.classList.toggle("active", authMode === "update");
-
-    // show update tab only when relevant
-    const canShowUpdateTab = (authMode === "update");
-    tabUpdate.classList.toggle("hidden", !canShowUpdateTab);
-
-    if (authMode === "login") {
-      submitAuthBtn.textContent = "Přihlásit";
-      emailField.classList.remove("hidden");
-      passwordField.classList.remove("hidden");
-      password2Field.classList.add("hidden");
-      forgotWrap.classList.remove("hidden");
-      authPassword.setAttribute("autocomplete", "current-password");
-    } else if (authMode === "register") {
-      submitAuthBtn.textContent = "Registrovat";
-      emailField.classList.remove("hidden");
-      passwordField.classList.remove("hidden");
-      password2Field.classList.remove("hidden");
-      forgotWrap.classList.add("hidden");
-      authPassword.setAttribute("autocomplete", "new-password");
-      authPassword2.setAttribute("autocomplete", "new-password");
-    } else {
-      // update password (for logged-in "change password" OR recovery)
-      submitAuthBtn.textContent = "Nastavit nové heslo";
-      emailField.classList.add("hidden");
-      passwordField.classList.remove("hidden");
-      password2Field.classList.remove("hidden");
-      forgotWrap.classList.add("hidden");
-      authPassword.setAttribute("autocomplete", "new-password");
-      authPassword2.setAttribute("autocomplete", "new-password");
-    }
-  }
-
-  document.getElementById("closeModalBtn").onclick = closeModal;
-  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
-  window.addEventListener("keydown", (e) => { if (e.key === "Escape" && overlay.classList.contains("open")) closeModal(); });
-
-  tabLogin.onclick = () => { authMode = "login"; authMsg.textContent = ""; setModeUI(); };
-  tabRegister.onclick = () => { authMode = "register"; authMsg.textContent = ""; setModeUI(); };
-
-  async function runAuth() {
-    const email = (authEmail.value || "").trim();
-    const p1 = authPassword.value || "";
-    const p2 = authPassword2.value || "";
-
-    if (authMode !== "update") {
-      if (!email) { authMsg.textContent = "Zadej email."; return; }
-    }
-    if (p1.length < 8) { authMsg.textContent = "Heslo musí mít alespoň 8 znaků."; return; }
-    if (authMode !== "login") {
-      if (p1 !== p2) { authMsg.textContent = "Hesla se neshodují."; return; }
-    }
-
-    submitAuthBtn.disabled = true;
-    authMsg.textContent = authMode === "login" ? "Přihlašuji…" : (authMode === "register" ? "Registruji…" : "Nastavuji nové heslo…");
-    boot("Auth: working…");
-
-    try {
-      if (authMode === "login") {
-        const { error } = await supabaseClient.auth.signInWithPassword({ email, password: p1 });
-        if (error) throw error;
-        closeModal();
-        boot("Auth: signed in");
-        return;
-      }
-
-      if (authMode === "register") {
-        const { error } = await supabaseClient.auth.signUp({
-          email,
-          password: p1,
-          options: { emailRedirectTo: APP_BASE_URL + "#auth" }
-        });
-        if (error) throw error;
-        authMsg.textContent = "Registrace vytvořena. Zkontroluj email a potvrď adresu. Pak se přihlas heslem.";
-        boot("Auth: signUp ok");
-        return;
-      }
-
-      // update
-      const { error } = await supabaseClient.auth.updateUser({ password: p1 });
-      if (error) throw error;
-      authMsg.textContent = "Heslo změněno.";
-      boot("Auth: password updated");
-      setTimeout(() => { try { closeModal(); } catch(e){} }, 700);
-    } catch (err) {
-      console.error(err);
-      authMsg.textContent = (err && err.message) ? err.message : "Neznámá chyba";
-      boot("Auth: error");
-    } finally {
-      submitAuthBtn.disabled = false;
-    }
-  }
-
-  submitAuthBtn.onclick = runAuth;
-  authPassword.addEventListener("keydown", (e) => { if (e.key === "Enter") runAuth(); });
-  authPassword2.addEventListener("keydown", (e) => { if (e.key === "Enter") runAuth(); });
-
-  async function forgotPasswordFlow() {
-    const email = (authEmail.value || "").trim() || prompt("Zadej email pro reset hesla:");
-    if (!email) return;
-
-    forgotBtn.disabled = true;
-    authMsg.textContent = "Odesílám email pro reset hesla…";
-    boot("Auth: reset email…");
-
-    try {
-      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-        redirectTo: APP_BASE_URL + "#reset"
-      });
-      if (error) throw error;
-      authMsg.textContent = "Hotovo. Zkontroluj email, klikni na odkaz a nastav nové heslo.";
-      boot("Auth: reset sent");
-    } catch (err) {
-      console.error(err);
-      authMsg.textContent = (err && err.message) ? err.message : "Neznámá chyba";
-      boot("Auth: reset error");
-    } finally {
-      forgotBtn.disabled = false;
-    }
-  }
-  forgotBtn.onclick = forgotPasswordFlow;
-
-  /* ===== App auth UI ===== */
-  function disableVoteButtons(disabled) {
-    document.querySelectorAll("button[data-vote-btn='1']").forEach(b => { b.disabled = disabled; });
-  }
-
-  function setAuthUI() {
-    const authStatus = document.getElementById("authStatus");
-    const voteGateMsg = document.getElementById("voteGateMsg");
-    const navUser = document.getElementById("navUser");
-
-    const loginBtn = document.getElementById("loginNavBtn");
-    const registerBtn = document.getElementById("registerNavBtn");
-    const changeBtn = document.getElementById("changePassNavBtn");
-    const logoutBtn = document.getElementById("logoutNavBtn");
-
-    if (!session) {
-      isVerified = false;
-      authStatus.textContent = "Nepřihlášený uživatel";
-      voteGateMsg.textContent = "Hlasování je dostupné pouze pro přihlášené a ověřené uživatele.";
-      navUser.textContent = "Nepřihlášený";
-
-      loginBtn.classList.remove("hidden");
-      registerBtn.classList.remove("hidden");
-      changeBtn.classList.add("hidden");
-      logoutBtn.classList.add("hidden");
-
-      disableVoteButtons(true);
-      return;
-    }
-
-    isVerified = !!session.user?.email_confirmed_at;
-    const email = session.user?.email || "uživatel";
-
-    navUser.textContent = email + (isVerified ? " (ověřený)" : " (neověřený)");
-    authStatus.textContent = isVerified
-      ? "Přihlášený a ověřený uživatel"
-      : "Přihlášený, ale NEověřený uživatel";
-
-    voteGateMsg.textContent = isVerified
-      ? ""
-      : "Prosím potvrď email (odkaz v emailu) – bez ověření nejde hlasovat.";
-
-    loginBtn.classList.add("hidden");
-    registerBtn.classList.add("hidden");
-    changeBtn.classList.remove("hidden");
-    logoutBtn.classList.remove("hidden");
-
-    disableVoteButtons(!isVerified);
-  }
-
-  function canVote() { return !!session && !!isVerified; }
-
-  async function signOut() {
-    boot("Auth: signing out…");
-    await supabaseClient.auth.signOut();
-    boot("Auth: signed out");
-  }
-
-  /* ===== Data rendering ===== */
-  function escapeHtml(s) {
-    return String(s ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
-
-
-  function pct(n, d) {
-    if (!d || d <= 0) return 0;
-    return Math.round((n / d) * 100);
-  }
-  function setBar(el, valuePct) {
-    const v = Math.max(0, Math.min(100, Number(valuePct) || 0));
-    if (el) el.style.width = v + "%";
-  }
-  function renderResultBlock(title, r, sizeClass) {
-    const yes = r?.yes || 0, no = r?.no || 0, dk = r?.dk || 0, total = r?.total || 0;
-    const wrap = document.createElement("div");
-    wrap.className = "resultBlock " + (sizeClass || "large");
-    wrap.innerHTML = `
-      <div class="resultTitle">${escapeHtml(title)}</div>
-
-      <div class="rowBar">
-        <div><b>Ano</b></div>
-        <div class="bar"><div class="barFill" data-k="yes"></div></div>
-        <div class="pct">${pct(yes,total)}%</div>
-      </div>
-      <div class="rowBar">
-        <div><b>Ne</b></div>
-        <div class="bar"><div class="barFill" data-k="no"></div></div>
-        <div class="pct">${pct(no,total)}%</div>
-      </div>
-      <div class="rowBar">
-        <div><b>Nevím</b></div>
-        <div class="bar"><div class="barFill" data-k="dk"></div></div>
-        <div class="pct">${pct(dk,total)}%</div>
-      </div>
-
-      <div class="countLine">Hlasů celkem: <b>${total}</b> (Ano: ${yes}, Ne: ${no}, Nevím: ${dk})</div>
-    `;
-    setBar(wrap.querySelector('[data-k="yes"]'), pct(yes,total));
-    setBar(wrap.querySelector('[data-k="no"]'),  pct(no,total));
-    setBar(wrap.querySelector('[data-k="dk"]'),  pct(dk,total));
-    return wrap;
-  }
-
-
-  function renderTop3(items) {
-    const top3 = document.getElementById("top3");
-    top3.innerHTML = "";
-    if (!items?.length) {
-      top3.innerHTML = "<div class='muted'>Zatím žádná data pro TOP 3.</div>";
-      return;
-    }
-    for (const it of items) {
-      const div = document.createElement("div");
-      div.className = "card";
-      div.innerHTML = `
-        <div class="eventTitle">${escapeHtml(it.title || "Untitled")}</div>
-        <div class="muted">${escapeHtml(it.country_code || "")}</div>
-        <div style="margin-top:6px;"><span class="pill">hlasujících: ${it.votes ?? 0}</span></div>
-      `;
-      top3.appendChild(div);
-    }
-  }
-
-  async function loadTop3() {
-    boot("Data: loading TOP3…");
-    const { data, error } = await supabaseClient
-      .from("event_vote_counts")
-      .select("event_id,votes,events(title,country_code,is_active)")
-      .order("votes", { ascending: false })
-      .limit(3);
-
-    if (error) throw new Error("TOP3 load failed: " + error.message);
-
-    const normalized = (data || [])
-      .map(r => ({
-        event_id: r.event_id,
-        votes: r.votes,
-        title: r.events?.title,
-        country_code: r.events?.country_code,
-        is_active: r.events?.is_active
-      }))
-      .filter(x => x.is_active !== false);
-
-    renderTop3(normalized);
-    boot("Data: TOP3 ready");
-  }
-
-  function renderEvents(items, votesMap, resultsMap) {
-    const events = document.getElementById("events");
-    events.innerHTML = "";
-    if (!items?.length) {
-      events.innerHTML = "<div class='muted'>V této zemi zatím nejsou žádné aktivní události.</div>";
-      return;
-    }
-
-    for (const e of items) {
-      const hasVoted = votesMap && votesMap.has(e.id);
-
-      const div = document.createElement("div");
-      div.className = "card";
-
-      const ended = e.ends_at ? (new Date(e.ends_at).getTime() < Date.now()) : false;
-      const statusPill = ended ? "<span class='pill'>ukončeno</span>" : "<span class='pill'>aktivní</span>";
-      const votedPill = hasVoted ? "<span class='pill'>už jste hlasoval</span>" : "";
-
-      div.innerHTML = `
-        <div class="eventTitle">${escapeHtml(e.title || "Untitled")} ${statusPill} ${votedPill}</div>
-        <div class="muted">${escapeHtml(e.description || "")}</div>
-        <div class="muted" style="margin-top:6px;">Země: ${escapeHtml(e.country_code || "")}</div>
-      `;
-
-      // Answers
-      const answers = document.createElement("div");
-      answers.className = "answers";
-
-      function mkAnswer(label, choice) {
-        const b = document.createElement("button");
-        b.textContent = label;
-        b.className = "primary";
-        b.disabled = ended || !canVote() || hasVoted;
-
-        b.onclick = async () => {
-          if (!canVote()) {
-            alert("Hlasování je dostupné jen pro přihlášené a ověřené uživatele.");
-            return;
-          }
-          if (ended) {
-            alert("Tato událost už je ukončená.");
-            return;
-          }
-          if (hasVoted) {
-            alert("Už jste pro tuto událost hlasoval.");
-            return;
-          }
-
-          boot("Vote: submitting…");
-          const payload = { event_id: e.id, user_id: session.user.id, choice };
-          const { error } = await supabaseClient.from("votes").insert(payload);
-
-          if (error) {
-            // Duplicate vote (unique constraint) -> show friendly message
-            if (error.code === "23505") {
-              alert("Už jste pro tuto událost hlasoval.");
-            } else {
-              alert("Hlasování se nepodařilo: " + error.message);
-            }
-            boot("Vote: error");
-            return;
-          }
-
-          alert("Díky! Hlas byl uložen.");
-          boot("Vote: OK");
-
-          // Refresh events + TOP3 so results update immediately
-          await loadEventsForCountry(e.country_code);
-          await loadTop3();
-        };
-
-        return b;
-      }
-
-      answers.appendChild(mkAnswer("Ano", "yes"));
-      answers.appendChild(mkAnswer("Ne", "no"));
-      answers.appendChild(mkAnswer("Nevím", "dont_know"));
-      div.appendChild(answers);
-
-      // Results (public)
-      const resWrap = document.createElement("div");
-      resWrap.className = "resultsWrap";
-
-      const r = resultsMap && resultsMap.has(e.id) ? resultsMap.get(e.id) : null;
-      if (r) {
-        resWrap.appendChild(renderResultBlock("Celkem (všichni)", { yes: r.yes_total, no: r.no_total, dk: r.dk_total, total: r.votes_total }, "large"));
-        resWrap.appendChild(renderResultBlock("Občané cílové země", { yes: r.yes_dom, no: r.no_dom, dk: r.dk_dom, total: r.votes_dom_total }, "medium"));
-        resWrap.appendChild(renderResultBlock("Ostatní země", { yes: r.yes_for, no: r.no_for, dk: r.dk_for, total: r.votes_for_total }, "small"));
-      } else {
-        resWrap.innerHTML = "<div class='muted'>Výsledky se načítají…</div>";
-      }
-
-      div.appendChild(resWrap);
-      events.appendChild(div);
-    }
-  }
-
-
-
-  async function loadEventsForCountry(countryCode) {
-    if (!countryCode) return;
-    boot("Data: loading events…");
-    const { data, error } = await supabaseClient
-      .from("events")
-      .select("id,title,description,country_code,is_active,is_top,ends_at,created_at")
-      .eq("country_code", countryCode)
-      .eq("is_active", true)
-      .order("created_at", { ascending: false });
-
-    
-if (error) throw new Error("Events load failed: " + error.message);
-
-    const events = data || [];
-    const ids = events.map(x => x.id);
-
-    // My votes (for disabling buttons) - only when logged in
-    let votesMap = new Map();
-    if (session?.user?.id && ids.length) {
-      try {
-        const { data: myVotes, error: vErr } = await supabaseClient
-          .from("votes")
-          .select("event_id")
-          .eq("user_id", session.user.id)
-          .in("event_id", ids);
-
-        if (!vErr && myVotes) {
-          votesMap = new Map(myVotes.map(v => [v.event_id, true]));
-        }
-      } catch (e) {
-        console.warn("Votes lookup failed", e);
-      }
-    }
-
-    // Public results (visible to everyone) via RPC
-    let resultsMap = new Map();
-    if (ids.length) {
-      try {
-        const { data: rows, error: rErr } = await supabaseClient.rpc("get_event_results", { event_ids: ids });
-        if (!rErr && rows) {
-          resultsMap = new Map(rows.map(r => [r.event_id, r]));
-        } else if (rErr) {
-          console.warn("Results RPC error", rErr);
-        }
-      } catch (e) {
-        console.warn("Results lookup failed", e);
-      }
-    }
-
-    renderEvents(events, votesMap, resultsMap);
-renderEvents(data || []);
-    boot("Data: events ready");
-  }
-
-  async function loadContinentsAndCountries() {
-    boot("Init: loading continents/countries…");
-
-    const continentSel = document.getElementById("continentSel");
-    const countrySel = document.getElementById("countrySel");
-
-    const { data: continents, error: cErr } = await supabaseClient
-      .from("continents")
-      .select("id,name,code")
-      .order("id", { ascending: true });
-
-    if (cErr) throw new Error("Continents load failed: " + cErr.message);
-
-    continentSel.innerHTML = "";
-    for (const c of continents) {
-      const opt = document.createElement("option");
-      opt.value = String(c.id);
-      opt.textContent = c.name;
-      continentSel.appendChild(opt);
-    }
-
-    async function fillCountries(continentId) {
-      countrySel.innerHTML = "";
-      const { data: countries, error: coErr } = await supabaseClient
-        .from("countries")
-        .select("code,name,continent_id")
-        .eq("continent_id", Number(continentId))
-        .order("name", { ascending: true });
-
-      if (coErr) throw new Error("Countries load failed: " + coErr.message);
-
-      for (const co of countries) {
-        const opt = document.createElement("option");
-        opt.value = co.code;
-        opt.textContent = co.name + " (" + co.code + ")";
-        countrySel.appendChild(opt);
-      }
-    }
-
-    continentSel.onchange = async () => {
-      await fillCountries(continentSel.value);
-      if (countrySel.value) await loadEventsForCountry(countrySel.value);
-    };
-
-    countrySel.onchange = async () => {
-      if (countrySel.value) await loadEventsForCountry(countrySel.value);
-    };
-
-    const firstContinent = continentSel.value || (continents[0] ? String(continents[0].id) : "");
-    if (firstContinent) {
-      continentSel.value = firstContinent;
-      await fillCountries(firstContinent);
-      if (countrySel.value) await loadEventsForCountry(countrySel.value);
-    }
-
-    boot("Init: geo ready");
-  }
-
-  function goHome() {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    const continentSel = document.getElementById("continentSel");
-    if (continentSel?.options?.length) {
-      continentSel.selectedIndex = 0;
-      continentSel.dispatchEvent(new Event("change"));
-    }
-    boot("UI: home");
-  }
-
-  function maybeOpenRecoveryModal() {
-    // If user comes back from reset email link, Supabase usually triggers PASSWORD_RECOVERY event.
-    // We also check hash for "type=recovery" or our "#reset" marker.
-    const h = window.location.hash || "";
-    const isRecoveryHint = h.includes("type=recovery") || h.includes("access_token") || h.includes("#reset");
-    if (isRecoveryHint) {
-      authMode = "update";
-      setModeUI();
-      openModal("update");
-      authMsg.textContent = "Nastav nové heslo (z reset odkazu).";
-    }
-  }
-
-  (async function init() {
-    try {
-      boot("Init: JS running");
-      const supabaseLib = await loadSupabase();
-
-      supabaseClient = supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true
-        }
-      });
-
-      boot("Init: Supabase ready");
-
-      // Navbar actions
-      document.getElementById("homeBtn").onclick = goHome;
-      document.getElementById("loginNavBtn").onclick = () => openModal("login");
-      document.getElementById("registerNavBtn").onclick = () => openModal("register");
-      document.getElementById("changePassNavBtn").onclick = () => openModal("update");
-      document.getElementById("logoutNavBtn").onclick = signOut;
-
-      // Refresh actions
-      document.getElementById("refreshTop3Btn").onclick = loadTop3;
-      document.getElementById("refreshEventsBtn").onclick = async () => {
-        const cc = document.getElementById("countrySel").value;
-        await loadEventsForCountry(cc);
-      };
-
-      // Session
-      const { data: sessData } = await supabaseClient.auth.getSession();
-      session = sessData?.session || null;
-      setAuthUI();
-
-      supabaseClient.auth.onAuthStateChange(async (event, newSession) => {
-        session = newSession;
-        setAuthUI();
-
-        if (event === "PASSWORD_RECOVERY") {
-          // open change password modal automatically
-          openModal("update");
-          authMsg.textContent = "Nastav nové heslo (reset).";
-        }
-
-        const cc = document.getElementById("countrySel").value;
-        if (cc) await loadEventsForCountry(cc);
-      });
-
-      await loadContinentsAndCountries();
-      await loadTop3();
-
-      // If user lands with recovery hash, open the update modal
-      maybeOpenRecoveryModal();
-
-      boot("Boot: ready");
-    } catch (err) {
-      boot("Startup error: " + err.message);
-      console.error(err);
-    }
-  })();
-}
-</script>
 </body>
 </html>
