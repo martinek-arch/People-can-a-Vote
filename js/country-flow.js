@@ -1,4 +1,4 @@
-import { fetchCountryStatsEvents, fetchCountryStatsVotes, fetchEventsByCountry, fetchEventResults, fetchUserVotesForEvents, fetchCountryTopEvent } from "./data-layer.js?v=20260220f";
+import { fetchCountryStatsEvents, fetchCountryStatsVotes, fetchEventsByCountry, fetchEventResults, fetchUserVotesForEvents, fetchCountryTopEvent } from "./data-layer.js?v=20260220g";
 
 export function createCountryFlow({
   t,

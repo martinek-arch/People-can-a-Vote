@@ -23,7 +23,7 @@ function resolveMapboxToken() {
 
 const resolvedMapbox = resolveMapboxToken();
 
-export const APP_BUILD_VERSION = "20260220f";
+export const APP_BUILD_VERSION = "20260220g";
 export const SUPABASE_URL = "https://jqoomnhpyuikbntnrukw.supabase.co";
 export const SUPABASE_ANON_KEY = "sb_publishable_SjZ_HQWN0XRE9ebbf_OwQg_kmJeS43h";
 export const APP_BASE_URL = "https://martinek-arch.github.io/People-can-a-Vote/";

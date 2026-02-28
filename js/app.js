@@ -1,13 +1,14 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN, MAPBOX_TOKEN_SOURCE, APP_BUILD_VERSION } from "./constants.js?v=20260220f";
-import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220f";
-import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220f";
-import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220f";
-import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220f";
-import { createAuthController } from "./auth.js?v=20260220f";
-import { createEventsUI } from "./events-ui.js?v=20260220f";
-import { createMapController } from "./map.js?v=20260220f";
-import { createCountryFlow } from "./country-flow.js?v=20260220f";
-import { fetchTop3Events, fetchUserVotesForEvents, fetchEventById, fetchEventResults, fetchContinents, fetchCountries, searchEvents, insertVote } from "./data-layer.js?v=20260220f";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN, MAPBOX_TOKEN_SOURCE, APP_BUILD_VERSION } from "./constants.js?v=20260220g";
+import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220g";
+import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220g";
+import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220g";
+import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220g";
+import { createAuthController } from "./auth.js?v=20260220g";
+import { createEventsUI } from "./events-ui.js?v=20260220g";
+import { createMapController } from "./map.js?v=20260220g";
+import { createCountryFlow } from "./country-flow.js?v=20260220g";
+import { createEventFlow } from "./event-flow.js?v=20260220g";
+import { fetchTop3Events, fetchUserVotesForEvents, fetchContinents, fetchCountries, searchEvents, insertVote } from "./data-layer.js?v=20260220g";
 
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");
@@ -143,6 +144,17 @@ if (window.__PCV_INIT_DONE__) {
   const loadCountryStats = (...args) => countryFlow.loadCountryStats(...args);
   const loadEventsForCountry = (...args) => countryFlow.loadEventsForCountry(...args);
   const loadCountryDetail = (...args) => countryFlow.loadCountryDetail(...args);
+  const eventFlow = createEventFlow({
+    t,
+    escapeHtml,
+    getSupabaseClient: () => supabaseClient,
+    getSession: () => session,
+    setCurrentEventTitle: (title) => { currentEventTitle = title; },
+    setCurrentEventId: (id) => { currentEventId = id; },
+    renderEventList,
+  });
+
+  const loadEventDetail = (...args) => eventFlow.loadEventDetail(...args);
 
   function setActiveView(viewId) {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
@@ -451,55 +463,6 @@ if (window.__PCV_INIT_DONE__) {
     );
   }
 
-
-  async function loadEventDetail(eventId) {
-    const detailCard = document.getElementById("eventDetailCard");
-    detailCard.innerHTML = `<div class='muted'>${escapeHtml(t("event.loading"))}</div>`;
-
-    const { data: eventData, error } = await fetchEventById(supabaseClient, eventId);
-
-    if (error || !eventData) {
-      detailCard.innerHTML = `<div class='muted'>${escapeHtml(t("event.loadFailed"))}</div>`;
-      return;
-    }
-
-    const { data: rows } = await fetchEventResults(supabaseClient, [eventId]);
-    const resultsMap = new Map((rows || []).map(r => [r.event_id, r]));
-
-    let votesMap = new Map();
-    if (session?.user?.id) {
-      const { data: myVotes } = await fetchUserVotesForEvents(supabaseClient, session.user.id, [eventId]);
-      if (myVotes?.length) {
-        votesMap.set(eventId, true);
-      }
-    }
-
-    const eventMeta = document.getElementById("eventMeta");
-    document.getElementById("eventTitle").textContent = eventData.title || t("event.title");
-    currentEventTitle = eventData.title || t("event.title");
-    currentEventId = eventId;
-    if (eventMeta) {
-      eventMeta.textContent = "";
-      eventMeta.classList.add("hidden");
-      eventMeta.classList.remove("eventQuestion");
-    }
-    const eventCountryHeader = document.getElementById("eventCountryHeader");
-    if (eventCountryHeader) {
-      eventCountryHeader.textContent = t("event.countryName", { code: eventData.country_code || "" });
-    }
-    const statusEl = document.getElementById("eventStatus");
-    const eventEndAt = typeof window.getEventEnd === "function" ? window.getEventEnd(eventData) : NaN;
-    const isClosed = eventData.is_active === false || (Number.isNaN(eventEndAt) ? false : eventEndAt < Date.now());
-    if (statusEl) {
-      statusEl.textContent = isClosed ? t("event.closed") : t("event.active");
-      statusEl.classList.toggle("active", !isClosed);
-      statusEl.classList.toggle("closed", isClosed);
-    }
-    detailCard.innerHTML = "";
-    const wrap = document.createElement("div");
-    renderEventList(wrap, [eventData], votesMap, resultsMap, "", false);
-    detailCard.appendChild(wrap.firstElementChild || wrap);
-  }
 
   async function loadContinentsAndCountries() {
     boot("Init: loading continents/countries…");
