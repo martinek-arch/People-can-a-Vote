@@ -1,4 +1,4 @@
-import { fetchEventById, fetchEventResults, fetchUserVotesForEvents } from "./data-layer.js?v=20260220g";
+import { fetchEventById, fetchEventResults, fetchUserVotesForEvents } from "./data-layer.js?v=20260220h";
 
 export function createEventFlow({
   t,

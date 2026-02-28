@@ -1,14 +1,15 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN, MAPBOX_TOKEN_SOURCE, APP_BUILD_VERSION } from "./constants.js?v=20260220g";
-import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220g";
-import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220g";
-import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220g";
-import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220g";
-import { createAuthController } from "./auth.js?v=20260220g";
-import { createEventsUI } from "./events-ui.js?v=20260220g";
-import { createMapController } from "./map.js?v=20260220g";
-import { createCountryFlow } from "./country-flow.js?v=20260220g";
-import { createEventFlow } from "./event-flow.js?v=20260220g";
-import { fetchTop3Events, fetchUserVotesForEvents, fetchContinents, fetchCountries, searchEvents, insertVote } from "./data-layer.js?v=20260220g";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN, MAPBOX_TOKEN_SOURCE, APP_BUILD_VERSION } from "./constants.js?v=20260220h";
+import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220h";
+import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220h";
+import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220h";
+import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220h";
+import { createAuthController } from "./auth.js?v=20260220h";
+import { createEventsUI } from "./events-ui.js?v=20260220h";
+import { createMapController } from "./map.js?v=20260220h";
+import { createCountryFlow } from "./country-flow.js?v=20260220h";
+import { createEventFlow } from "./event-flow.js?v=20260220h";
+import { createSearchFlow } from "./search-flow.js?v=20260220h";
+import { fetchTop3Events, fetchUserVotesForEvents, fetchContinents, fetchCountries, insertVote } from "./data-layer.js?v=20260220h";
 
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");
@@ -155,6 +156,19 @@ if (window.__PCV_INIT_DONE__) {
   });
 
   const loadEventDetail = (...args) => eventFlow.loadEventDetail(...args);
+
+  const searchFlow = createSearchFlow({
+    t,
+    getSupabaseClient: () => supabaseClient,
+    getCachedCountriesAll: () => cachedCountriesAll,
+    getSearchIndex: () => searchIndex,
+    setSearchIndex: (next) => { searchIndex = next; },
+    navigateCountry,
+    navigateEvent,
+    setCurrentCountry: (code) => { currentCountry = code; },
+  });
+
+  const rebuildSearchIndex = (...args) => searchFlow.rebuildSearchIndex(...args);
 
   function setActiveView(viewId) {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
@@ -542,72 +556,6 @@ if (window.__PCV_INIT_DONE__) {
     navigateHome();
   }
 
-  function rebuildSearchIndex() {
-    const list = document.getElementById("searchOptions");
-    list.innerHTML = "";
-    searchIndex = new Map();
-    for (const c of cachedCountriesAll) {
-      const label = t("search.countryLabel", { name: c.name, code: c.code });
-      const opt = document.createElement("option");
-      opt.value = label;
-      list.appendChild(opt);
-      searchIndex.set(label.toLowerCase(), { type: "country", code: c.code });
-    }
-  }
-
-  let searchTimer = null;
-  async function updateSearch(term) {
-    const list = document.getElementById("searchOptions");
-    const trimmed = (term || "").trim();
-    const normalized = trimmed.toLowerCase();
-    if (!trimmed || trimmed.length < 2) {
-      rebuildSearchIndex();
-      return;
-    }
-    if (searchIndex.has(normalized)) {
-      return;
-    }
-    if (searchTimer) clearTimeout(searchTimer);
-    searchTimer = setTimeout(async () => {
-      rebuildSearchIndex();
-      const { data, error } = await searchEvents(supabaseClient, trimmed, 8);
-      if (error || !data) return;
-      for (const ev of data) {
-        const label = t("search.eventLabel", { title: ev.title, code: ev.country_code || "??" });
-        const opt = document.createElement("option");
-        opt.value = label;
-        list.appendChild(opt);
-        searchIndex.set(label.toLowerCase(), { type: "event", id: ev.id, country: ev.country_code });
-      }
-    }, 250);
-  }
-
-  function handleSearchSubmit() {
-    const input = document.getElementById("globalSearch");
-    const value = (input.value || "").trim();
-    const normalized = value.toLowerCase();
-    if (!value) return;
-    let hit = searchIndex.get(normalized);
-    if (!hit) {
-      for (const [key, entry] of searchIndex.entries()) {
-        if (key.includes(normalized)) {
-          hit = entry;
-          break;
-        }
-      }
-    }
-    if (hit?.type === "country") {
-      navigateCountry(hit.code);
-      return;
-    }
-    if (hit?.type === "event") {
-      if (hit.country) {
-        currentCountry = hit.country;
-      }
-      navigateEvent(hit.id);
-      return;
-    }
-  }
 
   (async function init() {
     try {
@@ -652,15 +600,7 @@ if (window.__PCV_INIT_DONE__) {
 
       // Refresh actions
       document.getElementById("refreshTop3Btn").onclick = loadTop3;
-      const globalSearch = document.getElementById("globalSearch");
-      globalSearch.setAttribute("list", "searchOptions");
-      globalSearch.addEventListener("input", (e) => updateSearch(e.target.value));
-      globalSearch.addEventListener("change", handleSearchSubmit);
-      globalSearch.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          handleSearchSubmit();
-        }
-      });
+      searchFlow.bindSearchUI();
       document.addEventListener("click", (event) => {
         const popover = document.getElementById("countryPopover");
         const tabs = document.getElementById("continentTabs");
