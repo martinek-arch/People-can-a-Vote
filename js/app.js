@@ -1,16 +1,17 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN, MAPBOX_TOKEN_SOURCE, APP_BUILD_VERSION } from "./constants.js?v=20260220i";
-import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220i";
-import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220i";
-import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220i";
-import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220i";
-import { createAuthController } from "./auth.js?v=20260220i";
-import { createEventsUI } from "./events-ui.js?v=20260220i";
-import { createMapController } from "./map.js?v=20260220i";
-import { createCountryFlow } from "./country-flow.js?v=20260220i";
-import { createEventFlow } from "./event-flow.js?v=20260220i";
-import { createSearchFlow } from "./search-flow.js?v=20260220i";
-import { fetchTop3Events, fetchUserVotesForEvents, fetchContinents, fetchCountries, insertVote } from "./data-layer.js?v=20260220i";
-import { bindNavbarActions, bindGlobalUIActions } from "./ui-init.js?v=20260220i";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN, MAPBOX_TOKEN_SOURCE, APP_BUILD_VERSION } from "./constants.js?v=20260220j";
+import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220j";
+import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220j";
+import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220j";
+import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220j";
+import { createAuthController } from "./auth.js?v=20260220j";
+import { createEventsUI } from "./events-ui.js?v=20260220j";
+import { createMapController } from "./map.js?v=20260220j";
+import { createCountryFlow } from "./country-flow.js?v=20260220j";
+import { createEventFlow } from "./event-flow.js?v=20260220j";
+import { createSearchFlow } from "./search-flow.js?v=20260220j";
+import { fetchTop3Events, fetchUserVotesForEvents, fetchContinents, fetchCountries, insertVote } from "./data-layer.js?v=20260220j";
+import { bindNavbarActions, bindGlobalUIActions } from "./ui-init.js?v=20260220j";
+import { initSessionFlow } from "./session-flow.js?v=20260220j";
 
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");
@@ -599,21 +600,15 @@ if (window.__PCV_INIT_DONE__) {
       bindGlobalUIActions({ loadTop3, searchFlow });
 
       // Session
-      const { data: sessData } = await supabaseClient.auth.getSession();
-      session = sessData?.session || null;
-      setAuthUI();
-
-      supabaseClient.auth.onAuthStateChange(async (event, newSession) => {
-        session = newSession;
-        setAuthUI();
-
-        if (event === "PASSWORD_RECOVERY") {
-          // open change password modal automatically
-          openModal("update");
-          authController.setMessage(t("auth.resetMode"));
-        }
-
-        if (currentCountry) await loadEventsForCountry(currentCountry);
+      await initSessionFlow({
+        getSupabaseClient: () => supabaseClient,
+        setSession: (next) => { session = next; },
+        setAuthUI,
+        openModal,
+        authController,
+        t,
+        getCurrentCountry: () => currentCountry,
+        loadEventsForCountry,
       });
 
       await loadContinentsAndCountries();
