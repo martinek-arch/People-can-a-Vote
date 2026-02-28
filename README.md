@@ -15,3 +15,8 @@
 - Messages starting with `contentScript.js` or `runtime.lastError` usually come from browser extensions, not from this app code.
 
 - Debug panel (build/token-source/map renderer): set `localStorage.setItem("pcvDebug", "1")` and reload.
+
+## Smoke checks
+- Run repeatable browser smoke scenarios (Mapbox default + forced Leaflet fallback):
+  - `python3 scripts/smoke_checks.py --start-server`
+- The script enables debug mode (`pcvDebug=1`) and validates renderer state through the debug panel.
