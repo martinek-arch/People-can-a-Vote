@@ -1,15 +1,16 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN, MAPBOX_TOKEN_SOURCE, APP_BUILD_VERSION } from "./constants.js?v=20260220h";
-import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220h";
-import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220h";
-import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220h";
-import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220h";
-import { createAuthController } from "./auth.js?v=20260220h";
-import { createEventsUI } from "./events-ui.js?v=20260220h";
-import { createMapController } from "./map.js?v=20260220h";
-import { createCountryFlow } from "./country-flow.js?v=20260220h";
-import { createEventFlow } from "./event-flow.js?v=20260220h";
-import { createSearchFlow } from "./search-flow.js?v=20260220h";
-import { fetchTop3Events, fetchUserVotesForEvents, fetchContinents, fetchCountries, insertVote } from "./data-layer.js?v=20260220h";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, MAPBOX_TOKEN, MAPBOX_TOKEN_SOURCE, APP_BUILD_VERSION } from "./constants.js?v=20260220i";
+import { escapeHtml, pct, formatDate, formatRemainingTime, getEventEnd, setBar } from "./formatters.js?v=20260220i";
+import { t, applyStaticTranslations, initI18nSelector } from "./i18n.js?v=20260220i";
+import { createBoot, loadSupabaseLib, loadMapboxLib } from "./bootstrap.js?v=20260220i";
+import { setHomeHash, setCountryHash, setEventHash, parseHashRoute, hasRecoveryHint } from "./router.js?v=20260220i";
+import { createAuthController } from "./auth.js?v=20260220i";
+import { createEventsUI } from "./events-ui.js?v=20260220i";
+import { createMapController } from "./map.js?v=20260220i";
+import { createCountryFlow } from "./country-flow.js?v=20260220i";
+import { createEventFlow } from "./event-flow.js?v=20260220i";
+import { createSearchFlow } from "./search-flow.js?v=20260220i";
+import { fetchTop3Events, fetchUserVotesForEvents, fetchContinents, fetchCountries, insertVote } from "./data-layer.js?v=20260220i";
+import { bindNavbarActions, bindGlobalUIActions } from "./ui-init.js?v=20260220i";
 
 if (window.__PCV_INIT_DONE__) {
   console.warn("PCV: duplicate init prevented");
@@ -573,18 +574,14 @@ if (window.__PCV_INIT_DONE__) {
       boot("Init: Supabase ready");
 
       // Navbar actions
-      document.getElementById("backToHomeBtn").onclick = goHome;
-      document.getElementById("backToCountryBtn").onclick = () => {
-        if (currentCountry) {
-          navigateCountry(currentCountry);
-        } else {
-          navigateHome();
-        }
-      };
-      document.getElementById("loginNavBtn").onclick = () => openModal("login");
-      document.getElementById("registerNavBtn").onclick = () => openModal("register");
-      document.getElementById("changePassNavBtn").onclick = () => openModal("update");
-      document.getElementById("logoutNavBtn").onclick = signOut;
+      bindNavbarActions({
+        goHome,
+        getCurrentCountry: () => currentCountry,
+        navigateCountry,
+        navigateHome,
+        openModal,
+        signOut,
+      });
 
       initI18nSelector(async () => {
         setModeUI();
@@ -598,19 +595,8 @@ if (window.__PCV_INIT_DONE__) {
         }
       });
 
-      // Refresh actions
-      document.getElementById("refreshTop3Btn").onclick = loadTop3;
-      searchFlow.bindSearchUI();
-      document.addEventListener("click", (event) => {
-        const popover = document.getElementById("countryPopover");
-        const tabs = document.getElementById("continentTabs");
-        if (!popover || !tabs) return;
-        if (!popover.classList.contains("open")) return;
-        const clickedInside = popover.contains(event.target) || tabs.contains(event.target);
-        if (!clickedInside) {
-          popover.classList.remove("open");
-        }
-      });
+      // Refresh and global UI actions
+      bindGlobalUIActions({ loadTop3, searchFlow });
 
       // Session
       const { data: sessData } = await supabaseClient.auth.getSession();
